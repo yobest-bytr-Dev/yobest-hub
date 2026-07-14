@@ -384,7 +384,7 @@ export default function GameDetail() {
                 {!ytStats && !ytLoading && game.video_url && (
                   <div className="pt-2 mt-2 border-t border-border-primary">
                     <span className="text-[11px] text-text-dim font-medium uppercase tracking-wider">YouTube Stats</span>
-                    <p className="text-[11px] text-text-muted mt-1">Could not load YouTube data</p>
+                    <p className="text-[11px] text-text-muted mt-1">Stats unavailable</p>
                   </div>
                 )}
               </div>
@@ -400,11 +400,7 @@ export default function GameDetail() {
               <div className="p-4">
                 {ytCommentsLoading ? (
                   <div className="flex items-center justify-center py-8"><Loader2 size={20} className="animate-spin text-red-400" /></div>
-                ) : ytComments.length === 0 ? (
-                  <p className="text-xs text-text-muted text-center py-4">
-                    {game.video_url ? 'No YouTube comments found' : 'No YouTube video linked'}
-                  </p>
-                ) : (
+                ) : ytComments.length > 0 ? (
                   <div className="space-y-3 max-h-[500px] overflow-y-auto">
                     {ytComments.map((c) => (
                       <div key={c.id} className="flex gap-2.5">
@@ -429,6 +425,24 @@ export default function GameDetail() {
                       </div>
                     ))}
                   </div>
+                ) : thumbId ? (
+                  <div className="space-y-3">
+                    <div className="aspect-video rounded-xl overflow-hidden bg-bg-tertiary border border-border-primary">
+                      <iframe
+                        src={`https://www.youtube.com/embed/${thumbId}?rel=0`}
+                        className="w-full h-full"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowFullScreen
+                        title={game.title}
+                      />
+                    </div>
+                    <a href={`https://www.youtube.com/watch?v=${thumbId}`} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-medium hover:bg-red-500/20 transition-colors">
+                      <ExternalLink size={14} /> View all comments on YouTube
+                    </a>
+                  </div>
+                ) : (
+                  <p className="text-xs text-text-muted text-center py-4">No YouTube video linked</p>
                 )}
               </div>
             </div>

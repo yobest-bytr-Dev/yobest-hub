@@ -475,7 +475,7 @@ export async function editGameComment(commentId: string, content: string) {
   if (!user) throw new Error('Not authenticated')
   const { error } = await supabase
     .from('game_comments')
-    .update({ content, edited_at: new Date().toISOString() })
+    .update({ content })
     .eq('id', commentId)
     .eq('user_id', user.id)
   if (error) throw error

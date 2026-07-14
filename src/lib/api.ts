@@ -470,6 +470,28 @@ export async function getGameComments(gameId: string) {
   }))
 }
 
+export async function editGameComment(commentId: string, content: string) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+  const { error } = await supabase
+    .from('game_comments')
+    .update({ content, edited_at: new Date().toISOString() })
+    .eq('id', commentId)
+    .eq('user_id', user.id)
+  if (error) throw error
+}
+
+export async function deleteGameComment(commentId: string) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+  const { error } = await supabase
+    .from('game_comments')
+    .delete()
+    .eq('id', commentId)
+    .eq('user_id', user.id)
+  if (error) throw error
+}
+
 // ── Asset Submission ──
 
 export async function submitAsset(submission: {

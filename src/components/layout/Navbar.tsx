@@ -5,6 +5,7 @@ import { useStore } from '@/store/useStore'
 import { getCurrentProfile, signOut } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import RobloxAvatar from '@/components/ui/RobloxAvatar'
+import NotificationBell from '@/components/ui/NotificationBell'
 
 const navLinks = [
   { to: '/games', label: 'Games', icon: Gamepad2 },
@@ -97,6 +98,7 @@ export default function Navbar() {
                     </div>
                   )}
                 </Link>
+                <NotificationBell />
                 <div className="w-px h-6 bg-border-primary mx-1" />
                 <Link to="/profile" className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl hover:bg-bg-elevated/70 transition-colors group">
                   <RobloxAvatar

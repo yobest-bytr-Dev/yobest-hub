@@ -1,9 +1,9 @@
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { ArrowLeft, Globe, Download, Play, ExternalLink, Eye, Heart, Share2, Copy, Check, MessageSquare, Calendar, User, Loader2, Lock, MessageCircle } from 'lucide-react'
+import { ArrowLeft, Globe, Download, Play, ExternalLink, Eye, Heart, Share2, Copy, Check, MessageSquare, Calendar, User, Loader2, Lock, MessageCircle, Pencil, Trash2 } from 'lucide-react'
 import { experiences } from '@/data/official-games'
-import { getApprovedCommunityGames, toggleGameLike, hasUserLikedGame, getGameLikeCount, addGameComment, getGameComments } from '@/lib/api'
+import { getApprovedCommunityGames, toggleGameLike, hasUserLikedGame, getGameLikeCount, addGameComment, getGameComments, editGameComment, deleteGameComment } from '@/lib/api'
 import type { Experience } from '@/lib/types'
 import { extractYoutubeId, formatNumber, getCategoryColor, cn } from '@/lib/utils'
 import { getYouTubeStats, getYouTubeComments, type YouTubeStats, type YouTubeComment } from '@/lib/youtube'
@@ -11,6 +11,8 @@ import { trackGameView, getGameViewCount, trackDownload } from '@/lib/analytics'
 import { useStore } from '@/store/useStore'
 import { toDirectImageUrl } from '@/lib/drive-upload'
 import RobloxAvatar from '@/components/ui/RobloxAvatar'
+import { useToast } from '@/components/ui/Toast'
+import { addNotification } from '@/lib/notifications'
 
 function LoginPrompt({ message, onLogin }: { message: string; onLogin: () => void }) {
   return (
@@ -44,6 +46,9 @@ export default function GameDetail() {
   const [siteViews, setSiteViews] = useState(0)
   const [ytComments, setYtComments] = useState<YouTubeComment[]>([])
   const [ytCommentsLoading, setYtCommentsLoading] = useState(false)
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
+  const [editCommentText, setEditCommentText] = useState('')
+  const { toast } = useToast()
 
   useEffect(() => {
     setLoading(true)
@@ -144,6 +149,7 @@ export default function GameDetail() {
       const newLiked = await toggleGameLike(game.id)
       setLiked(newLiked)
       setLikes((prev) => newLiked ? prev + 1 : prev - 1)
+      toast(newLiked ? 'Liked!' : 'Unliked', 'success')
     } catch {}
   }
 
@@ -157,10 +163,38 @@ export default function GameDetail() {
       setComment('')
       const updated = await getGameComments(game.id)
       setComments(updated)
+      addNotification({ type: 'comment', title: 'New comment', body: `You commented on ${game.title}`, link: `/games/${game.id}` })
+      toast('Comment posted!', 'success')
     } catch {
-      alert('Failed to post comment.')
+      toast('Failed to post comment', 'error')
     }
     setCommentLoading(false)
+  }
+
+  const handleEditComment = async (commentId: string) => {
+    if (!editCommentText.trim()) return
+    try {
+      await editGameComment(commentId, editCommentText.trim())
+      const updated = await getGameComments(game.id)
+      setComments(updated)
+      setEditingCommentId(null)
+      setEditCommentText('')
+      toast('Comment edited!', 'success')
+    } catch {
+      toast('Failed to edit comment', 'error')
+    }
+  }
+
+  const handleDeleteComment = async (commentId: string) => {
+    if (!confirm('Delete this comment?')) return
+    try {
+      await deleteGameComment(commentId)
+      const updated = await getGameComments(game.id)
+      setComments(updated)
+      toast('Comment deleted', 'success')
+    } catch {
+      toast('Failed to delete comment', 'error')
+    }
   }
 
   const timeAgo = (dateStr: string) => {
@@ -310,8 +344,42 @@ export default function GameDetail() {
                           <div className="flex items-center gap-2 mb-0.5">
                             <span className="text-xs font-semibold text-text-primary">{c.profile?.username || 'Unknown'}</span>
                             <span className="text-[10px] text-text-muted">{timeAgo(c.created_at)}</span>
+                            {c.edited_at && <span className="text-[10px] text-text-dim">(edited)</span>}
+                            {currentUser && currentUser.id === c.user_id && (
+                              <div className="flex items-center gap-1 ml-auto">
+                                <button
+                                  onClick={() => { setEditingCommentId(c.id); setEditCommentText(c.content) }}
+                                  className="p-1 rounded hover:bg-bg-tertiary text-text-dim hover:text-accent-blue transition-colors"
+                                  title="Edit"
+                                >
+                                  <Pencil size={11} />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteComment(c.id)}
+                                  className="p-1 rounded hover:bg-bg-tertiary text-text-dim hover:text-red-400 transition-colors"
+                                  title="Delete"
+                                >
+                                  <Trash2 size={11} />
+                                </button>
+                              </div>
+                            )}
                           </div>
-                          <p className="text-xs text-text-secondary leading-relaxed">{c.content}</p>
+                          {editingCommentId === c.id ? (
+                            <div className="flex gap-2 mt-1">
+                              <input
+                                type="text"
+                                value={editCommentText}
+                                onChange={(e) => setEditCommentText(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') handleEditComment(c.id); if (e.key === 'Escape') { setEditingCommentId(null); setEditCommentText('') } }}
+                                className="flex-1 px-3 py-1.5 rounded-lg bg-bg-elevated border border-accent-blue/50 text-text-primary text-xs focus:outline-none"
+                                autoFocus
+                              />
+                              <button onClick={() => handleEditComment(c.id)} className="px-3 py-1.5 rounded-lg bg-accent-blue text-white text-xs font-medium hover:bg-blue-600 transition-colors">Save</button>
+                              <button onClick={() => { setEditingCommentId(null); setEditCommentText('') }} className="px-3 py-1.5 rounded-lg bg-bg-elevated border border-border-primary text-text-secondary text-xs hover:text-text-primary transition-colors">Cancel</button>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-text-secondary leading-relaxed">{c.content}</p>
+                          )}
                         </div>
                       </div>
                     ))

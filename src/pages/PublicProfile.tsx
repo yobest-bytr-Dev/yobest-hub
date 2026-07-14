@@ -10,6 +10,8 @@ import { useStore } from '@/store/useStore'
 import { cn, formatNumber } from '@/lib/utils'
 import RobloxAvatar from '@/components/ui/RobloxAvatar'
 import type { UserProfile } from '@/lib/types'
+import { useToast } from '@/components/ui/Toast'
+import { addNotification } from '@/lib/notifications'
 
 export default function PublicProfile() {
   const { userId } = useParams<{ userId: string }>()
@@ -20,6 +22,7 @@ export default function PublicProfile() {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
+  const { toast } = useToast()
 
   useEffect(() => {
     if (!userId) return
@@ -144,7 +147,15 @@ export default function PublicProfile() {
                 {!isYou && (
                   <>
                     <button
-                      onClick={() => { if (!currentUser) { navigate('/auth'); return } toggleFollow(profile.id) }}
+                      onClick={() => {
+                        if (!currentUser) { navigate('/auth'); return }
+                        toggleFollow(profile.id)
+                        const nowFollowing = !isFollowing(profile.id)
+                        toast(nowFollowing ? `Following ${profile.username}` : `Unfollowed ${profile.username}`, 'success')
+                        if (nowFollowing) {
+                          addNotification({ type: 'follow', title: 'New follower', body: `You are now following ${profile.username}`, link: `/profile/${profile.id}` })
+                        }
+                      }}
                       className={cn(
                         'flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all',
                         following

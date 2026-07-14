@@ -8,6 +8,7 @@ import {
 import { useStore } from '@/store/useStore'
 import { supabase } from '@/config/supabase'
 import { cn, formatNumber } from '@/lib/utils'
+import { useToast } from '@/components/ui/Toast'
 import RobloxAvatar from '@/components/ui/RobloxAvatar'
 import type { UserProfile } from '@/lib/types'
 
@@ -16,6 +17,7 @@ export default function Creators() {
   const toggleFollow = useStore((s) => s.toggleFollow)
   const isFollowing = useStore((s) => s.isFollowing)
   const navigate = useNavigate()
+  const { toast } = useToast()
   const [search, setSearch] = useState('')
   const [profiles, setProfiles] = useState<UserProfile[]>([])
   const [loading, setLoading] = useState(true)
@@ -198,7 +200,11 @@ export default function Creators() {
                           <UserCheck size={13} /> View Profile
                         </button>
                         <button
-                          onClick={() => { if (!currentUser) { navigate('/auth'); return } toggleFollow(profile.id) }}
+                          onClick={() => {
+  if (!currentUser) { navigate('/auth'); return }
+  toggleFollow(profile.id)
+  toast(!isFollowing(profile.id) ? `Following ${profile.username}` : `Unfollowed ${profile.username}`, 'success')
+}}
                           className={cn(
                             'flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all',
                             following

@@ -1,4 +1,5 @@
 import { HashRouter, Routes, Route } from 'react-router-dom'
+import { ToastProvider } from '@/components/ui/Toast'
 import Layout from '@/components/layout/Layout'
 import Home from '@/pages/Home'
 import Games from '@/pages/Games'
@@ -19,28 +20,30 @@ import NotFound from '@/pages/NotFound'
 
 export default function App() {
   return (
-    <HashRouter>
-      <Routes>
-        <Route element={<Layout />}>
-          <Route path="/" element={<Home />} />
-          <Route path="/games" element={<Games />} />
-          <Route path="/games/:id" element={<GameDetail />} />
-          <Route path="/ai" element={<AI />} />
-          <Route path="/community" element={<Community />} />
-          <Route path="/marketplace" element={<Marketplace />} />
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/profile/:userId" element={<PublicProfile />} />
-          <Route path="/creators" element={<Creators />} />
-          <Route path="/messages" element={<Messages />} />
-          <Route path="/messages/:participantId" element={<Messages />} />
-          <Route path="/terms" element={<Terms />} />
-          <Route path="/privacy" element={<Privacy />} />
-          <Route path="/dmca" element={<DMCA />} />
-          <Route path="/contact" element={<Contact />} />
-          <Route path="*" element={<NotFound />} />
-        </Route>
-      </Routes>
-    </HashRouter>
+    <ToastProvider>
+      <HashRouter>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="/" element={<Home />} />
+            <Route path="/games" element={<Games />} />
+            <Route path="/games/:id" element={<GameDetail />} />
+            <Route path="/ai" element={<AI />} />
+            <Route path="/community" element={<Community />} />
+            <Route path="/marketplace" element={<Marketplace />} />
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/profile/:userId" element={<PublicProfile />} />
+            <Route path="/creators" element={<Creators />} />
+            <Route path="/messages" element={<Messages />} />
+            <Route path="/messages/:participantId" element={<Messages />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/dmca" element={<DMCA />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="*" element={<NotFound />} />
+          </Route>
+        </Routes>
+      </HashRouter>
+    </ToastProvider>
   )
 }

@@ -249,6 +249,7 @@ export async function submitGame(submission: {
   drive_file_url?: string
   gamepass_url?: string
   thumbnail_url?: string
+  price?: string
 }) {
   const user = await getCurrentUser()
   if (!user) throw new Error('Not authenticated')

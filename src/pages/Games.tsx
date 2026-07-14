@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, SlidersHorizontal, Play, Eye, X, ChevronDown, Plus, Loader2, Heart, MessageSquare, Calendar, ExternalLink } from 'lucide-react'
+import { Search, SlidersHorizontal, Play, Eye, X, ChevronDown, Plus, Loader2, Heart, MessageSquare, ExternalLink } from 'lucide-react'
 import { experiences } from '@/data/official-games'
 import { getApprovedCommunityGames, submitGame } from '@/lib/api'
 import { toDirectImageUrl } from '@/lib/drive-upload'

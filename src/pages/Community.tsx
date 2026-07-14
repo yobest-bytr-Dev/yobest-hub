@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Users, Trophy, Award, Target, Crown, Medal, TrendingUp, Gamepad2, Download, Heart, MessageSquare, Eye, Clock, Loader2, ExternalLink, ShoppingBag, Calendar } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { getPlatformStats, getLeaderboard, getChallenges, getApprovedCommunityGames, getAssets } from '@/lib/api'
 import { formatNumber, cn } from '@/lib/utils'
 import RobloxAvatar from '@/components/ui/RobloxAvatar'
@@ -125,7 +125,7 @@ export default function Community() {
                   <h2 className="text-xl font-bold text-text-primary mb-4">Recent Community Games</h2>
                   <div className="space-y-2">
                     {recentGames.map((game, i) => (
-                      <a key={game.id} onClick={(e) => { e.preventDefault(); navigate(`/games/${game.id}`) }}
+                      <Link key={game.id} to={`/games/${game.id}`}
                         className="flex items-center gap-3 p-3 rounded-xl bg-bg-secondary border border-border-primary hover:bg-bg-elevated/50 transition-colors group cursor-pointer">
                         <div className="w-7 text-center">
                           {i < 3 ? (
@@ -143,7 +143,7 @@ export default function Community() {
                         </div>
                         <span className="text-[10px] text-text-dim shrink-0">{game.created_at ? new Date(game.created_at).toLocaleDateString() : ''}</span>
                         <ExternalLink size={12} className="text-text-dim group-hover:text-accent-blue transition-colors shrink-0" />
-                      </a>
+                      </Link>
                     ))}
                   </div>
                 </div>
@@ -154,7 +154,7 @@ export default function Community() {
                   <h2 className="text-xl font-bold text-text-primary mb-4">Top Official Games</h2>
                   <div className="space-y-2">
                     {experiences.sort((a, b) => (b.views_count || 0) - (a.views_count || 0)).slice(0, 5).map((game, i) => (
-                      <a key={game.id} onClick={(e) => { e.preventDefault(); navigate(`/games/${game.id}`) }}
+                      <Link key={game.id} to={`/games/${game.id}`}
                         className="flex items-center gap-3 p-3 rounded-xl bg-bg-secondary border border-border-primary hover:bg-bg-elevated/50 transition-colors group cursor-pointer">
                         <div className="w-7 text-center">
                           {i < 3 ? (
@@ -175,7 +175,7 @@ export default function Community() {
                           <div className="flex items-center gap-1"><Heart size={11} />{formatNumber(game.likes_count || 0)}</div>
                         </div>
                         <ExternalLink size={12} className="text-text-dim group-hover:text-accent-blue transition-colors shrink-0" />
-                      </a>
+                      </Link>
                     ))}
                   </div>
                 </div>
@@ -198,7 +198,7 @@ export default function Community() {
                   ) : (
                     leaderboard.map((creator, i) => (
                       <div key={creator.id} className="flex items-center gap-3 px-5 py-3 hover:bg-bg-elevated/50 transition-colors cursor-pointer"
-                        onClick={() => navigate(`/user/${creator.id}`)}>
+                        onClick={() => navigate(`/profile/${creator.id}`)}>
                         <div className="w-7 text-center">
                           {i < 3 ? (
                             <div className={cn('w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold',

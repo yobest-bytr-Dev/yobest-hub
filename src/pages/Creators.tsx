@@ -192,7 +192,7 @@ export default function Creators() {
                     {!isYou && (
                       <div className="flex gap-2">
                         <button
-                          onClick={() => navigate(`/user/${profile.id}`)}
+                          onClick={() => navigate(`/profile/${profile.id}`)}
                           className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-semibold bg-bg-elevated border border-border-primary text-text-secondary hover:text-accent-blue hover:border-accent-blue/30 transition-all"
                         >
                           <UserCheck size={13} /> View Profile

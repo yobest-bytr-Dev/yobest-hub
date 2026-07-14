@@ -16,6 +16,8 @@ import Terms from '@/pages/legal/Terms'
 import Privacy from '@/pages/legal/Privacy'
 import DMCA from '@/pages/legal/DMCA'
 import Contact from '@/pages/legal/Contact'
+import Admin from '@/pages/Admin'
+import Dashboard from '@/pages/Dashboard'
 import NotFound from '@/pages/NotFound'
 
 export default function App() {
@@ -40,6 +42,8 @@ export default function App() {
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/dmca" element={<DMCA />} />
             <Route path="/contact" element={<Contact />} />
+            <Route path="/admin" element={<Admin />} />
+            <Route path="/dashboard" element={<Dashboard />} />
             <Route path="*" element={<NotFound />} />
           </Route>
         </Routes>

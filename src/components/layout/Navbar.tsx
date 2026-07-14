@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { Gamepad2, Brain, Users, ShoppingBag, Menu, X, LogIn, Zap, LogOut, MessageCircle, UserPlus } from 'lucide-react'
+import { Gamepad2, Brain, Users, ShoppingBag, Menu, X, LogIn, Zap, LogOut, MessageCircle, UserPlus, Shield, LayoutDashboard } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useStore } from '@/store/useStore'
 import { getCurrentProfile, signOut } from '@/lib/api'
@@ -99,6 +99,32 @@ export default function Navbar() {
                   )}
                 </Link>
                 <NotificationBell />
+                <Link
+                  to="/dashboard"
+                  className={cn(
+                    'p-2 rounded-lg transition-all',
+                    location.pathname === '/dashboard'
+                      ? 'bg-accent-blue/15 text-accent-blue'
+                      : 'text-text-muted hover:text-accent-blue hover:bg-accent-blue/10'
+                  )}
+                  title="My Dashboard"
+                >
+                  <LayoutDashboard size={18} />
+                </Link>
+                {(currentUser?.is_admin || currentUser?.username?.toLowerCase() === 'byocefs') && (
+                  <Link
+                    to="/admin"
+                    className={cn(
+                      'p-2 rounded-lg transition-all',
+                      location.pathname === '/admin'
+                        ? 'bg-yellow-500/15 text-yellow-400'
+                        : 'text-text-muted hover:text-yellow-400 hover:bg-yellow-500/10'
+                    )}
+                    title="Admin Panel"
+                  >
+                    <Shield size={18} />
+                  </Link>
+                )}
                 <div className="w-px h-6 bg-border-primary mx-1" />
                 <Link to="/profile" className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl hover:bg-bg-elevated/70 transition-colors group">
                   <RobloxAvatar
@@ -183,6 +209,36 @@ export default function Navbar() {
                 </span>
               )}
             </Link>
+            )}
+            {currentUser && (
+              <Link
+                to="/dashboard"
+                onClick={() => setMobileOpen(false)}
+                className={cn(
+                  'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all',
+                  location.pathname === '/dashboard'
+                    ? 'bg-accent-blue/15 text-accent-blue'
+                    : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated'
+                )}
+              >
+                <LayoutDashboard size={18} />
+                My Dashboard
+              </Link>
+            )}
+            {currentUser && (currentUser.is_admin || currentUser.username?.toLowerCase() === 'byocefs') && (
+              <Link
+                to="/admin"
+                onClick={() => setMobileOpen(false)}
+                className={cn(
+                  'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all',
+                  location.pathname === '/admin'
+                    ? 'bg-yellow-500/15 text-yellow-400'
+                    : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated'
+                )}
+              >
+                <Shield size={18} />
+                Admin Panel
+              </Link>
             )}
             <div className="pt-2 border-t border-border-primary mt-2">
               {currentUser ? (

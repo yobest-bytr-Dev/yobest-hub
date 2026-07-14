@@ -41,11 +41,11 @@ export function toDirectImageUrl(url: string): string {
   if (url.startsWith('http://') || url.startsWith('https://')) {
     const fileIdMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/)
     if (fileIdMatch) {
-      return `https://drive.google.com/uc?export=view&id=${fileIdMatch[1]}`
+      return `https://lh3.googleusercontent.com/d/${fileIdMatch[1]}=w800`
     }
     const idParam = url.match(/[?&]id=([a-zA-Z0-9_-]+)/)
     if (idParam) {
-      return `https://drive.google.com/uc?export=view&id=${idParam[1]}`
+      return `https://lh3.googleusercontent.com/d/${idParam[1]}=w800`
     }
     return url
   }

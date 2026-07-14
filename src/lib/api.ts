@@ -256,7 +256,13 @@ export async function submitGame(submission: {
 
   const { data, error } = await supabase.from('submissions').insert({
     user_id: user.id,
-    ...submission,
+    title: submission.title,
+    description: submission.description,
+    category: submission.category,
+    price: submission.price,
+    video_url: submission.video_url,
+    game_url: submission.game_url,
+    drive_file_url: submission.drive_file_url,
   }).select().single()
 
   if (error) throw error
@@ -544,4 +550,116 @@ export async function recordGamepassPurchase(gamepassId: string, gameId?: string
 export function extractGamepassId(url: string): string | null {
   const match = url.match(/game-pass[\/?]([0-9]+)/)
   return match ? match[1] : null
+}
+
+// ── Owner Dashboard CRUD ──
+
+export async function getOwnerExperiences(): Promise<Experience[]> {
+  const user = await getCurrentUser()
+  if (!user) return []
+  const { data, error } = await supabase
+    .from('experiences')
+    .select('*')
+    .eq('creator_id', user.id)
+    .order('created_at', { ascending: false })
+  if (error) return []
+  return (data || []) as Experience[]
+}
+
+export async function getOwnerSubmissions(): Promise<Submission[]> {
+  return getSubmissions()
+}
+
+export async function updateExperience(id: string, updates: Partial<Experience>) {
+  const user = await getCurrentUser()
+  if (!user) throw new Error('Not authenticated')
+  const { error } = await supabase
+    .from('experiences')
+    .update({
+      title: updates.title,
+      description: updates.description,
+      category: updates.category,
+      price: updates.price,
+      video_url: updates.video_url,
+      game_url: updates.game_url,
+      download_url: updates.download_url,
+      thumbnail_url: updates.thumbnail_url,
+      download_enabled: updates.download_enabled,
+      game_play: updates.game_play,
+    })
+    .eq('id', id)
+    .eq('creator_id', user.id)
+  if (error) throw error
+}
+
+export async function deleteExperience(id: string) {
+  const user = await getCurrentUser()
+  if (!user) throw new Error('Not authenticated')
+  const { error } = await supabase
+    .from('experiences')
+    .delete()
+    .eq('id', id)
+    .eq('creator_id', user.id)
+  if (error) throw error
+}
+
+export async function updateAsset(id: string, updates: Partial<Asset>) {
+  const user = await getCurrentUser()
+  if (!user) throw new Error('Not authenticated')
+  const { error } = await supabase
+    .from('assets')
+    .update({
+      title: updates.title,
+      description: updates.description,
+      type: updates.type,
+      price_robux: updates.price_robux,
+      drive_file_url: updates.drive_file_url,
+      thumbnail_url: updates.thumbnail_url,
+      gamepass_id: updates.gamepass_id,
+    })
+    .eq('id', id)
+    .eq('creator_id', user.id)
+  if (error) throw error
+}
+
+export async function deleteAsset(id: string) {
+  const user = await getCurrentUser()
+  if (!user) throw new Error('Not authenticated')
+  const { error } = await supabase
+    .from('assets')
+    .delete()
+    .eq('id', id)
+    .eq('creator_id', user.id)
+  if (error) throw error
+}
+
+export async function updateSubmission(id: string, updates: Partial<Submission>) {
+  const user = await getCurrentUser()
+  if (!user) throw new Error('Not authenticated')
+  const { error } = await supabase
+    .from('submissions')
+    .update({
+      title: updates.title,
+      description: updates.description,
+      category: updates.category,
+      price: updates.price,
+      video_url: updates.video_url,
+      game_url: updates.game_url,
+      drive_file_url: updates.drive_file_url,
+      thumbnail_url: updates.thumbnail_url,
+    })
+    .eq('id', id)
+    .eq('user_id', user.id)
+  if (error) throw error
+}
+
+export async function deleteSubmission(id: string) {
+  const user = await getCurrentUser()
+  if (!user) throw new Error('Not authenticated')
+  const { error } = await supabase
+    .from('submissions')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', user.id)
+  if (error) throw error
 }

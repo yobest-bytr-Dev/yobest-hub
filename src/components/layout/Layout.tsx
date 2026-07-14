@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import Navbar from './Navbar'
 import Sidebar from './Sidebar'
 import Footer from './Footer'
+import NotificationPrompt from '@/components/ui/NotificationPrompt'
 import { useStore } from '@/store/useStore'
 import { cn } from '@/lib/utils'
 import { trackVisit, getSiteAnalytics } from '@/lib/analytics'
@@ -42,6 +43,7 @@ export default function Layout() {
         </div>
         <Footer />
       </main>
+      <NotificationPrompt />
     </div>
   )
 }

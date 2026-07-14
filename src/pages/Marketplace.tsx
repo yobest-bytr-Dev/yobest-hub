@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { ShoppingBag, Search, Star, Download, Code, Box, Palette, X, Loader2, Plus } from 'lucide-react'
+import { ShoppingBag, Search, Star, Download, Code, Box, Palette, X, Loader2, Plus, Upload } from 'lucide-react'
 import { getAssets, submitAsset } from '@/lib/api'
-import { toDirectImageUrl } from '@/lib/drive-upload'
+import { toDirectImageUrl, uploadToGoogleDrive } from '@/lib/drive-upload'
 import ImagePicker from '@/components/ui/ImagePicker'
 import { useStore } from '@/store/useStore'
 import type { Asset } from '@/lib/types'
@@ -73,6 +73,9 @@ export default function Marketplace() {
   const [submitForm, setSubmitForm] = useState({ title: '', description: '', type: 'script' as 'script' | 'model' | 'uikit', price: '0', imageUrl: '', gamepassUrl: '' })
   const [submitting, setSubmitting] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
+  const [uploadingFile, setUploadingFile] = useState(false)
+  const [assetFileUrl, setAssetFileUrl] = useState('')
+  const assetFileRef = useRef<HTMLInputElement>(null)
   const currentUser = useStore((s) => s.currentUser)
   const navigate = useNavigate()
 
@@ -91,6 +94,21 @@ export default function Marketplace() {
     return true
   })
 
+  const handleAssetFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 100 * 1024 * 1024) { alert('File too large. Maximum 100MB.'); return }
+    setUploadingFile(true)
+    try {
+      const result = await uploadToGoogleDrive(file, 'yobest/assets')
+      setAssetFileUrl(result.directLink)
+    } catch (err: any) {
+      alert('Upload failed: ' + (err.message || 'Unknown error'))
+    }
+    setUploadingFile(false)
+    if (assetFileRef.current) assetFileRef.current.value = ''
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!currentUser) { navigate('/auth'); return }
@@ -103,12 +121,14 @@ export default function Marketplace() {
         price_robux: parseInt(submitForm.price) || 0,
         thumbnail_url: submitForm.imageUrl || undefined,
         gamepass_id: submitForm.gamepassUrl || undefined,
+        drive_file_url: assetFileUrl || undefined,
       })
       setSubmitSuccess(true)
       setTimeout(() => {
         setShowSubmit(false)
         setSubmitSuccess(false)
         setSubmitForm({ title: '', description: '', type: 'script', price: '0', imageUrl: '', gamepassUrl: '' })
+        setAssetFileUrl('')
         getAssets().then(setAssets)
       }, 2000)
     } catch {
@@ -209,7 +229,7 @@ export default function Marketplace() {
                   <Download size={24} className="text-green-400" />
                 </div>
                 <h3 className="text-lg font-bold text-text-primary mb-2">Asset Submitted!</h3>
-                <p className="text-sm text-text-secondary">Your asset is pending review.</p>
+                <p className="text-sm text-text-secondary">Your asset is being checked by our team. Track status in My Dashboard.</p>
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="p-6 space-y-4">
@@ -258,6 +278,22 @@ export default function Marketplace() {
                     folder="yobest/assets"
                     label="Thumbnail Image"
                   />
+                </div>
+                <div>
+                  <label className="text-xs text-text-muted font-medium mb-1.5 block">Asset File (optional)</label>
+                  <p className="text-[10px] text-text-dim mb-2">Upload your script, model, or UI kit file (max 100MB)</p>
+                  <input type="file" accept=".lua,.luau,.rbxm,.rbxmx,.rbxmx,.json,.xml,.zip,.rar,.7z,.txt" onChange={handleAssetFileUpload} className="hidden" ref={assetFileRef} />
+                  <button type="button" onClick={() => assetFileRef.current?.click()} disabled={uploadingFile}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-dashed border-border-primary hover:border-accent-blue/50 hover:bg-accent-blue/5 transition-all text-text-secondary hover:text-accent-blue text-sm">
+                    {uploadingFile ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+                    {assetFileUrl ? 'File uploaded - click to change' : 'Upload Asset File'}
+                  </button>
+                  {assetFileUrl && (
+                    <div className="flex items-center gap-2 mt-2 text-xs text-green-400">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                      File uploaded successfully
+                    </div>
+                  )}
                 </div>
                 <button type="submit" disabled={submitting}
                   className="w-full py-3 rounded-xl bg-accent-blue text-white font-semibold text-sm hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2">

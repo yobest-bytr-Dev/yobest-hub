@@ -58,6 +58,7 @@ export default function ImagePicker({ value, onChange, folder = 'yobest/uploads'
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    if (file.size > 10 * 1024 * 1024) { alert('Image too large. Maximum 10MB.'); setUploading(false); return }
     setUploading(true)
     try {
       const result = await uploadToGoogleDrive(file, folder)

@@ -296,6 +296,7 @@ function SubmissionsTab() {
   const [subs, setSubs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending')
+  const [expanded, setExpanded] = useState<string | null>(null)
   const { toast } = useToast()
 
   const load = useCallback(async () => {
@@ -369,41 +370,93 @@ function SubmissionsTab() {
       </div>
       <div className="space-y-2">
         {filtered.map((sub) => (
-          <div key={sub.id} className="p-4 rounded-xl bg-bg-secondary border border-border-primary">
-            <div className="flex items-start gap-3">
-              {sub.thumbnail_url && <img src={sub.thumbnail_url} alt="" className="w-16 h-12 rounded-lg object-cover shrink-0 bg-bg-tertiary" />}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-sm font-semibold text-text-primary truncate">{sub.title}</span>
-                  <span className={cn('px-1.5 py-0.5 rounded text-[10px] font-bold',
-                    sub.status === 'pending' && 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/25',
-                    sub.status === 'approved' && 'bg-green-500/15 text-green-400 border border-green-500/25',
-                    sub.status === 'rejected' && 'bg-red-500/15 text-red-400 border border-red-500/25'
-                  )}>{sub.status}</span>
-                </div>
-                <p className="text-xs text-text-muted line-clamp-2">{sub.description}</p>
-                <div className="flex items-center gap-2 mt-1 text-[10px] text-text-dim">
-                  <span>{sub.category}</span>
-                  <span>{sub.price || 'Free'}</span>
-                  <span>{new Date(sub.created_at).toLocaleDateString()}</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-1 shrink-0">
-                {sub.status === 'pending' && (
-                  <>
-                    <button onClick={() => handleApprove(sub.id)} className="p-1.5 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors" title="Approve">
-                      <CheckCircle size={14} />
+          <div key={sub.id} className="rounded-xl bg-bg-secondary border border-border-primary overflow-hidden">
+            <div className="p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <button onClick={() => setExpanded(expanded === sub.id ? null : sub.id)} className="text-sm font-semibold text-text-primary truncate hover:text-accent-blue transition-colors text-left">
+                      {sub.title}
                     </button>
-                    <button onClick={() => handleReject(sub.id)} className="p-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors" title="Reject">
-                      <XCircle size={14} />
-                    </button>
-                  </>
-                )}
-                <button onClick={() => handleDelete(sub.id)} className="p-1.5 rounded-lg bg-bg-elevated text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors" title="Delete">
-                  <Trash2 size={14} />
-                </button>
+                    <span className={cn('px-1.5 py-0.5 rounded text-[10px] font-bold',
+                      sub.status === 'pending' && 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/25',
+                      sub.status === 'approved' && 'bg-green-500/15 text-green-400 border border-green-500/25',
+                      sub.status === 'rejected' && 'bg-red-500/15 text-red-400 border border-red-500/25'
+                    )}>{sub.status}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px] text-text-dim">
+                    <span>{sub.category}</span>
+                    <span>·</span>
+                    <span>{sub.price || 'Free'}</span>
+                    <span>·</span>
+                    <span>{new Date(sub.created_at).toLocaleDateString()}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  {sub.status === 'pending' && (
+                    <>
+                      <button onClick={() => handleApprove(sub.id)} className="px-2 py-1 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors text-[10px] font-bold" title="Approve">
+                        <CheckCircle size={14} />
+                      </button>
+                      <button onClick={() => handleReject(sub.id)} className="px-2 py-1 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors text-[10px] font-bold" title="Reject">
+                        <XCircle size={14} />
+                      </button>
+                    </>
+                  )}
+                  <button onClick={() => handleDelete(sub.id)} className="p-1.5 rounded-lg bg-bg-elevated text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors" title="Delete">
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </div>
             </div>
+            {expanded === sub.id && (
+              <div className="px-4 pb-4 border-t border-border-primary pt-3 space-y-3">
+                {sub.thumbnail_url && (
+                  <div>
+                    <p className="text-[10px] text-text-muted mb-1">Thumbnail</p>
+                    <img src={sub.thumbnail_url} alt="" className="w-full max-w-sm h-auto rounded-lg object-cover bg-bg-tertiary" />
+                  </div>
+                )}
+                <div>
+                  <p className="text-[10px] text-text-muted mb-1">Description</p>
+                  <p className="text-xs text-text-primary whitespace-pre-wrap">{sub.description || 'No description'}</p>
+                </div>
+                {sub.video_url && (
+                  <div>
+                    <p className="text-[10px] text-text-muted mb-1">Video</p>
+                    <a href={sub.video_url} target="_blank" rel="noopener noreferrer" className="text-xs text-accent-blue hover:underline break-all">{sub.video_url}</a>
+                  </div>
+                )}
+                {sub.game_url && (
+                  <div>
+                    <p className="text-[10px] text-text-muted mb-1">Game URL</p>
+                    <a href={sub.game_url} target="_blank" rel="noopener noreferrer" className="text-xs text-accent-blue hover:underline break-all">{sub.game_url}</a>
+                  </div>
+                )}
+                {sub.drive_file_url && (
+                  <div>
+                    <p className="text-[10px] text-text-muted mb-1">Download File</p>
+                    <a href={sub.drive_file_url} target="_blank" rel="noopener noreferrer" className="text-xs text-accent-blue hover:underline break-all">{sub.drive_file_url}</a>
+                  </div>
+                )}
+                {sub.gamepass_url && (
+                  <div>
+                    <p className="text-[10px] text-text-muted mb-1">Gamepass ID</p>
+                    <p className="text-xs text-text-primary">{sub.gamepass_url}</p>
+                  </div>
+                )}
+                <div className="flex gap-4 text-[10px] text-text-dim">
+                  <span>Submitted: {new Date(sub.created_at).toLocaleString()}</span>
+                  {sub.reviewed_at && <span>Reviewed: {new Date(sub.reviewed_at).toLocaleString()}</span>}
+                </div>
+                {sub.rejection_reason && (
+                  <div className="p-2 rounded-lg bg-red-500/10 border border-red-500/20">
+                    <p className="text-[10px] text-red-400 font-medium mb-0.5">Rejection Reason</p>
+                    <p className="text-xs text-red-300">{sub.rejection_reason}</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         ))}
         {filtered.length === 0 && <p className="text-sm text-text-muted text-center py-8">No submissions</p>}

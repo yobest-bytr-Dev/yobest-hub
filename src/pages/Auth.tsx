@@ -5,6 +5,7 @@ import { Zap, Mail, Lock, ArrowRight, Loader2, Eye, EyeOff, Check, X, Gamepad2, 
 import { signIn, signUp, getCurrentProfile } from '@/lib/api'
 import { useStore } from '@/store/useStore'
 import { verifyRobloxUsername, type RobloxUser } from '@/lib/roblox'
+import { saveAccount } from '@/lib/accounts'
 import { cn } from '@/lib/utils'
 
 type AuthMode = 'signin' | 'signup'
@@ -87,7 +88,16 @@ export default function Auth() {
       } else {
         await signIn(email, password)
         const profile = await getCurrentProfile()
-        if (profile) setCurrentUser(profile)
+        if (profile) {
+          setCurrentUser(profile)
+          saveAccount({
+            id: profile.id,
+            email: email,
+            username: profile.username,
+            avatar_url: profile.avatar_url,
+            roblox_id: profile.roblox_id,
+          })
+        }
         navigate('/')
       }
     } catch (err: unknown) {

@@ -67,3 +67,27 @@ export function removeNotification(id: string) {
   const all = loadNotifications().filter((n) => n.id !== id)
   saveNotifications(all)
 }
+
+const VAPID_PUBLIC_KEY = '' // Will be configured later
+
+export async function requestNotificationPermission(): Promise<boolean> {
+  if (!('Notification' in window)) return false
+  if (Notification.permission === 'granted') return true
+  if (Notification.permission === 'denied') return false
+  const result = await Notification.requestPermission()
+  return result === 'granted'
+}
+
+export function sendLocalNotification(title: string, body: string, icon?: string) {
+  if (Notification.permission !== 'granted') return
+  new Notification(title, {
+    body,
+    icon: icon || `${import.meta.env.BASE_URL}YobestLogo.png`,
+    badge: `${import.meta.env.BASE_URL}YobestLogo.png`,
+  })
+}
+
+export function setupNotificationListener() {
+  // Listen for Supabase realtime notifications or periodic checks
+  // For now, we'll use localStorage-based notifications
+}

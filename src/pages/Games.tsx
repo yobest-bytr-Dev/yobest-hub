@@ -1,10 +1,10 @@
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, SlidersHorizontal, Play, Eye, X, ChevronDown, Plus, Loader2, Heart, MessageSquare, ExternalLink } from 'lucide-react'
+import { Search, SlidersHorizontal, Play, Eye, X, ChevronDown, Plus, Loader2, Heart, MessageSquare, ExternalLink, Upload, Check, Clock } from 'lucide-react'
 import { experiences } from '@/data/official-games'
-import { getApprovedCommunityGames, submitGame } from '@/lib/api'
-import { toDirectImageUrl } from '@/lib/drive-upload'
+import { getApprovedCommunityGames, submitGame, getSubmissions } from '@/lib/api'
+import { toDirectImageUrl, uploadToGoogleDrive } from '@/lib/drive-upload'
 import ImagePicker from '@/components/ui/ImagePicker'
 import type { Experience, GameCategory } from '@/lib/types'
 import { extractYoutubeId, formatNumber, getCategoryColor, cn } from '@/lib/utils'
@@ -107,6 +107,53 @@ function GameCard({ game, ytStats, onMouseEnter, onMouseLeave }: {
         </div>
       </div>
     </motion.div>
+  )
+}
+
+function SubmissionStatusSection() {
+  const [subs, setSubs] = useState<any[]>([])
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    getSubmissions().then(setSubs)
+  }, [])
+
+  if (subs.length === 0) return null
+
+  const pending = subs.filter(s => s.status === 'pending').length
+  const approved = subs.filter(s => s.status === 'approved').length
+  const rejected = subs.filter(s => s.status === 'rejected').length
+
+  return (
+    <div className="mb-4 rounded-xl bg-bg-secondary border border-border-primary overflow-hidden">
+      <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between px-4 py-3 text-sm">
+        <div className="flex items-center gap-3">
+          <Clock size={14} className="text-yellow-400" />
+          <span className="font-medium text-text-primary">My Submissions</span>
+          <div className="flex items-center gap-2">
+            {pending > 0 && <span className="px-1.5 py-0.5 rounded bg-yellow-500/15 text-yellow-400 text-[10px] font-bold">{pending} pending</span>}
+            {approved > 0 && <span className="px-1.5 py-0.5 rounded bg-green-500/15 text-green-400 text-[10px] font-bold">{approved} approved</span>}
+            {rejected > 0 && <span className="px-1.5 py-0.5 rounded bg-red-500/15 text-red-400 text-[10px] font-bold">{rejected} rejected</span>}
+          </div>
+        </div>
+        <ChevronDown size={14} className={cn('text-text-muted transition-transform', open && 'rotate-180')} />
+      </button>
+      {open && (
+        <div className="px-4 pb-3 space-y-2 border-t border-border-primary pt-2">
+          {subs.map(sub => (
+            <div key={sub.id} className="flex items-center gap-2 text-xs">
+              <span className={cn('px-1.5 py-0.5 rounded text-[10px] font-bold',
+                sub.status === 'pending' && 'bg-yellow-500/15 text-yellow-400',
+                sub.status === 'approved' && 'bg-green-500/15 text-green-400',
+                sub.status === 'rejected' && 'bg-red-500/15 text-red-400'
+              )}>{sub.status}</span>
+              <span className="text-text-primary truncate">{sub.title}</span>
+              {sub.rejection_reason && <span className="text-red-400 text-[10px]">— {sub.rejection_reason}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -217,7 +264,9 @@ export default function Games() {
   const [sortBy, setSortBy] = useState<'newest' | 'popular' | 'az'>('newest')
   const [showFilters, setShowFilters] = useState(false)
   const [showSubmit, setShowSubmit] = useState(false)
-  const [submitForm, setSubmitForm] = useState({ title: '', description: '', category: 'Minigame', videoUrl: '', gameUrl: '', imageUrl: '', price: '0', gamepassUrl: '' })
+  const [submitForm, setSubmitForm] = useState({ title: '', description: '', category: 'Minigame', videoUrl: '', gameUrl: '', imageUrl: '', price: '0', gamepassUrl: '', gameFileUrl: '' })
+  const [uploadingGameFile, setUploadingGameFile] = useState(false)
+  const gameFileRef = useRef<HTMLInputElement>(null)
   const [submitting, setSubmitting] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
 
@@ -242,6 +291,21 @@ export default function Games() {
     setTooltipGame(null)
     setTooltipYtStats(null)
   }, [])
+
+  const handleGameFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 100 * 1024 * 1024) { alert('File too large. Maximum 100MB.'); return }
+    setUploadingGameFile(true)
+    try {
+      const result = await uploadToGoogleDrive(file, 'yobest/games')
+      setSubmitForm({ ...submitForm, gameFileUrl: result.directLink })
+    } catch (err: any) {
+      alert('Upload failed: ' + (err.message || 'Unknown error'))
+    }
+    setUploadingGameFile(false)
+    if (gameFileRef.current) gameFileRef.current.value = ''
+  }
 
   useEffect(() => {
     if (activeTab === 'community') {
@@ -300,7 +364,7 @@ export default function Games() {
         category: submitForm.category,
         video_url: submitForm.videoUrl,
         game_url: submitForm.gameUrl,
-        drive_file_url: submitForm.imageUrl,
+        drive_file_url: submitForm.gameFileUrl || submitForm.imageUrl,
         thumbnail_url: submitForm.imageUrl,
         gamepass_url: submitForm.gamepassUrl,
         price: priceVal === 0 ? 'Free' : `${priceVal} Robux`,
@@ -309,7 +373,7 @@ export default function Games() {
       setTimeout(() => {
         setShowSubmit(false)
         setSubmitSuccess(false)
-        setSubmitForm({ title: '', description: '', category: 'Minigame', videoUrl: '', gameUrl: '', imageUrl: '', price: '0', gamepassUrl: '' })
+        setSubmitForm({ title: '', description: '', category: 'Minigame', videoUrl: '', gameUrl: '', imageUrl: '', price: '0', gamepassUrl: '', gameFileUrl: '' })
       }, 2000)
     } catch {
       alert('Failed to submit. Make sure you are signed in.')
@@ -412,6 +476,10 @@ export default function Games() {
           Showing {filteredGames.length} {activeTab === 'official' ? 'official' : 'community'} games
         </div>
 
+        {activeTab === 'community' && currentUser && (
+          <SubmissionStatusSection />
+        )}
+
         <div className="flex justify-center mb-6">
           <AdBanner type="leaderboard" />
         </div>
@@ -452,11 +520,11 @@ export default function Games() {
       <Modal open={showSubmit} onClose={() => { setShowSubmit(false); setSubmitSuccess(false) }} title="Submit a Game" maxWidth="max-w-lg">
         {submitSuccess ? (
           <div className="text-center py-8">
-            <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+            <div className="w-16 h-16 rounded-full bg-yellow-500/20 flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-yellow-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
             </div>
-            <h3 className="text-lg font-semibold text-text-primary mb-1">Submitted!</h3>
-            <p className="text-text-secondary text-sm">Your game is pending review.</p>
+            <h3 className="text-lg font-semibold text-text-primary mb-1">Wait, the game is being checked</h3>
+            <p className="text-text-secondary text-sm">Your game will be reviewed by our team. You can track the status in My Dashboard.</p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -498,6 +566,22 @@ export default function Games() {
                 folder="yobest/thumbnails"
                 label="Thumbnail Image"
               />
+            </div>
+            <div>
+              <label className="text-xs text-text-muted font-medium mb-1.5 block">Game Download File (optional)</label>
+              <p className="text-[10px] text-text-dim mb-2">Upload .rbxl, .rbxlx, .zip, or .rar files up to 100MB</p>
+              <input type="file" accept=".rbxl,.rbxlx,.zip,.rar,.7z" onChange={handleGameFileUpload} className="hidden" ref={gameFileRef} />
+              <button type="button" onClick={() => gameFileRef.current?.click()} disabled={uploadingGameFile}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-dashed border-border-primary hover:border-accent-blue/50 hover:bg-accent-blue/5 transition-all text-text-secondary hover:text-accent-blue text-sm">
+                {uploadingGameFile ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+                {submitForm.gameFileUrl ? 'File uploaded - click to change' : 'Upload Game File'}
+              </button>
+              {submitForm.gameFileUrl && (
+                <div className="flex items-center gap-2 mt-2 text-xs text-green-400">
+                  <Check size={12} /> File uploaded successfully
+                  <button type="button" onClick={() => setSubmitForm({ ...submitForm, gameFileUrl: '' })} className="text-red-400 hover:text-red-300 ml-auto"><X size={12} /></button>
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>

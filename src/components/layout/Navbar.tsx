@@ -1,9 +1,10 @@
-import { Link, useLocation } from 'react-router-dom'
-import { Gamepad2, Brain, Users, ShoppingBag, Menu, X, LogIn, Zap, LogOut, MessageCircle, UserPlus, Shield, LayoutDashboard } from 'lucide-react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Gamepad2, Brain, Users, ShoppingBag, Menu, X, LogIn, Zap, LogOut, MessageCircle, UserPlus, Shield, LayoutDashboard, Plus } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useStore } from '@/store/useStore'
 import { getCurrentProfile, signOut } from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { getSavedAccounts, setActiveAccount } from '@/lib/accounts'
 import RobloxAvatar from '@/components/ui/RobloxAvatar'
 import NotificationBell from '@/components/ui/NotificationBell'
 
@@ -17,12 +18,15 @@ const navLinks = [
 
 export default function Navbar() {
   const location = useLocation()
+  const navigate = useNavigate()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [showAccounts, setShowAccounts] = useState(false)
   const currentUser = useStore((s) => s.currentUser)
   const setCurrentUser = useStore((s) => s.setCurrentUser)
   const conversations = useStore((s) => s.conversations)
 
   const totalUnread = conversations.reduce((sum, c) => sum + c.unread, 0)
+  const savedAccounts = getSavedAccounts()
 
   useEffect(() => {
     getCurrentProfile().then((profile) => {
@@ -137,6 +141,38 @@ export default function Navbar() {
                   />
                   <span className="text-sm font-medium text-text-primary group-hover:text-accent-blue transition-colors">{currentUser.username}</span>
                 </Link>
+                {savedAccounts.length > 1 && (
+                  <div className="relative">
+                    <button onClick={() => setShowAccounts(!showAccounts)} className="p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-elevated/70 transition-all" title="Switch Account">
+                      <Users size={16} />
+                    </button>
+                    {showAccounts && (
+                      <div className="absolute right-0 top-full mt-1 w-64 rounded-xl bg-bg-secondary border border-border-primary shadow-2xl z-50 p-2">
+                        <p className="text-[10px] text-text-muted font-medium px-2 mb-1">Switch Account</p>
+                        {savedAccounts.map(acc => (
+                          <div key={acc.id} className={cn('flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm cursor-pointer transition-colors',
+                            currentUser?.id === acc.id ? 'bg-accent-blue/15 text-accent-blue' : 'text-text-secondary hover:bg-bg-elevated hover:text-text-primary'
+                          )} onClick={() => {
+                            if (currentUser?.id !== acc.id) {
+                              setActiveAccount(acc.id)
+                              window.location.reload()
+                            }
+                            setShowAccounts(false)
+                          }}>
+                            <img src={acc.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${acc.username}`} className="w-6 h-6 rounded-full" alt="" />
+                            <span className="truncate text-xs">{acc.username}</span>
+                            {currentUser?.id === acc.id && <span className="ml-auto text-[9px] text-accent-blue">Active</span>}
+                          </div>
+                        ))}
+                        <div className="border-t border-border-primary mt-1 pt-1">
+                          <button onClick={() => { navigate('/auth'); setShowAccounts(false) }} className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-text-muted hover:text-text-primary hover:bg-bg-elevated transition-colors">
+                            <Plus size={12} /> Add Account
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <button
                   onClick={handleSignOut}
                   className="p-2 rounded-lg text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-all"
@@ -260,6 +296,29 @@ export default function Navbar() {
                       <div className="text-xs text-text-muted">View Profile</div>
                     </div>
                   </Link>
+                  {savedAccounts.length > 1 && (
+                    <div className="px-3 py-1.5">
+                      <p className="text-[10px] text-text-muted font-medium mb-1">Switch Account</p>
+                      {savedAccounts.map(acc => (
+                        <div key={acc.id} className={cn('flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm cursor-pointer transition-colors',
+                          currentUser?.id === acc.id ? 'bg-accent-blue/15 text-accent-blue' : 'text-text-secondary hover:bg-bg-elevated hover:text-text-primary'
+                        )} onClick={() => {
+                          if (currentUser?.id !== acc.id) {
+                            setActiveAccount(acc.id)
+                            window.location.reload()
+                          }
+                          setMobileOpen(false)
+                        }}>
+                          <img src={acc.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${acc.username}`} className="w-6 h-6 rounded-full" alt="" />
+                          <span className="truncate text-xs">{acc.username}</span>
+                          {currentUser?.id === acc.id && <span className="ml-auto text-[9px] text-accent-blue">Active</span>}
+                        </div>
+                      ))}
+                      <button onClick={() => { navigate('/auth'); setMobileOpen(false) }} className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-text-muted hover:text-text-primary hover:bg-bg-elevated transition-colors">
+                        <Plus size={12} /> Add Account
+                      </button>
+                    </div>
+                  )}
                   <button
                     onClick={handleSignOut}
                     className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors"

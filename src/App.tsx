@@ -1,27 +1,44 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
-import NotFound from "./pages/NotFound";
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import Layout from '@/components/layout/Layout'
+import Home from '@/pages/Home'
+import Games from '@/pages/Games'
+import GameDetail from '@/pages/GameDetail'
+import AI from '@/pages/AI'
+import Community from '@/pages/Community'
+import Marketplace from '@/pages/Marketplace'
+import Auth from '@/pages/Auth'
+import Profile from '@/pages/Profile'
+import PublicProfile from '@/pages/PublicProfile'
+import Creators from '@/pages/Creators'
+import Messages from '@/pages/Messages'
+import Terms from '@/pages/legal/Terms'
+import Privacy from '@/pages/legal/Privacy'
+import DMCA from '@/pages/legal/DMCA'
+import Contact from '@/pages/legal/Contact'
 
-const queryClient = new QueryClient();
-
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
-
-export default App;
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route element={<Layout />}>
+          <Route path="/" element={<Home />} />
+          <Route path="/games" element={<Games />} />
+          <Route path="/games/:id" element={<GameDetail />} />
+          <Route path="/ai" element={<AI />} />
+          <Route path="/community" element={<Community />} />
+          <Route path="/marketplace" element={<Marketplace />} />
+          <Route path="/auth" element={<Auth />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/profile/:userId" element={<PublicProfile />} />
+          <Route path="/creators" element={<Creators />} />
+          <Route path="/messages" element={<Messages />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/dmca" element={<DMCA />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="*" element={<Home />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
+  )
+}

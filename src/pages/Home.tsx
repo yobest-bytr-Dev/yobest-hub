@@ -1,9 +1,9 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Gamepad2, Brain, Users, ShoppingBag, ArrowRight, Download, Play, Sparkles, Eye, Heart, Rocket, Trophy, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Gamepad2, Brain, Users, ShoppingBag, ArrowRight, Download, Play, Sparkles, Eye, Heart, Rocket, Trophy } from 'lucide-react'
 import { experiences } from '@/data/official-games'
 import { extractYoutubeId, formatNumber, cn } from '@/lib/utils'
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { getPlatformStats, getOfficialGames } from '@/lib/api'
 import { getSiteAnalytics } from '@/lib/analytics'
 import { useStore } from '@/store/useStore'
@@ -55,10 +55,6 @@ const pillars = [
 ]
 
 const GameGallery = ({ officialGames }: { officialGames: Experience[] }) => {
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const [canScrollLeft, setCanScrollLeft] = useState(false)
-  const [canScrollRight, setCanScrollRight] = useState(true)
-
   const allImages: { src: string; title: string; id: string }[] = []
   officialGames.forEach((game) => {
     if (game.thumbnail_url) {
@@ -66,7 +62,7 @@ const GameGallery = ({ officialGames }: { officialGames: Experience[] }) => {
     } else if (game.video_url) {
       const thumbId = extractYoutubeId(game.video_url)
       if (thumbId) {
-        allImages.push({ src: `https://img.youtube.com/vi/${thumbId}/mqdefault.jpg`, title: game.title, id: game.id })
+        allImages.push({ src: `https://img.youtube.com/vi/${thumbId}/hqdefault.jpg`, title: game.title, id: game.id })
       }
     }
     if (game.images && Array.isArray(game.images) && game.images.length > 0) {
@@ -78,65 +74,52 @@ const GameGallery = ({ officialGames }: { officialGames: Experience[] }) => {
     }
   })
 
-  const checkScroll = useCallback(() => {
-    const el = scrollRef.current
-    if (!el) return
-    setCanScrollLeft(el.scrollLeft > 10)
-    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 10)
-  }, [])
-
-  useEffect(() => {
-    checkScroll()
-    const el = scrollRef.current
-    if (el) el.addEventListener('scroll', checkScroll, { passive: true })
-    return () => { if (el) el.removeEventListener('scroll', checkScroll) }
-  }, [checkScroll])
-
-  const scroll = (dir: 'left' | 'right') => {
-    const el = scrollRef.current
-    if (!el) return
-    el.scrollBy({ left: dir === 'left' ? -340 : 340, behavior: 'smooth' })
-  }
-
   if (allImages.length === 0) return null
 
+  const doubled = [...allImages, ...allImages]
+
   return (
-    <div className="relative group">
-      {canScrollLeft && (
-        <button onClick={() => scroll('left')}
-          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-bg-secondary/90 border border-border-primary flex items-center justify-center text-text-primary hover:bg-bg-elevated transition-all shadow-lg opacity-0 group-hover:opacity-100">
-          <ChevronLeft size={20} />
-        </button>
-      )}
-      {canScrollRight && (
-        <button onClick={() => scroll('right')}
-          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-bg-secondary/90 border border-border-primary flex items-center justify-center text-text-primary hover:bg-bg-elevated transition-all shadow-lg opacity-0 group-hover:opacity-100">
-          <ChevronRight size={20} />
-        </button>
-      )}
-      <div ref={scrollRef} className="flex gap-4 overflow-x-auto scrollbar-hide snap-x snap-mandatory pb-4" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-        {allImages.map((img, i) => (
-          <motion.div key={img.id} initial={{ opacity: 0, scale: 0.9 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }}
-            transition={{ delay: i * 0.05 }}
-            className="shrink-0 w-[300px] sm:w-[340px] snap-start">
-            <Link to={`/games/${img.id.split('-')[0]}`} className="block rounded-2xl overflow-hidden bg-bg-secondary border border-border-primary card-hover group/card relative aspect-[16/10]">
-              <img src={img.src} alt={img.title} loading="lazy"
-                className="w-full h-full object-cover transition-transform duration-500 group-hover/card:scale-105"
-                onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-              <div className="absolute bottom-3 left-3 right-3">
-                <p className="text-sm font-semibold text-white truncate">{img.title}</p>
+    <div className="relative group/gallery overflow-hidden">
+      <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-bg-primary to-transparent z-10 pointer-events-none" />
+      <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-bg-primary to-transparent z-10 pointer-events-none" />
+      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-accent-blue/30 to-transparent" />
+      <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-accent-purple/30 to-transparent" />
+
+      <div className="game-gallery-track flex gap-5 py-4 group-hover/gallery:[animation-play-state:paused]">
+        {doubled.map((img, i) => (
+          <Link key={`${img.id}-${i}`} to={`/games/${img.id.split('-')[0]}`}
+            className="shrink-0 w-[280px] sm:w-[320px] block rounded-2xl overflow-hidden bg-bg-secondary border border-border-primary/60 card-hover group/card relative aspect-[16/10] transition-all duration-300 hover:border-accent-blue/40 hover:shadow-[0_0_30px_-5px_rgba(59,130,246,0.3)]">
+            <img src={img.src} alt={img.title} loading="lazy"
+              className="w-full h-full object-cover transition-transform duration-700 group-hover/card:scale-110"
+              onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-60 group-hover/card:opacity-80 transition-opacity duration-300" />
+            <div className="absolute inset-0 bg-gradient-to-r from-accent-blue/0 via-accent-blue/5 to-accent-purple/0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-500" />
+            <div className="absolute bottom-0 left-0 right-0 p-4 translate-y-1 group-hover/card:translate-y-0 transition-transform duration-300">
+              <p className="text-sm font-bold text-white truncate drop-shadow-lg">{img.title}</p>
+              <div className="flex items-center gap-2 mt-1 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300 delay-75">
+                <span className="text-[11px] text-white/70 font-medium">View Game</span>
+                <ArrowRight size={11} className="text-white/70" />
               </div>
-              <div className="absolute inset-0 bg-black/0 group-hover/card:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover/card:opacity-100">
-                <div className="w-12 h-12 rounded-full bg-white/15 backdrop-blur-md flex items-center justify-center border border-white/20">
-                  <Play size={20} className="text-white ml-0.5" fill="white" />
-                </div>
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/card:opacity-100 transition-all duration-300">
+              <div className="w-14 h-14 rounded-full bg-white/10 backdrop-blur-xl flex items-center justify-center border border-white/20 shadow-2xl group-hover/card:scale-110 transition-transform duration-300">
+                <Play size={22} className="text-white ml-0.5" fill="white" />
               </div>
-            </Link>
-          </motion.div>
+            </div>
+          </Link>
         ))}
       </div>
-      <style>{`.scrollbar-hide::-webkit-scrollbar { display: none; }`}</style>
+
+      <style>{`
+        @keyframes gallery-scroll {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+        .game-gallery-track {
+          animation: gallery-scroll 40s linear infinite;
+          width: max-content;
+        }
+      `}</style>
     </div>
   )
 }
@@ -290,7 +273,7 @@ export default function Home() {
                 <Link to={`/games/${game.id}`} className="block rounded-2xl bg-bg-secondary border border-border-primary overflow-hidden card-hover card-glow group">
                   <div className="relative aspect-video bg-bg-tertiary">
                     {thumbId ? (
-                      <img src={`https://img.youtube.com/vi/${thumbId}/mqdefault.jpg`} alt={game.title} className="w-full h-full object-cover" loading="lazy" />
+                      <img src={`https://img.youtube.com/vi/${thumbId}/hqdefault.jpg`} alt={game.title} className="w-full h-full object-cover" loading="lazy" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center"><Gamepad2 size={32} className="text-text-dim" /></div>
                     )}

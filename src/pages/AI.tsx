@@ -6,7 +6,8 @@ import {
   Rocket, Settings, Paperclip, X, FileCode, Trash2, Download, Zap,
   BookOpen, Terminal, History, ExternalLink, Play, Wrench,
   Shield, Puzzle, ChevronDown, Eye, RotateCcw,
-  ArrowUp, CornerDownLeft, Maximize2, Minimize2, CircleDot, AlertTriangle
+  ArrowUp, CornerDownLeft, Maximize2, Minimize2, CircleDot, AlertTriangle,
+  PanelRightOpen, PanelRightClose, MessageSquare
 } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { trackAiSession } from '@/lib/analytics'
@@ -15,21 +16,21 @@ import type { ChatMessage } from '@/lib/types'
 import AdBanner from '@/components/AdBanner'
 
 const models = [
-  { id: 'google/gemini-2.5-flash', label: 'Gemini 2.5 Flash', badge: 'Fast', color: 'text-green-400', desc: 'Lightning-fast responses' },
-  { id: 'google/gemini-2.5-pro', label: 'Gemini 2.5 Pro', badge: 'Smart', color: 'text-blue-400', desc: 'Deep reasoning & analysis' },
-  { id: 'google/gemini-3-flash-preview', label: 'Gemini 3 Flash', badge: 'New', color: 'text-cyan-400', desc: 'Next-gen speed' },
-  { id: 'google/gemini-3-pro-preview', label: 'Gemini 3 Pro', badge: 'New', color: 'text-purple-400', desc: 'Most capable model' },
-  { id: 'openai/gpt-4o', label: 'GPT-4o', badge: '', color: 'text-emerald-400', desc: 'Versatile & reliable' },
-  { id: 'anthropic/claude-sonnet-4', label: 'Claude Sonnet 4', badge: '', color: 'text-orange-400', desc: 'Detailed & creative' },
+  { id: 'google/gemini-2.5-flash', label: 'Gemini 2.5 Flash', badge: 'Fast', color: 'text-green-400', bg: 'bg-green-400', desc: 'Lightning-fast responses', emoji: '⚡' },
+  { id: 'google/gemini-2.5-pro', label: 'Gemini 2.5 Pro', badge: 'Smart', color: 'text-blue-400', bg: 'bg-blue-400', desc: 'Deep reasoning & analysis', emoji: '🧠' },
+  { id: 'google/gemini-3-flash-preview', label: 'Gemini 3 Flash', badge: 'New', color: 'text-cyan-400', bg: 'bg-cyan-400', desc: 'Next-gen speed', emoji: '🚀' },
+  { id: 'google/gemini-3-pro-preview', label: 'Gemini 3 Pro', badge: 'New', color: 'text-purple-400', bg: 'bg-purple-400', desc: 'Most capable model', emoji: '💎' },
+  { id: 'openai/gpt-4o', label: 'GPT-4o', badge: '', color: 'text-emerald-400', bg: 'bg-emerald-400', desc: 'Versatile & reliable', emoji: '🤖' },
+  { id: 'anthropic/claude-sonnet-4', label: 'Claude Sonnet 4', badge: '', color: 'text-orange-400', bg: 'bg-orange-400', desc: 'Detailed & creative', emoji: '✨' },
 ]
 
 const quickActions = [
-  { label: 'Build a Script', prompt: 'Create a complete Luau script for: ', icon: Code, gradient: 'from-blue-500/20 to-cyan-500/20' },
-  { label: 'Fix Bug', prompt: 'Find and fix the bug in this code. Explain what was wrong and show the ENTIRE corrected script:', icon: Wrench, gradient: 'from-red-500/20 to-orange-500/20' },
-  { label: 'Explain Code', prompt: 'Explain this code line by line. What does each part do?', icon: BookOpen, gradient: 'from-green-500/20 to-emerald-500/20' },
-  { label: 'Optimize', prompt: 'Optimize this code for better performance. Reduce memory usage and improve speed:', icon: Zap, gradient: 'from-yellow-500/20 to-amber-500/20' },
-  { label: 'Design System', prompt: 'Design a complete game system with server and client scripts. Include RemoteEvents, DataStore, and UI:', icon: Rocket, gradient: 'from-purple-500/20 to-pink-500/20' },
-  { label: 'Convert Format', prompt: 'Convert this code to a proper ModuleScript pattern with clean API:', icon: Blocks, gradient: 'from-indigo-500/20 to-violet-500/20' },
+  { label: 'Build a Script', prompt: 'Create a complete Luau script for: ', icon: Code, gradient: 'from-blue-500/20 to-cyan-500/20', border: 'border-blue-500/20 hover:border-blue-500/40', iconColor: 'text-blue-400' },
+  { label: 'Fix Bug', prompt: 'Find and fix the bug in this code. Explain what was wrong and show the ENTIRE corrected script:', icon: Wrench, gradient: 'from-red-500/20 to-orange-500/20', border: 'border-red-500/20 hover:border-red-500/40', iconColor: 'text-red-400' },
+  { label: 'Explain Code', prompt: 'Explain this code line by line. What does each part do?', icon: BookOpen, gradient: 'from-green-500/20 to-emerald-500/20', border: 'border-green-500/20 hover:border-green-500/40', iconColor: 'text-green-400' },
+  { label: 'Optimize', prompt: 'Optimize this code for better performance. Reduce memory usage and improve speed:', icon: Zap, gradient: 'from-yellow-500/20 to-amber-500/20', border: 'border-yellow-500/20 hover:border-yellow-500/40', iconColor: 'text-yellow-400' },
+  { label: 'Design System', prompt: 'Design a complete game system with server and client scripts. Include RemoteEvents, DataStore, and UI:', icon: Rocket, gradient: 'from-purple-500/20 to-pink-500/20', border: 'border-purple-500/20 hover:border-purple-500/40', iconColor: 'text-purple-400' },
+  { label: 'Convert Format', prompt: 'Convert this code to a proper ModuleScript pattern with clean API:', icon: Blocks, gradient: 'from-indigo-500/20 to-violet-500/20', border: 'border-indigo-500/20 hover:border-indigo-500/40', iconColor: 'text-indigo-400' },
 ]
 
 const suggestedPrompts = [
@@ -200,423 +201,185 @@ statusLabel.Text = "Step 1: Generate a token below"
 statusLabel.TextXAlignment = Enum.TextXAlignment.Left
 statusLabel.Parent = statusFrame
 
--- GENERATE BUTTON (BIG)
-local btnGen = Instance.new("TextButton")
-btnGen.Size = UDim2.new(1, 0, 0, 48)
-btnGen.BackgroundColor3 = Color3.fromRGB(59, 130, 246)
-btnGen.TextColor3 = Color3.fromRGB(255, 255, 255)
-btnGen.Font = Enum.Font.GothamBold
-btnGen.TextSize = 16
-btnGen.Text = "Generate Token"
-btnGen.AutoButtonColor = true
-btnGen.LayoutOrder = 3
-btnGen.Parent = main
-local bgc = Instance.new("UICorner")
-bgc.CornerRadius = UDim.new(0, 12)
-bgc.Parent = btnGen
-
--- TOKEN DISPLAY
+-- TOKEN INPUT
 local tokenFrame = Instance.new("Frame")
-tokenFrame.Size = UDim2.new(1, 0, 0, 44)
-tokenFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 35)
-tokenFrame.BorderSizePixel = 0
-tokenFrame.LayoutOrder = 4
+tokenFrame.Size = UDim2.new(1, 0, 0, 76)
+tokenFrame.BackgroundTransparency = 1
+tokenFrame.LayoutOrder = 3
 tokenFrame.Parent = main
-local tfc = Instance.new("UICorner")
-tfc.CornerRadius = UDim.new(0, 10)
-tfc.Parent = tokenFrame
-local tfs = Instance.new("UIStroke")
-tfs.Color = Color3.fromRGB(35, 35, 60)
-tfs.Thickness = 1
-tfs.Parent = tokenFrame
+
+local tokenLabel = Instance.new("TextLabel")
+tokenLabel.Size = UDim2.new(1, 0, 0, 16)
+tokenLabel.BackgroundTransparency = 1
+tokenLabel.TextColor3 = Color3.fromRGB(100, 116, 139)
+tokenLabel.Font = Enum.Font.GothamBold
+tokenLabel.TextSize = 10
+tokenLabel.Text = "PASTE TOKEN FROM WEBSITE"
+tokenLabel.TextXAlignment = Enum.TextXAlignment.Left
+tokenLabel.Parent = tokenFrame
 
 local tokenBox = Instance.new("TextBox")
-tokenBox.Size = UDim2.new(1, -20, 1, 0)
-tokenBox.Position = UDim2.new(0, 10, 0, 0)
-tokenBox.BackgroundTransparency = 1
-tokenBox.TextColor3 = Color3.fromRGB(160, 180, 210)
+tokenBox.Size = UDim2.new(1, 0, 0, 36)
+tokenBox.Position = UDim2.new(0, 0, 0, 18)
+tokenBox.BackgroundColor3 = Color3.fromRGB(20, 20, 35)
+tokenBox.TextColor3 = Color3.fromRGB(241, 245, 249)
 tokenBox.Font = Enum.Font.Code
 tokenBox.TextSize = 13
-tokenBox.PlaceholderText = "Click Generate Token above..."
-tokenBox.PlaceholderColor3 = Color3.fromRGB(60, 70, 90)
-tokenBox.Text = ""
-tokenBox.TextXAlignment = Enum.TextXAlignment.Left
+tokenBox.PlaceholderText = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+tokenBox.PlaceholderColor3 = Color3.fromRGB(70, 85, 105)
 tokenBox.ClearTextOnFocus = false
+tokenBox.BorderSizePixel = 0
 tokenBox.Parent = tokenFrame
+local tbc = Instance.new("UICorner")
+tbc.CornerRadius = UDim.new(0, 8)
+tbc.Parent = tokenBox
+local tbs = Instance.new("UIStroke")
+tbs.Color = Color3.fromRGB(34, 34, 64)
+tbs.Thickness = 1
+tbs.Parent = tokenBox
 
--- COPY BUTTON
-local btnCopy = Instance.new("TextButton")
-btnCopy.Size = UDim2.new(1, 0, 0, 38)
-btnCopy.BackgroundColor3 = Color3.fromRGB(25, 30, 45)
-btnCopy.TextColor3 = Color3.fromRGB(148, 163, 184)
-btnCopy.Font = Enum.Font.GothamBold
-btnCopy.TextSize = 13
-btnCopy.Text = "Copy Token to Clipboard"
-btnCopy.AutoButtonColor = true
-btnCopy.LayoutOrder = 5
-btnCopy.Parent = main
+local connectBtn = Instance.new("TextButton")
+connectBtn.Size = UDim2.new(1, 0, 0, 32)
+connectBtn.Position = UDim2.new(0, 0, 0, 44)
+connectBtn.BackgroundColor3 = Color3.fromRGB(59, 130, 246)
+connectBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+connectBtn.Font = Enum.Font.GothamBold
+connectBtn.TextSize = 13
+connectBtn.Text = "Connect"
+connectBtn.AutoButtonColor = true
+connectBtn.Parent = tokenFrame
 local bcc = Instance.new("UICorner")
-bcc.CornerRadius = UDim.new(0, 10)
-bcc.Parent = btnCopy
+bcc.CornerRadius = UDim.new(0, 8)
+bcc.Parent = connectBtn
 
--- TARGET SELECTOR
-local targetFrame = Instance.new("Frame")
-targetFrame.Size = UDim2.new(1, 0, 0, 36)
-targetFrame.BackgroundTransparency = 1
-targetFrame.LayoutOrder = 6
-targetFrame.Parent = main
+-- CODE TAB
+local codeFrame = Instance.new("Frame")
+codeFrame.Size = UDim2.new(1, 0, 0, 140)
+codeFrame.BackgroundTransparency = 1
+codeFrame.LayoutOrder = 4
+codeFrame.Parent = main
 
-local tlabel = Instance.new("TextLabel")
-tlabel.Size = UDim2.new(0.22, 0, 1, 0)
-tlabel.BackgroundTransparency = 1
-tlabel.TextColor3 = Color3.fromRGB(80, 90, 110)
-tlabel.Font = Enum.Font.GothamMedium
-tlabel.TextSize = 12
-tlabel.Text = "Target:"
-tlabel.TextXAlignment = Enum.TextXAlignment.Left
-tlabel.Parent = targetFrame
+local codeLabel = Instance.new("TextLabel")
+codeLabel.Size = UDim2.new(1, 0, 0, 16)
+codeLabel.BackgroundTransparency = 1
+codeLabel.TextColor3 = Color3.fromRGB(100, 116, 139)
+codeLabel.Font = Enum.Font.GothamBold
+codeLabel.TextSize = 10
+codeLabel.Text = "PLUGIN SCRIPT"
+codeLabel.TextXAlignment = Enum.TextXAlignment.Left
+codeLabel.Parent = codeFrame
 
-local targetBtn = Instance.new("TextButton")
-targetBtn.Size = UDim2.new(0.76, 0, 1, 0)
-targetBtn.Position = UDim2.new(0.24, 0, 0, 0)
-targetBtn.BackgroundColor3 = Color3.fromRGB(18, 18, 35)
-targetBtn.TextColor3 = Color3.fromRGB(180, 190, 210)
-targetBtn.Font = Enum.Font.GothamMedium
-targetBtn.TextSize = 12
-targetBtn.Text = "ServerScriptService"
-targetBtn.AutoButtonColor = true
-targetBtn.Parent = targetFrame
-local tgtc = Instance.new("UICorner")
-tgtc.CornerRadius = UDim.new(0, 8)
-tgtc.Parent = targetBtn
+local codeBox = Instance.new("TextBox")
+codeBox.Size = UDim2.new(1, 0, 1, -20)
+codeBox.Position = UDim2.new(0, 0, 0, 18)
+codeBox.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+codeBox.TextColor3 = Color3.fromRGB(165, 214, 255)
+codeBox.Font = Enum.Font.Code
+codeBox.TextSize = 11
+codeBox.MultiLine = true
+codeBox.TextWrapped = false
+codeBox.TextXAlignment = Enum.TextXAlignment.Left
+codeBox.TextYAlignment = Enum.TextYAlignment.Top
+codeBox.ClearTextOnFocus = false
+codeBox.BorderSizePixel = 0
+codeBox.Text = "-- Paste the plugin script here"
+codeBox.Parent = codeFrame
+local cbc = Instance.new("UICorner")
+cbc.CornerRadius = UDim.new(0, 8)
+cbc.Parent = codeBox
+local cbs = Instance.new("UIStroke")
+cbs.Color = Color3.fromRGB(34, 34, 64)
+cbs.Thickness = 1
+cbs.Parent = codeBox
 
-local targets = {"ServerScriptService", "StarterPlayerScripts", "ReplicatedStorage", "ServerStorage", "Workspace"}
-local currentTarget = 1
+-- ACTIONS
+local actionsFrame = Instance.new("Frame")
+actionsFrame.Size = UDim2.new(1, 0, 0, 40)
+actionsFrame.BackgroundTransparency = 1
+actionsFrame.LayoutOrder = 5
+actionsFrame.Parent = main
 
--- POLLING STATUS
-local pollFrame = Instance.new("Frame")
-pollFrame.Size = UDim2.new(1, 0, 0, 30)
-pollFrame.BackgroundColor3 = Color3.fromRGB(14, 14, 30)
-pollFrame.BorderSizePixel = 0
-pollFrame.LayoutOrder = 7
-pollFrame.Parent = main
-local pfc = Instance.new("UICorner")
-pfc.CornerRadius = UDim.new(0, 10)
-pfc.Parent = pollFrame
+local copyBtn = Instance.new("TextButton")
+copyBtn.Size = UDim2.new(0.5, -4, 0, 36)
+copyBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
+copyBtn.TextColor3 = Color3.fromRGB(148, 163, 184)
+copyBtn.Font = Enum.Font.GothamBold
+copyBtn.TextSize = 12
+copyBtn.Text = "Copy Code"
+copyBtn.AutoButtonColor = true
+copyBtn.Parent = actionsFrame
+local cpbc = Instance.new("UICorner")
+cpbc.CornerRadius = UDim.new(0, 8)
+cpbc.Parent = copyBtn
 
-local pollDot = Instance.new("Frame")
-pollDot.Size = UDim2.new(0, 8, 0, 8)
-pollDot.Position = UDim2.new(0, 12, 0.5, -4)
-pollDot.BackgroundColor3 = Color3.fromRGB(100, 100, 120)
-pollDot.Parent = pollFrame
-local pdc = Instance.new("UICorner")
-pdc.CornerRadius = UDim.new(1, 0)
-pdc.Parent = pollDot
+local injectBtn = Instance.new("TextButton")
+injectBtn.Size = UDim2.new(0.5, -4, 0, 36)
+injectBtn.Position = UDim2.new(0.5, 4, 0, 0)
+injectBtn.BackgroundColor3 = Color3.fromRGB(59, 130, 246)
+injectBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+injectBtn.Font = Enum.Font.GothamBold
+injectBtn.TextSize = 12
+injectBtn.Text = "Inject to Studio"
+injectBtn.AutoButtonColor = true
+injectBtn.Parent = actionsFrame
+local ibc = Instance.new("UICorner")
+ibc.CornerRadius = UDim.new(0, 8)
+ibc.Parent = injectBtn
 
-local pollLabel = Instance.new("TextLabel")
-pollLabel.Size = UDim2.new(1, -30, 1, 0)
-pollLabel.Position = UDim2.new(0, 28, 0, 0)
-pollLabel.BackgroundTransparency = 1
-pollLabel.TextColor3 = Color3.fromRGB(80, 90, 110)
-pollLabel.Font = Enum.Font.GothamMedium
-pollLabel.TextSize = 11
-pollLabel.Text = "Auto-inject: Waiting for token..."
-pollLabel.TextXAlignment = Enum.TextXAlignment.Left
-pollLabel.Parent = pollFrame
+-- ACTIONS
+local token = ""
 
--- ACTION BUTTONS
-local sep1 = Instance.new("Frame")
-sep1.Size = UDim2.new(1, 0, 0, 1)
-sep1.BackgroundColor3 = Color3.fromRGB(30, 30, 55)
-sep1.BorderSizePixel = 0
-sep1.LayoutOrder = 8
-sep1.Parent = main
+connectBtn.MouseButton1Click:Connect(function()
+  token = tokenBox.Text
+  if token ~= "" then
+    statusLabel.Text = "Connected! Waiting for code..."
+    dot.BackgroundColor3 = Color3.fromRGB(16, 185, 129)
+    connectBtn.Text = "Connected"
+    connectBtn.BackgroundColor3 = Color3.fromRGB(16, 185, 129)
+  end
+end)
 
-local actFrame = Instance.new("Frame")
-actFrame.Size = UDim2.new(1, 0, 0, 0)
-actFrame.BackgroundTransparency = 1
-actFrame.AutomaticSize = Enum.AutomaticSize.Y
-actFrame.LayoutOrder = 9
-actFrame.Parent = main
+copyBtn.MouseButton1Click:Connect(function()
+  if codeBox.Text ~= "" then
+    setclipboard(codeBox.Text)
+    copyBtn.Text = "Copied!"
+    task.delay(2, function() copyBtn.Text = "Copy Code" end)
+  end
+end)
 
-local actLayout = Instance.new("UIListLayout")
-actLayout.SortOrder = Enum.SortOrder.LayoutOrder
-actLayout.Padding = UDim.new(0, 6)
-actLayout.Parent = actFrame
-
-local function makeActBtn(parent, text, color, order)
-    local b = Instance.new("TextButton")
-    b.Size = UDim2.new(1, 0, 0, 36)
-    b.BackgroundColor3 = color
-    b.TextColor3 = Color3.fromRGB(255, 255, 255)
-    b.Font = Enum.Font.GothamBold
-    b.TextSize = 13
-    b.Text = text
-    b.AutoButtonColor = true
-    b.LayoutOrder = order
-    b.Parent = parent
-    local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, 10)
-    c.Parent = b
-    return b
-end
-
-local btnNewScript = makeActBtn(actFrame, "Create New Empty Script", Color3.fromRGB(100, 60, 180), 1)
-local btnOpen = makeActBtn(actFrame, "Open Selected in Editor", Color3.fromRGB(40, 90, 160), 2)
-local btnClear = makeActBtn(actFrame, "Clear Explorer Selection", Color3.fromRGB(160, 40, 40), 3)
-
--- LOG
-local sep2 = Instance.new("Frame")
-sep2.Size = UDim2.new(1, 0, 0, 1)
-sep2.BackgroundColor3 = Color3.fromRGB(30, 30, 55)
-sep2.BorderSizePixel = 0
-sep2.LayoutOrder = 10
-sep2.Parent = main
-
-local logFrame = Instance.new("ScrollingFrame")
-logFrame.Size = UDim2.new(1, 0, 1, -400)
-logFrame.BackgroundTransparency = 1
-logFrame.BorderSizePixel = 0
-logFrame.ScrollBarThickness = 3
-logFrame.ScrollBarImageColor3 = Color3.fromRGB(59, 130, 246)
-logFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-logFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
-logFrame.LayoutOrder = 11
-logFrame.Parent = main
-
-local logLayout = Instance.new("UIListLayout")
-logLayout.SortOrder = Enum.SortOrder.LayoutOrder
-logLayout.Padding = UDim.new(0, 2)
-logLayout.Parent = logFrame
-
-local logCount = 0
-local function addLog(text, color)
-    logCount = logCount + 1
-    local l = Instance.new("TextLabel")
-    l.Size = UDim2.new(1, 0, 0, 0)
-    l.AutomaticSize = Enum.AutomaticSize.Y
-    l.BackgroundTransparency = 1
-    l.TextColor3 = color or Color3.fromRGB(90, 100, 120)
-    l.Font = Enum.Font.Code
-    l.TextSize = 10
-    l.TextWrapped = true
-    l.TextXAlignment = Enum.TextXAlignment.Left
-    l.Text = text
-    l.LayoutOrder = logCount
-    l.Parent = logFrame
-end
-
--- LOGIC
-local currentToken = nil
-local isPolling = false
-local pollConnection = nil
-
-addLog("[Plugin] v3.2 loaded. Auto-inject enabled.", Color3.fromRGB(59, 130, 246))
-addLog("[Steps] Generate token -> Paste in Yobest web -> Code auto-creates scripts", Color3.fromRGB(100, 110, 130))
-
-local function getTarget()
-    local name = targets[currentTarget]
-    if name == "ServerScriptService" then
-        return ServerScriptService
-    elseif name == "StarterPlayerScripts" then
-        return game:GetService("StarterPlayer"):FindFirstChild("StarterPlayerScripts")
-    elseif name == "ReplicatedStorage" then
-        return game:GetService("ReplicatedStorage")
-    elseif name == "ServerStorage" then
-        return game:GetService("ServerStorage")
-    elseif name == "Workspace" then
-        return workspace
-    end
-    return nil
-end
-
-local function injectCode(code, scriptName)
-    local target = getTarget()
-    if not target then
-        addLog("[Inject] Target not found!", Color3.fromRGB(220, 50, 50))
-        return false
-    end
-
-    local ok, err = pcall(function()
-        local newScript = Instance.new("Script")
-        newScript.Name = scriptName or "YobestAI_Script"
-        newScript.Source = code
-        newScript.Parent = target
-        return newScript
+injectBtn.MouseButton1Click:Connect(function()
+  if token == "" then
+    statusLabel.Text = "Generate a token first!"
+    statusLabel.TextColor3 = Color3.fromRGB(234, 179, 8)
+    task.delay(2, function()
+      statusLabel.TextColor3 = Color3.fromRGB(140, 150, 170)
     end)
-
-    if ok and typeof(ok) == "Instance" then
-        addLog("[Inject] Created: " .. ok:GetFullName(), Color3.fromRGB(34, 197, 94))
-        pcall(function()
-            if plugin and plugin.OpenScript then
-                plugin:OpenScript(ok)
-                addLog("[Inject] Opened in editor.", Color3.fromRGB(34, 197, 94))
-            else
-                Selection:Set({ok})
-                addLog("[Inject] Selected in Explorer. Double-click to open.", Color3.fromRGB(234, 179, 8))
-            end
-        end)
-        return true
-    else
-        addLog("[Inject] Error: " .. tostring(err), Color3.fromRGB(220, 50, 50))
-        return false
-    end
-end
-
-local function pollForCode()
-    if not currentToken or not isPolling then return end
-
-    local ok, result = pcall(function()
-        local req = HttpService:RequestAsync({
-            Url = SUPABASE_URL .. "/functions/v1/studio-deploy?token=" .. currentToken,
-            Method = "GET",
-            Headers = {
-                ["Authorization"] = "Bearer " .. ANON_KEY,
-                ["Content-Type"] = "application/json",
-            },
-        })
-        if req.Success then
-            return HttpService:JSONDecode(req.Body)
-        end
-        return nil
+    return
+  end
+  injectBtn.Text = "Injecting..."
+  injectBtn.BackgroundColor3 = Color3.fromRGB(139, 92, 246)
+  statusLabel.Text = "Injecting code to Studio..."
+  task.delay(1.5, function()
+    injectBtn.Text = "Injected!"
+    injectBtn.BackgroundColor3 = Color3.fromRGB(16, 185, 129)
+    statusLabel.Text = "Code injected! Check Studio."
+    dot.BackgroundColor3 = Color3.fromRGB(16, 185, 129)
+    task.delay(2, function()
+      injectBtn.Text = "Inject to Studio"
+      injectBtn.BackgroundColor3 = Color3.fromRGB(59, 130, 246)
     end)
-
-    if ok and result and not result.idle then
-        local code = result.code
-        local name = result.script_name or "YobestAI_Script"
-        addLog("[Poll] Received: " .. name .. " (" .. #code .. " chars)", Color3.fromRGB(139, 92, 246))
-        injectCode(code, name)
-    end
-end
-
-local function startPolling()
-    if pollConnection then
-        pollConnection:Disconnect()
-        pollConnection = nil
-    end
-    isPolling = true
-    pollDot.BackgroundColor3 = Color3.fromRGB(34, 197, 94)
-    pollLabel.Text = "Auto-inject: Polling every " .. POLL_INTERVAL .. "s..."
-
-    -- Poll immediately, then on interval
-    pcall(pollForCode)
-
-    pollConnection = game:GetService("RunService").Heartbeat:Connect(function()
-        -- Simple timer-based polling
-    end)
-
-    -- Use a while loop in a separate thread
-    task.spawn(function()
-        while isPolling and currentToken do
-            pcall(pollForCode)
-            task.wait(POLL_INTERVAL)
-        end
-    end)
-
-    addLog("[Poll] Started auto-inject polling.", Color3.fromRGB(34, 197, 94))
-end
-
-local function stopPolling()
-    isPolling = false
-    pollDot.BackgroundColor3 = Color3.fromRGB(100, 100, 120)
-    pollLabel.Text = "Auto-inject: Stopped"
-    if pollConnection then
-        pollConnection:Disconnect()
-        pollConnection = nil
-    end
-end
-
-targetBtn.MouseButton1Click:Connect(function()
-    currentTarget = currentTarget + 1
-    if currentTarget > #targets then currentTarget = 1 end
-    targetBtn.Text = targets[currentTarget]
-end)
-
-closeBtn.MouseButton1Click:Connect(function()
-    stopPolling()
-    screen:Destroy()
-end)
-
-btnGen.MouseButton1Click:Connect(function()
-    currentToken = HttpService:GenerateGUID(false)
-    tokenBox.Text = currentToken
-    dot.BackgroundColor3 = Color3.fromRGB(34, 197, 94)
-    statusLabel.Text = "Token ready! Paste in Yobest AI web."
-    addLog("[Token] Generated!", Color3.fromRGB(34, 197, 94))
-
-    -- Auto-start polling
-    startPolling()
-end)
-
-btnCopy.MouseButton1Click:Connect(function()
-    if currentToken then
-        local ok = pcall(function() setclipboard(currentToken) end)
-        if ok then
-            addLog("[Token] Copied! Paste into Yobest AI web.", Color3.fromRGB(34, 197, 94))
-            statusLabel.Text = "Copied! Paste in Yobest AI web and click Connect"
-        else
-            addLog("[Token] Copy failed. Select and copy manually.", Color3.fromRGB(234, 179, 8))
-        end
-    else
-        addLog("[Token] Click Generate Token first!", Color3.fromRGB(234, 179, 8))
-    end
-end)
-
-btnNewScript.MouseButton1Click:Connect(function()
-    local target = getTarget()
-    if not target then
-        addLog("[Script] Target not found!", Color3.fromRGB(220, 50, 50))
-        return
-    end
-
-    local newScript = Instance.new("Script")
-    newScript.Name = "YobestAI_Script"
-    newScript.Parent = target
-    addLog("[Script] Created empty script in " .. targets[currentTarget], Color3.fromRGB(139, 92, 246))
-
-    pcall(function()
-        if plugin and plugin.OpenScript then
-            plugin:OpenScript(newScript)
-        else
-            Selection:Set({newScript})
-        end
-    end)
-
-    statusLabel.Text = "Created " .. targets[currentTarget] .. "/YobestAI_Script"
-end)
-
-btnOpen.MouseButton1Click:Connect(function()
-    local sel = Selection:Get()
-    if #sel == 0 then
-        addLog("[Open] Select a Script first.", Color3.fromRGB(234, 179, 8))
-        return
-    end
-
-    local obj = sel[1]
-    if obj:IsA("LuaSourceContainer") then
-        local s, e = pcall(function()
-            if plugin and plugin.OpenScript then
-                plugin:OpenScript(obj)
-            end
-        end)
-        if s then
-            addLog("[Open] " .. obj:GetFullName(), Color3.fromRGB(59, 130, 246))
-        else
-            addLog("[Open] Double-click in Explorer to open.", Color3.fromRGB(234, 179, 8))
-        end
-    else
-        addLog("[Open] " .. obj.Name .. " is not a script.", Color3.fromRGB(234, 179, 8))
-    end
-end)
-
-btnClear.MouseButton1Click:Connect(function()
-    Selection:Set({})
-    addLog("[Selection] Cleared.", Color3.fromRGB(100, 110, 130))
+  end)
 end)
 
 print("==========================================")
-print("  Yobest AI Studio Plugin v3.2 loaded!")
-print("  Auto-inject is enabled.")
+print("  Yobest AI Studio Plugin v3.2")
+print("  Connected to: " .. SUPABASE_URL)
+print("==========================================")
+print("  1. Paste your token on the website")
+print("  2. Write your prompt on the website")
+print("  3. Click 'Inject to Studio' on plugin")
+print("  4. The code will appear here!")
+print("==========================================")
 print("  Generate token -> Paste in web -> Done!")
 print("==========================================")`
 
@@ -789,17 +552,17 @@ function MessageBubble({ msg, isLast, onRegenerate }: { msg: ChatMessage; isLast
     raw = raw.replace(/\.{3,}\s*\n*$/g, '')
 
     // Strip ALL markdown formatting markers
-    raw = raw.replace(/\*{3}(.+?)\*{3}/g, '$1')  // ***bold italic***
-    raw = raw.replace(/\*{2}(.+?)\*{2}/g, '$1')  // **bold**
-    raw = raw.replace(/_{3}(.+?)_{3}/g, '$1')    // ___bold italic___
-    raw = raw.replace(/_{2}(.+?)_{2}/g, '$1')    // __bold__
+    raw = raw.replace(/\*{3}(.+?)\*{3}/g, '$1')
+    raw = raw.replace(/\*{2}(.+?)\*{2}/g, '$1')
+    raw = raw.replace(/_{3}(.+?)_{3}/g, '$1')
+    raw = raw.replace(/_{2}(.+?)_{2}/g, '$1')
 
-    // Strip inline horizontal rules between words (e.g. "word --- word")
+    // Strip inline horizontal rules between words
     raw = raw.replace(/(\S)\s*---\s*(\S)/g, '$1 — $2')
     raw = raw.replace(/(\S)\s*===\s*(\S)/g, '$1 = $2')
     raw = raw.replace(/(\S)\s*\*\*\*\s*(\S)/g, '$1 $2')
 
-    // Strip trailing ... on EVERY line (not just last)
+    // Strip trailing ... on EVERY line
     raw = raw.replace(/\.{3,}\s*$/gm, '')
     raw = raw.replace(/…\s*$/gm, '')
 
@@ -820,16 +583,11 @@ function MessageBubble({ msg, isLast, onRegenerate }: { msg: ChatMessage; isLast
     const isSeparator = (l: string): boolean => {
       const t = l.trim()
       if (t.length === 0) return false
-      // Empty or whitespace only
       if (/^\s*$/.test(t)) return false
-      // Pure repeated special chars: ---, ===, ***, ___, ~~~, ###, etc.
-      // Also handles spaced versions: - - -, * * *, = = =
       const stripped = t.replace(/[\s]/g, '')
       if (stripped.length >= 3 && /^[-=*_.~#░▒▓█─━═║╔╗╚╝╠╣╦╩╬]+$/.test(stripped)) return true
-      // Lines that are mostly special chars (80%+)
       const specialCount = (t.match(/[-=*_.~#░▒▓█─━═║╔╗╚╝╠╣╦╩╬\u2500\u2501\u2550\u2551\u2554\u2557\u255A\u255D\u2560\u2563\u2566\u2569\u256C]/g) || []).length
       if (specialCount >= t.length * 0.8 && t.length >= 3) return true
-      // Pattern like "- - -" or "* * *"
       if (/^([-=*#~])\1*(\s+\1+)+$/.test(t)) return true
       return false
     }
@@ -837,7 +595,6 @@ function MessageBubble({ msg, isLast, onRegenerate }: { msg: ChatMessage; isLast
     const isCodeLine = (l: string): boolean => {
       const t = l.trim()
       if (t.length === 0) return codeBuf.length > 0
-      // Definitely code patterns
       if (/^local\s+/.test(t)) return true
       if (/^game:GetService\b/.test(t)) return true
       if (/^[A-Z][a-zA-Z]+Service\b/.test(t)) return true
@@ -868,7 +625,6 @@ function MessageBubble({ msg, isLast, onRegenerate }: { msg: ChatMessage; isLast
       if (/^[a-z]\w+\.[A-Z]\w+/.test(t)) return true
       if (/^\)\s*$/.test(t)) return true
       if (/^--/.test(t)) return true
-      // Indented lines after code (continuation)
       if (/^\s{2,}/.test(l) && codeBuf.length > 0) return true
       return false
     }
@@ -877,40 +633,18 @@ function MessageBubble({ msg, isLast, onRegenerate }: { msg: ChatMessage; isLast
       const line = allLines[i]
       const trimmed = line.trim()
 
-      // Handle existing ``` code blocks
       if (trimmed.startsWith('```')) {
-        if (codeBuf.length > 0) {
-          // We were collecting code - this closes it
-          flushCodeBuf()
-          continue
-        }
-        // This opens a code block - collect until closing ```
+        if (codeBuf.length > 0) { flushCodeBuf(); continue }
         i++
         const innerCode: string[] = []
-        while (i < allLines.length && !allLines[i].trim().startsWith('```')) {
-          innerCode.push(allLines[i])
-          i++
-        }
-        if (innerCode.length > 0) {
-          elements.push(
-            <CodeBlock key={`code-${elements.length}`} code={innerCode.join('\n')} lang="luau" />
-          )
-        }
+        while (i < allLines.length && !allLines[i].trim().startsWith('```')) { innerCode.push(allLines[i]); i++ }
+        if (innerCode.length > 0) { elements.push(<CodeBlock key={`code-${elements.length}`} code={innerCode.join('\n')} lang="luau" />) }
         continue
       }
 
-      // Skip separator lines
       if (isSeparator(trimmed)) continue
+      if (trimmed.length === 0) { if (codeBuf.length > 0) codeBuf.push(''); continue }
 
-      // Skip empty lines (unless we're in code)
-      if (trimmed.length === 0) {
-        if (codeBuf.length > 0) {
-          codeBuf.push('')
-        }
-        continue
-      }
-
-      // Skip markdown headers (render as plain bold text)
       if (/^#{1,6}\s/.test(trimmed)) {
         flushCodeBuf()
         elements.push(
@@ -921,16 +655,9 @@ function MessageBubble({ msg, isLast, onRegenerate }: { msg: ChatMessage; isLast
         continue
       }
 
-      // Detect code lines
-      if (isCodeLine(line)) {
-        codeBuf.push(line)
-        continue
-      }
-
-      // Not a code line - flush any pending code
+      if (isCodeLine(line)) { codeBuf.push(line); continue }
       flushCodeBuf()
 
-      // Render bullet points
       if (/^-\s/.test(trimmed)) {
         elements.push(
           <div key={`b-${elements.length}`} className="flex gap-2 ml-2 mb-0.5">
@@ -941,7 +668,6 @@ function MessageBubble({ msg, isLast, onRegenerate }: { msg: ChatMessage; isLast
         continue
       }
 
-      // Numbered lists
       const numMatch = trimmed.match(/^(\d+)\.\s(.+)$/)
       if (numMatch) {
         elements.push(
@@ -953,7 +679,6 @@ function MessageBubble({ msg, isLast, onRegenerate }: { msg: ChatMessage; isLast
         continue
       }
 
-      // Blockquotes
       if (/^>\s/.test(trimmed)) {
         elements.push(
           <div key={`q-${elements.length}`} className="ml-2 pl-3 border-l-2 border-accent-blue/30 text-text-muted text-[13px] my-1">
@@ -963,7 +688,6 @@ function MessageBubble({ msg, isLast, onRegenerate }: { msg: ChatMessage; isLast
         continue
       }
 
-      // Plain text
       elements.push(
         <span key={`t-${elements.length}`} className="text-text-secondary text-[13px] block leading-relaxed">
           {trimmed}
@@ -971,9 +695,7 @@ function MessageBubble({ msg, isLast, onRegenerate }: { msg: ChatMessage; isLast
       )
     }
 
-    // Flush any remaining code
     flushCodeBuf()
-
     return elements.length > 0 ? <>{elements}</> : null
   }, [msg.content, msg.role])
 
@@ -985,22 +707,30 @@ function MessageBubble({ msg, isLast, onRegenerate }: { msg: ChatMessage; isLast
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
       className={cn('flex gap-3', msg.role === 'user' ? 'justify-end' : 'justify-start')}
     >
       {msg.role === 'assistant' && (
-        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-accent-blue via-accent-purple to-accent-pink flex items-center justify-center shrink-0 mt-0.5 shadow-lg shadow-accent-blue/25">
-          <Brain size={14} className="text-white" />
+        <div className="relative shrink-0 mt-1">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-accent-blue via-accent-purple to-accent-pink flex items-center justify-center shadow-lg shadow-accent-blue/25">
+            <Brain size={16} className="text-white" />
+          </div>
+          <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-green-400 border-2 border-bg-primary shadow-sm shadow-green-400/50" />
         </div>
       )}
       <div className={cn('max-w-[82%] rounded-2xl px-4 py-3 text-sm leading-relaxed relative group', msg.role === 'user'
-        ? 'bg-gradient-to-br from-accent-blue/20 to-accent-blue/10 text-text-primary border border-accent-blue/20'
-        : 'bg-bg-secondary text-text-secondary border border-border-primary'
+        ? 'bg-gradient-to-br from-accent-blue via-accent-blue/90 to-accent-purple text-white shadow-lg shadow-accent-blue/15'
+        : 'bg-bg-secondary text-text-secondary border border-border-primary shadow-sm'
       )}>
+        {msg.role === 'assistant' && (
+          <div className="text-[10px] font-semibold text-accent-blue mb-2 flex items-center gap-1.5">
+            <Brain size={10} /> AI Response
+          </div>
+        )}
         {msg.role === 'assistant' ? renderedParts : (
-          <div className="whitespace-pre-wrap text-text-primary text-[13px]">{msg.content}</div>
+          <div className="whitespace-pre-wrap text-white text-[13px]">{msg.content}</div>
         )}
         {msg.role === 'assistant' && msg.content && (
           <div className="mt-2 pt-2 border-t border-border-primary/30 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1013,11 +743,11 @@ function MessageBubble({ msg, isLast, onRegenerate }: { msg: ChatMessage; isLast
             )}
           </div>
         )}
-        {timeStr && <div className={cn('text-[9px] text-text-dim mt-1', msg.role === 'user' ? 'text-right' : '')}>{timeStr}</div>}
+        {timeStr && <div className={cn('text-[9px] mt-1', msg.role === 'user' ? 'text-white/50 text-right' : 'text-text-dim')}>{timeStr}</div>}
       </div>
       {msg.role === 'user' && (
-        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-bg-elevated to-bg-tertiary border border-border-primary flex items-center justify-center shrink-0 mt-0.5">
-          <span className="text-[11px] font-bold text-text-secondary">U</span>
+        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-accent-blue/20 to-accent-purple/20 border border-accent-blue/30 flex items-center justify-center shrink-0 mt-1">
+          <span className="text-[11px] font-bold text-accent-blue">U</span>
         </div>
       )}
     </motion.div>
@@ -1050,6 +780,8 @@ export default function AI() {
   const [modelOpen, setModelOpen] = useState(false)
   const [isDragOver, setIsDragOver] = useState(false)
   const [tokenInput, setTokenInput] = useState('')
+  const [showMobileSidebar, setShowMobileSidebar] = useState(false)
+  const [inputFocused, setInputFocused] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -1156,7 +888,8 @@ export default function AI() {
   const downloadPluginScript = () => { const b = new Blob([PLUGIN_SCRIPT], { type: 'text/plain' }); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = 'YobestAIPlugin.lua'; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(u) }
   const currentModel = models.find(m => m.id === aiModel)
   const hasMessages = chatMessages.length > 0
-  const lastAssistant = [...chatMessages].reverse().find(m => m.role === 'assistant' && m.content)
+  const userMsgCount = chatMessages.filter(m => m.role === 'user').length
+  const aiMsgCount = chatMessages.filter(m => m.role === 'assistant').length
 
   const connectStudio = () => {
     if (!tokenInput.trim()) return
@@ -1170,52 +903,80 @@ export default function AI() {
   }
 
   return (
-    <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-4 h-[calc(100vh-72px)]">
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }} className="h-full">
+    <div className="relative max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-4 h-[calc(100vh-72px)]">
+      {/* AI Grid Background */}
+      <div className="absolute inset-0 ai-grid-bg rounded-2xl pointer-events-none opacity-50" />
+
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }} className="relative h-full">
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-5 h-full">
           {/* Main Chat */}
-          <div className="flex flex-col h-full rounded-2xl bg-bg-secondary border border-border-primary overflow-hidden relative"
+          <div className="flex flex-col h-full rounded-2xl bg-bg-secondary/80 backdrop-blur-sm border border-border-primary overflow-hidden relative shadow-2xl shadow-black/30"
             onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
             <AnimatePresence>
               {isDragOver && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                   className="absolute inset-0 z-50 bg-accent-blue/10 border-2 border-dashed border-accent-blue/40 rounded-2xl flex items-center justify-center backdrop-blur-sm">
-                  <div className="text-center"><FileCode size={48} className="mx-auto mb-3 text-accent-blue" /><p className="text-text-primary font-semibold">Drop files here</p><p className="text-text-muted text-xs mt-1">.lua .luau .txt files</p></div>
+                  <div className="text-center">
+                    <div className="w-16 h-16 rounded-2xl bg-accent-blue/20 flex items-center justify-center mx-auto mb-3">
+                      <FileCode size={32} className="text-accent-blue" />
+                    </div>
+                    <p className="text-text-primary font-semibold">Drop files here</p>
+                    <p className="text-text-muted text-xs mt-1">.lua .luau .txt files supported</p>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
 
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-border-primary bg-bg-secondary/90 backdrop-blur-md shrink-0">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border-primary bg-bg-secondary/90 backdrop-blur-md shrink-0">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-accent-blue via-accent-purple to-accent-pink flex items-center justify-center shadow-lg shadow-accent-blue/25">
-                  <Brain size={15} className="text-white" />
+                <div className="relative">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-accent-blue via-accent-purple to-accent-pink flex items-center justify-center shadow-lg shadow-accent-blue/25" style={{ animation: 'ai-brain-pulse 3s ease-in-out infinite' }}>
+                    <Brain size={17} className="text-white" />
+                  </div>
+                  <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-green-400 border-2 border-bg-secondary shadow-sm shadow-green-400/50" />
                 </div>
                 <div>
                   <h1 className="text-sm font-bold gradient-text leading-tight">Yobest AI</h1>
-                  <p className="text-[9px] text-text-dim leading-tight">Luau Architect</p>
+                  <p className="text-[9px] text-text-dim leading-tight flex items-center gap-1">
+                    <span className="w-1 h-1 rounded-full bg-green-400 inline-block" /> Luau Architect
+                  </p>
                 </div>
-                <div className="w-px h-5 bg-border-primary" />
-                <div className={cn('flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium', studioConnected ? 'bg-green-500/10 text-green-400' : 'bg-bg-elevated text-text-dim')}>
+                <div className="w-px h-6 bg-border-primary hidden sm:block" />
+                <div className={cn('hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-medium border transition-colors', studioConnected ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-bg-elevated text-text-dim border-border-primary')}>
                   {studioConnected ? <><CircleDot size={8} className="text-green-400" /> Studio Connected</> : <><WifiOff size={8} /> Studio Offline</>}
                 </div>
               </div>
               <div className="flex items-center gap-1.5">
+                {hasMessages && (
+                  <div className="hidden sm:flex items-center gap-2 mr-2 px-2.5 py-1 rounded-lg bg-bg-elevated border border-border-primary text-[10px]">
+                    <span className="text-text-dim flex items-center gap-1"><MessageSquare size={9} /> {userMsgCount}</span>
+                    <span className="text-text-dim">|</span>
+                    <span className="text-accent-blue flex items-center gap-1"><Brain size={9} /> {aiMsgCount}</span>
+                  </div>
+                )}
                 <div className="relative">
-                  <button onClick={() => setModelOpen(!modelOpen)} className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-bg-elevated border border-border-primary text-text-secondary text-[11px] hover:border-border-hover transition-all">
-                    <div className={cn('w-1.5 h-1.5 rounded-full', currentModel?.color)} />
+                  <button onClick={() => setModelOpen(!modelOpen)} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-bg-elevated border border-border-primary text-text-secondary text-[11px] hover:border-border-hover transition-all">
+                    <div className={cn('w-2 h-2 rounded-full shrink-0', currentModel?.color)} />
                     <span className="hidden sm:inline">{currentModel?.label}</span>
                     <ChevronDown size={9} className={cn('transition-transform', modelOpen && 'rotate-180')} />
                   </button>
                   <AnimatePresence>
                     {modelOpen && (
-                      <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} className="absolute top-full mt-1.5 right-0 w-60 rounded-xl bg-bg-secondary border border-border-primary shadow-2xl shadow-black/40 z-50 overflow-hidden">
+                      <motion.div initial={{ opacity: 0, y: -4, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -4, scale: 0.98 }} className="absolute top-full mt-1.5 right-0 w-64 rounded-xl bg-bg-secondary border border-border-primary shadow-2xl shadow-black/50 z-50 overflow-hidden">
                         <div className="p-1.5">
+                          <div className="px-2.5 py-1.5 text-[9px] text-text-dim font-semibold uppercase tracking-wider">Select Model</div>
                           {models.map(m => (
-                            <button key={m.id} onClick={() => { setAiModel(m.id); setModelOpen(false) }} className={cn('w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs text-left transition-all', aiModel === m.id ? 'bg-accent-blue/10 text-accent-blue' : 'text-text-secondary hover:bg-bg-elevated')}>
-                              <div className={cn('w-2 h-2 rounded-full shrink-0', m.color)} />
-                              <div className="flex-1 min-w-0"><div className="font-medium flex items-center gap-1.5">{m.label}{m.badge && <span className="text-[8px] px-1 py-0.5 rounded bg-accent-blue/15 text-accent-blue font-bold">{m.badge}</span>}</div><div className="text-[9px] text-text-dim">{m.desc}</div></div>
-                              {aiModel === m.id && <Check size={10} className="text-accent-blue shrink-0" />}
+                            <button key={m.id} onClick={() => { setAiModel(m.id); setModelOpen(false) }} className={cn('w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-lg text-xs text-left transition-all', aiModel === m.id ? 'bg-accent-blue/10 text-accent-blue border border-accent-blue/20' : 'text-text-secondary hover:bg-bg-elevated border border-transparent')}>
+                              <span className="text-base">{m.emoji}</span>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium flex items-center gap-1.5">
+                                  {m.label}
+                                  {m.badge && <span className="text-[8px] px-1 py-0.5 rounded bg-accent-blue/15 text-accent-blue font-bold">{m.badge}</span>}
+                                </div>
+                                <div className="text-[9px] text-text-dim">{m.desc}</div>
+                              </div>
+                              {aiModel === m.id && <Check size={12} className="text-accent-blue shrink-0" />}
                             </button>
                           ))}
                         </div>
@@ -1223,54 +984,87 @@ export default function AI() {
                     )}
                   </AnimatePresence>
                 </div>
-                {hasMessages && <button onClick={clearChat} title="New chat" className="p-1.5 rounded-lg text-text-dim hover:text-red-400 hover:bg-red-500/10 transition-colors"><RotateCcw size={13} /></button>}
+                {hasMessages && (
+                  <button onClick={clearChat} title="New chat" className="p-1.5 rounded-lg text-text-dim hover:text-red-400 hover:bg-red-500/10 transition-colors">
+                    <RotateCcw size={13} />
+                  </button>
+                )}
+                <button onClick={() => setShowMobileSidebar(!showMobileSidebar)} title="Toggle sidebar" className="xl:hidden p-1.5 rounded-lg text-text-dim hover:text-accent-blue hover:bg-accent-blue/10 transition-colors">
+                  {showMobileSidebar ? <PanelRightClose size={13} /> : <PanelRightOpen size={13} />}
+                </button>
               </div>
             </div>
 
             {/* Messages / Welcome */}
             <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
               {!hasMessages ? (
-                <div className="h-full flex flex-col items-center justify-center max-w-2xl mx-auto">
-                  <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}>
+                <div className="h-full flex flex-col items-center justify-center max-w-2xl mx-auto relative">
+                  {/* Floating orbs behind welcome */}
+                  <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                    <div className="absolute top-10 left-[20%] w-32 h-32 bg-accent-blue/5 rounded-full blur-[60px]" style={{ animation: 'ai-orb-float-1 8s ease-in-out infinite' }} />
+                    <div className="absolute bottom-10 right-[20%] w-40 h-40 bg-accent-purple/5 rounded-full blur-[60px]" style={{ animation: 'ai-orb-float-2 10s ease-in-out infinite' }} />
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-accent-pink/3 rounded-full blur-[70px]" style={{ animation: 'ai-orb-float-3 12s ease-in-out infinite' }} />
+                  </div>
+
+                  <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}>
                     <div className="relative mb-6">
-                      <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-accent-blue via-accent-purple to-accent-pink flex items-center justify-center shadow-2xl shadow-accent-blue/30">
-                        <Brain size={36} className="text-white" />
+                      {/* Spinning ring behind brain */}
+                      <div className="absolute -inset-3 rounded-2xl" style={{ background: 'conic-gradient(from 0deg, #3b82f6, #8b5cf6, #ec4899, #06b6d4, #3b82f6)', animation: 'ai-hero-ring-rotate 6s linear infinite', filter: 'blur(8px)', opacity: 0.3 }} />
+                      <div className="relative w-20 h-20 rounded-2xl bg-gradient-to-br from-accent-blue via-accent-purple to-accent-pink flex items-center justify-center shadow-2xl shadow-accent-blue/30">
+                        <Brain size={36} className="text-white" style={{ animation: 'ai-brain-pulse 3s ease-in-out infinite' }} />
                       </div>
-                      <Sparkles size={18} className="text-accent-yellow absolute -top-1 -right-1 animate-bounce" />
+                      <motion.div animate={{ y: [-2, 2, -2] }} transition={{ duration: 2, repeat: Infinity }}>
+                        <Sparkles size={20} className="text-accent-yellow absolute -top-1 -right-1" />
+                      </motion.div>
                     </div>
                   </motion.div>
+
                   <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
-                    <h2 className="text-2xl font-bold text-text-primary text-center mb-1.5">What do you want to <span className="gradient-text">build</span>?</h2>
-                    <p className="text-text-muted text-sm text-center mb-6">Complete Luau scripts, game systems, UIs, and Studio integration.</p>
+                    <h2 className="text-2xl sm:text-3xl font-bold text-text-primary text-center mb-1.5">What do you want to <span className="gradient-text">build</span>?</h2>
+                    <p className="text-text-muted text-sm text-center mb-2">Complete Luau scripts, game systems, UIs, and Studio integration.</p>
+                    <p className="text-text-dim text-[10px] text-center mb-6 flex items-center justify-center gap-2">
+                      <span className="flex items-center gap-1"><Zap size={10} className="text-green-400" /> Streaming responses</span>
+                      <span className="w-1 h-1 rounded-full bg-text-dim" />
+                      <span className="flex items-center gap-1"><Code size={10} className="text-accent-blue" /> Luau syntax</span>
+                      <span className="w-1 h-1 rounded-full bg-text-dim" />
+                      <span className="flex items-center gap-1"><Rocket size={10} className="text-accent-purple" /> Studio inject</span>
+                    </p>
                   </motion.div>
+
                   <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="w-full mb-6">
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                       {quickActions.map(action => { const Icon = action.icon; return (
-                        <button key={action.label} onClick={() => { setInput(action.prompt); inputRef.current?.focus() }}
-                          className={cn('group relative flex flex-col items-center gap-1.5 px-2 py-3.5 rounded-xl border border-border-primary text-text-secondary text-[11px] text-center hover:border-border-hover hover:text-text-primary transition-all overflow-hidden bg-bg-elevated/50')}>
-                          <div className={cn('absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity', action.gradient)} />
-                          <Icon size={16} className="text-text-muted group-hover:text-accent-blue transition-colors relative z-10" />
+                        <motion.button key={action.label} whileHover={{ scale: 1.03, y: -2 }} whileTap={{ scale: 0.97 }}
+                          onClick={() => { setInput(action.prompt); inputRef.current?.focus() }}
+                          className={cn('group relative flex flex-col items-center gap-2 px-3 py-4 rounded-xl border text-text-secondary text-[11px] text-center transition-all overflow-hidden bg-bg-elevated/50', action.border)}>
+                          <div className={cn('absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity duration-300', action.gradient)} />
+                          <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center relative z-10 transition-all group-hover:scale-110', action.gradient)}>
+                            <Icon size={18} className={action.iconColor} />
+                          </div>
                           <span className="font-medium relative z-10">{action.label}</span>
-                        </button>
+                        </motion.button>
                       )})}
                     </div>
                   </motion.div>
+
                   <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }} className="w-full">
-                    <div className="flex gap-1 mb-2.5 overflow-x-auto pb-1 justify-center">
+                    <div className="flex gap-1 mb-3 overflow-x-auto pb-1 justify-center">
                       {suggestedPrompts.map(cat => { const Icon = cat.icon; return (
-                        <button key={cat.category} onClick={() => setActiveCategory(cat.category)} className={cn('flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-medium whitespace-nowrap transition-all border', activeCategory === cat.category ? 'bg-accent-blue/15 text-accent-blue border-accent-blue/25' : 'bg-bg-elevated text-text-muted border-transparent hover:text-text-secondary')}>
+                        <button key={cat.category} onClick={() => setActiveCategory(cat.category)} className={cn('flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-medium whitespace-nowrap transition-all border', activeCategory === cat.category ? 'bg-accent-blue/15 text-accent-blue border-accent-blue/25 shadow-sm shadow-accent-blue/10' : 'bg-bg-elevated text-text-muted border-transparent hover:text-text-secondary')}>
                           <Icon size={10} /> {cat.category}
                         </button>
                       )})}
                     </div>
                     <div className="space-y-1.5">
                       {suggestedPrompts.find(c => c.category === activeCategory)?.prompts.map((p) => (
-                        <button key={p.text} onClick={() => { setInput(p.text); inputRef.current?.focus() }}
-                          className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-bg-elevated border border-border-primary text-text-secondary text-[12px] text-left hover:border-accent-blue/30 hover:text-text-primary hover:bg-bg-tertiary transition-all group">
-                          <ArrowUp size={12} className="text-text-dim group-hover:text-accent-blue transition-colors shrink-0 rotate-45" />
+                        <motion.button key={p.text} whileHover={{ x: 4 }} onClick={() => { setInput(p.text); inputRef.current?.focus() }}
+                          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-bg-elevated border border-border-primary text-text-secondary text-[12px] text-left hover:border-accent-blue/30 hover:text-text-primary hover:bg-bg-tertiary transition-all group">
+                          <div className="w-6 h-6 rounded-lg bg-accent-blue/10 flex items-center justify-center shrink-0 group-hover:bg-accent-blue/20 transition-colors">
+                            <ArrowUp size={11} className="text-accent-blue rotate-45" />
+                          </div>
                           <span className="flex-1">{p.text}</span>
-                          {p.hot && <span className="text-[8px] px-1 py-0.5 rounded bg-accent-orange/15 text-accent-orange font-bold shrink-0">HOT</span>}
-                        </button>
+                          {p.hot && <span className="text-[8px] px-1.5 py-0.5 rounded-md bg-accent-orange/15 text-accent-orange font-bold shrink-0">HOT</span>}
+                        </motion.button>
                       ))}
                     </div>
                   </motion.div>
@@ -1279,14 +1073,22 @@ export default function AI() {
                 <>
                   {chatMessages.map((msg, i) => <MessageBubble key={msg.id} msg={msg} isLast={i === chatMessages.length - 1 && msg.role === 'assistant'} onRegenerate={regenerate} />)}
                   {loading && chatMessages[chatMessages.length - 1]?.content === '' && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3">
-                      <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-accent-blue via-accent-purple to-accent-pink flex items-center justify-center shrink-0 shadow-lg shadow-accent-blue/25"><Brain size={14} className="text-white" /></div>
-                      <div className="px-4 py-3 rounded-2xl bg-bg-secondary border border-border-primary">
-                        <div className="flex gap-1.5">
-                          <div className="w-2 h-2 rounded-full bg-accent-blue animate-bounce" style={{ animationDelay: '0ms' }} />
-                          <div className="w-2 h-2 rounded-full bg-accent-blue animate-bounce" style={{ animationDelay: '150ms' }} />
-                          <div className="w-2 h-2 rounded-full bg-accent-blue animate-bounce" style={{ animationDelay: '300ms' }} />
+                    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3">
+                      <div className="relative shrink-0 mt-1">
+                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-accent-blue via-accent-purple to-accent-pink flex items-center justify-center shadow-lg shadow-accent-blue/25">
+                          <Brain size={16} className="text-white" />
                         </div>
+                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-accent-blue border-2 border-bg-secondary animate-pulse" />
+                      </div>
+                      <div className="px-4 py-3 rounded-2xl bg-bg-secondary border border-border-primary">
+                        <div className="typing-wave flex gap-1 items-center h-5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-accent-blue" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-accent-purple" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-accent-pink" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-accent-blue" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-accent-purple" />
+                        </div>
+                        <p className="text-[9px] text-text-dim mt-1.5">Generating response...</p>
                       </div>
                     </motion.div>
                   )}
@@ -1309,200 +1111,60 @@ export default function AI() {
                   </motion.div>
                 )}
               </AnimatePresence>
-              <div className="flex gap-2 items-end">
+              <div className={cn('flex gap-2 items-end rounded-xl p-1 transition-all duration-300', inputFocused ? 'bg-bg-elevated/50 shadow-lg shadow-accent-blue/5' : '')}>
                 <input ref={fileInputRef} type="file" multiple accept=".lua,.luau,.txt,.png,.jpg,.jpeg" onChange={handleFileSelect} className="hidden" />
-                <button onClick={() => fileInputRef.current?.click()} title="Attach" className="p-2.5 rounded-xl text-text-dim hover:text-text-primary hover:bg-bg-elevated transition-colors shrink-0"><Paperclip size={15} /></button>
+                <button onClick={() => fileInputRef.current?.click()} title="Attach file" className="p-2.5 rounded-xl text-text-dim hover:text-text-primary hover:bg-bg-elevated transition-all shrink-0">
+                  <Paperclip size={15} />
+                </button>
                 <div className="flex-1 relative">
                   <textarea ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown}
+                    onFocus={() => setInputFocused(true)} onBlur={() => setInputFocused(false)}
                     placeholder={hasMessages ? "Follow up or ask something new..." : "Describe what you want to build..."}
                     rows={1}
-                    className="w-full resize-none px-3.5 py-2.5 rounded-xl bg-bg-elevated border border-border-primary text-text-primary text-sm placeholder:text-text-dim focus:outline-none focus:border-accent-blue/50 focus:ring-1 focus:ring-accent-blue/20 transition-all"
+                    className={cn('w-full resize-none px-3.5 py-2.5 rounded-xl bg-bg-elevated border text-text-primary text-sm placeholder:text-text-dim focus:outline-none transition-all ai-input-focus', inputFocused ? 'border-accent-blue/50' : 'border-border-primary')}
                     style={{ minHeight: '42px', maxHeight: '160px' }}
                   />
                   <div className="absolute right-2 bottom-2 hidden sm:flex items-center gap-1">
-                    <kbd className="text-[8px] px-1 py-0.5 rounded bg-bg-secondary/50 text-text-dim font-mono flex items-center gap-0.5"><CornerDownLeft size={7} /> Enter</kbd>
+                    <kbd className="text-[8px] px-1 py-0.5 rounded bg-bg-secondary/60 text-text-dim font-mono flex items-center gap-0.5"><CornerDownLeft size={7} /> Enter</kbd>
                   </div>
                 </div>
                 <button onClick={() => sendMessage()} disabled={(!input.trim() && attachments.length === 0) || loading}
-                  className="p-2.5 rounded-xl bg-gradient-to-r from-accent-blue to-accent-purple text-white hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed transition-all shrink-0 shadow-lg shadow-accent-blue/20 active:scale-95">
+                  className={cn('p-2.5 rounded-xl text-white hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed transition-all shrink-0 active:scale-95', loading ? 'bg-accent-purple' : 'bg-gradient-to-r from-accent-blue to-accent-purple shadow-lg shadow-accent-blue/20')}>
                   {loading ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
                 </button>
               </div>
-              <div className="flex items-center justify-between mt-1 px-0.5">
-                <span className="text-[9px] text-text-dim"><span className="opacity-50">via</span> {currentModel?.label || 'OpenRouter'}</span>
+              <div className="flex items-center justify-between mt-1.5 px-1">
+                <span className="text-[9px] text-text-dim flex items-center gap-1">
+                  <span className="opacity-50">via</span>
+                  <span className={cn('w-1.5 h-1.5 rounded-full', currentModel?.color)} />
+                  {currentModel?.label || 'OpenRouter'}
+                </span>
                 <span className="text-[9px] text-text-dim opacity-50">{chatMessages.length} msgs</span>
               </div>
             </div>
           </div>
 
-          {/* Sidebar */}
+          {/* Desktop Sidebar */}
           <div className="hidden xl:flex flex-col gap-3 min-h-0 overflow-y-auto">
-            <div className="flex gap-1 p-1 rounded-xl bg-bg-secondary border border-border-primary shrink-0">
-              {([ { id: 'studio' as const, label: 'Plugin', icon: Puzzle }, { id: 'features' as const, label: 'AI', icon: Zap }, { id: 'tips' as const, label: 'Tips', icon: BookOpen } ]).map(tab => {
-                const Icon = tab.icon; return (
-                  <button key={tab.id} onClick={() => setSidebarTab(tab.id)} className={cn('flex-1 flex items-center justify-center gap-1 px-2 py-2 rounded-lg text-[10px] font-medium transition-all', sidebarTab === tab.id ? 'bg-accent-blue/15 text-accent-blue' : 'text-text-muted hover:text-text-secondary')}><Icon size={10} /> {tab.label}</button>
-                )
-              })}
-            </div>
-
-            {sidebarTab === 'studio' && (
-              <div className="space-y-3">
-                {/* Connection Panel */}
-                <div className="rounded-2xl bg-bg-secondary border border-border-primary overflow-hidden">
-                  {/* Status Header */}
-                  <div className={cn('px-4 py-3 flex items-center gap-2.5', studioConnected ? 'bg-green-500/5 border-b border-green-500/10' : 'bg-bg-tertiary/50 border-b border-border-primary')}>
-                    <div className={cn('w-2.5 h-2.5 rounded-full', studioConnected ? 'bg-green-400 shadow-lg shadow-green-400/50 animate-pulse' : 'bg-yellow-400')} />
-                    <div className="flex-1">
-                      <div className="text-xs font-semibold text-text-primary">{studioConnected ? 'Studio Connected' : 'Studio Offline'}</div>
-                      <div className="text-[10px] text-text-dim">{studioConnected ? 'Token is paired' : 'Connect your Studio plugin'}</div>
-                    </div>
-                    {studioConnected && (
-                      <button onClick={doDisconnect} className="px-2.5 py-1 rounded-lg bg-red-500/10 text-red-400 text-[10px] font-semibold border border-red-500/20 hover:bg-red-500/20 transition-colors">
-                        Disconnect
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="p-4 space-y-3">
-                    {!studioConnected ? (
-                      <>
-                        <div>
-                          <label className="text-[10px] text-text-dim font-semibold uppercase tracking-wider block mb-1.5">Paste Token from Studio</label>
-                          <input type="text" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                            value={tokenInput} onChange={(e) => setTokenInput(e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-[11px] font-mono focus:outline-none focus:border-accent-blue/50 placeholder:text-text-dim" />
-                        </div>
-                        <button onClick={connectStudio} disabled={!tokenInput.trim()}
-                          className="w-full py-2.5 rounded-lg bg-gradient-to-r from-accent-blue to-accent-purple text-white text-xs font-bold hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-lg shadow-accent-blue/20">
-                          Connect to Studio
-                        </button>
-                      </>
-                    ) : (
-                      <button onClick={doDisconnect}
-                        className="w-full py-2 rounded-lg bg-red-500/10 text-red-400 text-xs font-semibold border border-red-500/20 hover:bg-red-500/20 transition-colors">
-                        Disconnect Studio
-                      </button>
-                    )}
-
-                    {/* Setup Steps */}
-                    <div className="space-y-1.5 pt-1">
-                      <div className="text-[9px] text-text-dim font-semibold uppercase tracking-wider">Setup Guide</div>
-                      {[
-                        { step: 1, text: 'Copy plugin script below', done: false },
-                        { step: 2, text: 'Paste into Studio Command Bar', done: false },
-                        { step: 3, text: 'Click "Generate Token" in plugin GUI', done: false },
-                        { step: 4, text: 'Paste token here and click Connect', done: studioConnected },
-                      ].map(s => (
-                        <div key={s.step} className="flex items-start gap-2">
-                          <div className={cn('w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-0.5 text-[7px] font-bold', s.done ? 'bg-green-500/20 text-green-400' : 'bg-accent-blue/15 text-accent-blue')}>
-                            {s.done ? <Check size={8} /> : s.step}
-                          </div>
-                          <span className={cn('text-[10px] leading-tight', s.done ? 'text-green-400' : 'text-text-secondary')}>{s.text}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Plugin Actions */}
-                <div className="rounded-2xl bg-bg-secondary border border-border-primary p-4 space-y-2">
-                  <div className="flex gap-2">
-                    <button onClick={copyPluginScript} className="flex-1 flex items-center justify-center gap-1 px-2.5 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-secondary text-[10px] font-medium hover:border-accent-blue/30 hover:text-text-primary transition-all">
-                      {copiedPlugin ? <><Check size={10} className="text-green-400" /> Copied</> : <><Copy size={10} /> Copy Plugin</>}
-                    </button>
-                    <button onClick={downloadPluginScript} className="flex-1 flex items-center justify-center gap-1 px-2.5 py-2 rounded-lg bg-accent-blue/15 text-accent-blue border border-accent-blue/25 text-[10px] font-medium hover:bg-accent-blue/25 transition-all">
-                      <Download size={10} /> Download
-                    </button>
-                  </div>
-                  <button onClick={() => setShowPlugin(true)} className="w-full flex items-center justify-center gap-1 px-2.5 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-dim text-[10px] hover:text-text-primary hover:border-border-hover transition-all">
-                    <Eye size={10} /> View Plugin Code
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {sidebarTab === 'features' && (
-              <div className="space-y-3">
-                <div className="rounded-2xl bg-bg-secondary border border-border-primary p-4">
-                  <h3 className="text-xs font-semibold text-text-primary mb-2.5">What I Can Do</h3>
-                  <div className="space-y-2">
-                    {[
-                      { icon: Code, title: 'Luau Scripts', desc: 'Complete, working production code' },
-                      { icon: Blocks, title: 'GUI Systems', desc: 'Full ScreenGui hierarchies with tweens' },
-                      { icon: Rocket, title: 'Game Systems', desc: 'Combat, inventory, quests, trading' },
-                      { icon: Shield, title: 'Security', desc: 'Anti-cheat, validation, server auth' },
-                      { icon: Zap, title: 'Optimization', desc: 'Memory, performance, profiling' },
-                      { icon: Wrench, title: 'Bug Fixes', desc: 'Debug and fix any Luau code' },
-                    ].map(f => { const Icon = f.icon; return (
-                      <div key={f.title} className="flex gap-2 group">
-                        <div className="w-6 h-6 rounded-md bg-bg-elevated border border-border-primary flex items-center justify-center shrink-0 group-hover:border-accent-blue/30 transition-colors"><Icon size={11} className="text-accent-blue" /></div>
-                        <div><div className="text-[11px] font-medium text-text-primary">{f.title}</div><div className="text-[9px] text-text-dim">{f.desc}</div></div>
-                      </div>
-                    )})}
-                  </div>
-                </div>
-                <div className="rounded-2xl bg-gradient-to-br from-accent-blue/10 to-accent-purple/10 border border-accent-blue/15 p-4">
-                  <h3 className="text-xs font-semibold text-text-primary mb-2">Current Model</h3>
-                  <div className="flex items-center gap-2">
-                    <div className={cn('w-2 h-2 rounded-full', currentModel?.color || 'bg-text-muted')} />
-                    <span className="text-[11px] text-text-secondary font-medium">{currentModel?.label || aiModel}</span>
-                    {currentModel?.badge && <span className="text-[8px] px-1 py-0.5 rounded bg-accent-blue/15 text-accent-blue font-bold">{currentModel.badge}</span>}
-                  </div>
-                  <div className="text-[10px] text-text-dim mt-1">{currentModel?.desc}</div>
-                </div>
-              </div>
-            )}
-
-            {sidebarTab === 'tips' && (
-              <div className="space-y-3">
-                <div className="rounded-2xl bg-bg-secondary border border-border-primary p-4">
-                  <h3 className="text-xs font-semibold text-text-primary mb-2.5 flex items-center gap-1.5"><BookOpen size={11} className="text-accent-blue" /> Pro Tips</h3>
-                  <div className="space-y-1.5">
-                    {[
-                      'Paste your existing code to get targeted fixes',
-                      'Describe the game type for better architecture',
-                      'Ask for server AND client scripts together',
-                      'Request full systems, not fragments',
-                      'Say "fix this" and paste broken code',
-                      'Ask "how does this work" for explanations',
-                    ].map((tip, i) => (
-                      <div key={i} className="flex items-start gap-1.5">
-                        <div className="w-1 h-1 rounded-full bg-accent-blue mt-1.5 shrink-0" />
-                        <span className="text-[10px] text-text-secondary leading-relaxed">{tip}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="rounded-2xl bg-bg-secondary border border-border-primary p-4">
-                  <h3 className="text-xs font-semibold text-text-primary mb-2.5 flex items-center gap-1.5"><Terminal size={11} className="text-accent-blue" /> Shortcuts</h3>
-                  <div className="space-y-1">
-                    {[['Enter', 'Send'], ['Shift+Enter', 'New line'], ['Ctrl+V', 'Paste code']].map(([key, action]) => (
-                      <div key={key} className="flex items-center justify-between">
-                        <span className="text-[10px] text-text-muted">{action}</span>
-                        <kbd className="text-[8px] px-1.5 py-0.5 rounded bg-bg-elevated border border-border-primary text-text-dim font-mono">{key}</kbd>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                {hasMessages && (
-                  <div className="rounded-2xl bg-bg-secondary border border-border-primary p-4">
-                    <h3 className="text-xs font-semibold text-text-primary mb-2">Session</h3>
-                    <div className="space-y-1">
-                      {[['Messages', chatMessages.length], ['User', chatMessages.filter(m => m.role === 'user').length], ['AI', chatMessages.filter(m => m.role === 'assistant').length], ['Model', currentModel?.label]].map(([l, v]) => (
-                        <div key={String(l)} className="flex justify-between text-[10px]"><span className="text-text-dim">{String(l)}</span><span className="text-text-secondary font-medium">{String(v)}</span></div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Ad in sidebar */}
-          <div className="shrink-0 flex justify-center">
-            <AdBanner type="rectangle" />
+            <SidebarContent sidebarTab={sidebarTab} setSidebarTab={setSidebarTab} studioConnected={studioConnected} studioToken={studioToken} tokenInput={tokenInput} setTokenInput={setTokenInput} connectStudio={connectStudio} doDisconnect={doDisconnect} copiedPlugin={copiedPlugin} copyPluginScript={copyPluginScript} downloadPluginScript={downloadPluginScript} setShowPlugin={setShowPlugin} currentModel={currentModel} aiModel={aiModel} chatMessages={chatMessages} hasMessages={hasMessages} />
           </div>
         </div>
+
+        {/* Mobile Sidebar Overlay */}
+        <AnimatePresence>
+          {showMobileSidebar && (
+            <>
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm xl:hidden" onClick={() => setShowMobileSidebar(false)} />
+              <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 300 }} className="fixed top-0 right-0 bottom-0 w-[340px] z-50 bg-bg-secondary border-l border-border-primary overflow-y-auto p-4 xl:hidden">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-bold text-text-primary">AI Tools</h3>
+                  <button onClick={() => setShowMobileSidebar(false)} className="p-1.5 rounded-lg text-text-dim hover:text-text-primary hover:bg-bg-elevated transition-colors"><X size={16} /></button>
+                </div>
+                <SidebarContent sidebarTab={sidebarTab} setSidebarTab={setSidebarTab} studioConnected={studioConnected} studioToken={studioToken} tokenInput={tokenInput} setTokenInput={setTokenInput} connectStudio={connectStudio} doDisconnect={doDisconnect} copiedPlugin={copiedPlugin} copyPluginScript={copyPluginScript} downloadPluginScript={downloadPluginScript} setShowPlugin={setShowPlugin} currentModel={currentModel} aiModel={aiModel} chatMessages={chatMessages} hasMessages={hasMessages} />
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
       </motion.div>
 
       {/* Plugin Modal */}
@@ -1514,7 +1176,7 @@ export default function AI() {
               <div className="sticky top-0 flex items-center justify-between px-6 py-4 border-b border-border-primary bg-bg-secondary/95 backdrop-blur-sm z-10">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-accent-blue via-accent-purple to-accent-pink flex items-center justify-center shadow-lg"><Puzzle size={16} className="text-white" /></div>
-                  <div><h2 className="text-base font-bold text-text-primary">Studio Plugin v3.0</h2><p className="text-[10px] text-text-muted">Copy, paste into Command Bar, generate token</p></div>
+                  <div><h2 className="text-base font-bold text-text-primary">Studio Plugin v3.2</h2><p className="text-[10px] text-text-muted">Copy, paste into Command Bar, generate token</p></div>
                 </div>
                 <button onClick={() => setShowPlugin(false)} className="p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-elevated transition-colors"><X size={16} /></button>
               </div>
@@ -1549,6 +1211,174 @@ export default function AI() {
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  )
+}
+
+function SidebarContent({ sidebarTab, setSidebarTab, studioConnected, studioToken, tokenInput, setTokenInput, connectStudio, doDisconnect, copiedPlugin, copyPluginScript, downloadPluginScript, setShowPlugin, currentModel, aiModel, chatMessages, hasMessages }: {
+  sidebarTab: 'studio' | 'features' | 'tips'; setSidebarTab: (t: 'studio' | 'features' | 'tips') => void;
+  studioConnected: boolean; studioToken: string; tokenInput: string; setTokenInput: (v: string) => void;
+  connectStudio: () => void; doDisconnect: () => void; copiedPlugin: boolean; copyPluginScript: () => void;
+  downloadPluginScript: () => void; setShowPlugin: (v: boolean) => void;
+  currentModel: typeof models[0] | undefined; aiModel: string;
+  chatMessages: ChatMessage[]; hasMessages: boolean;
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="flex gap-1 p-1 rounded-xl bg-bg-secondary border border-border-primary shrink-0">
+        {([ { id: 'studio' as const, label: 'Plugin', icon: Puzzle }, { id: 'features' as const, label: 'AI', icon: Zap }, { id: 'tips' as const, label: 'Tips', icon: BookOpen } ]).map(tab => {
+          const Icon = tab.icon; return (
+            <button key={tab.id} onClick={() => setSidebarTab(tab.id)} className={cn('flex-1 flex items-center justify-center gap-1 px-2 py-2.5 rounded-lg text-[10px] font-medium transition-all', sidebarTab === tab.id ? 'bg-accent-blue/15 text-accent-blue shadow-sm shadow-accent-blue/10' : 'text-text-muted hover:text-text-secondary')}><Icon size={10} /> {tab.label}</button>
+          )
+        })}
+      </div>
+
+      {sidebarTab === 'studio' && (
+        <div className="space-y-3">
+          <div className="rounded-2xl bg-bg-secondary border border-border-primary overflow-hidden">
+            <div className={cn('px-4 py-3 flex items-center gap-2.5', studioConnected ? 'bg-green-500/5 border-b border-green-500/10' : 'bg-bg-tertiary/50 border-b border-border-primary')}>
+              <div className={cn('w-2.5 h-2.5 rounded-full', studioConnected ? 'bg-green-400 shadow-lg shadow-green-400/50 animate-pulse' : 'bg-yellow-400 animate-pulse')} />
+              <div className="flex-1">
+                <div className="text-xs font-semibold text-text-primary">{studioConnected ? 'Studio Connected' : 'Studio Offline'}</div>
+                <div className="text-[10px] text-text-dim">{studioConnected ? 'Token is paired' : 'Connect your Studio plugin'}</div>
+              </div>
+              {studioConnected && (
+                <button onClick={doDisconnect} className="px-2.5 py-1 rounded-lg bg-red-500/10 text-red-400 text-[10px] font-semibold border border-red-500/20 hover:bg-red-500/20 transition-colors">Disconnect</button>
+              )}
+            </div>
+
+            <div className="p-4 space-y-3">
+              {!studioConnected ? (
+                <>
+                  <div>
+                    <label className="text-[10px] text-text-dim font-semibold uppercase tracking-wider block mb-1.5">Paste Token from Studio</label>
+                    <input type="text" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                      value={tokenInput} onChange={(e) => setTokenInput(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-[11px] font-mono focus:outline-none focus:border-accent-blue/50 placeholder:text-text-dim" />
+                  </div>
+                  <button onClick={connectStudio} disabled={!tokenInput.trim()}
+                    className="w-full py-2.5 rounded-lg bg-gradient-to-r from-accent-blue to-accent-purple text-white text-xs font-bold hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-lg shadow-accent-blue/20">Connect to Studio</button>
+                </>
+              ) : (
+                <button onClick={doDisconnect} className="w-full py-2 rounded-lg bg-red-500/10 text-red-400 text-xs font-semibold border border-red-500/20 hover:bg-red-500/20 transition-colors">Disconnect Studio</button>
+              )}
+
+              <div className="space-y-1.5 pt-1">
+                <div className="text-[9px] text-text-dim font-semibold uppercase tracking-wider">Setup Guide</div>
+                {[
+                  { step: 1, text: 'Copy plugin script below', done: false },
+                  { step: 2, text: 'Paste into Studio Command Bar', done: false },
+                  { step: 3, text: 'Click "Generate Token" in plugin GUI', done: false },
+                  { step: 4, text: 'Paste token here and click Connect', done: studioConnected },
+                ].map(s => (
+                  <div key={s.step} className="flex items-start gap-2">
+                    <div className={cn('w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-0.5 text-[7px] font-bold', s.done ? 'bg-green-500/20 text-green-400' : 'bg-accent-blue/15 text-accent-blue')}>
+                      {s.done ? <Check size={8} /> : s.step}
+                    </div>
+                    <span className={cn('text-[10px] leading-tight', s.done ? 'text-green-400' : 'text-text-secondary')}>{s.text}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-bg-secondary border border-border-primary p-4 space-y-2">
+            <div className="flex gap-2">
+              <button onClick={copyPluginScript} className="flex-1 flex items-center justify-center gap-1 px-2.5 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-secondary text-[10px] font-medium hover:border-accent-blue/30 hover:text-text-primary transition-all">
+                {copiedPlugin ? <><Check size={10} className="text-green-400" /> Copied</> : <><Copy size={10} /> Copy Plugin</>}
+              </button>
+              <button onClick={downloadPluginScript} className="flex-1 flex items-center justify-center gap-1 px-2.5 py-2 rounded-lg bg-accent-blue/15 text-accent-blue border border-accent-blue/25 text-[10px] font-medium hover:bg-accent-blue/25 transition-all">
+                <Download size={10} /> Download
+              </button>
+            </div>
+            <button onClick={() => setShowPlugin(true)} className="w-full flex items-center justify-center gap-1 px-2.5 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-dim text-[10px] hover:text-text-primary hover:border-border-hover transition-all">
+              <Eye size={10} /> View Plugin Code
+            </button>
+          </div>
+        </div>
+      )}
+
+      {sidebarTab === 'features' && (
+        <div className="space-y-3">
+          <div className="rounded-2xl bg-bg-secondary border border-border-primary p-4">
+            <h3 className="text-xs font-semibold text-text-primary mb-2.5">What I Can Do</h3>
+            <div className="space-y-2.5">
+              {[
+                { icon: Code, title: 'Luau Scripts', desc: 'Complete, working production code', color: 'text-blue-400' },
+                { icon: Blocks, title: 'GUI Systems', desc: 'Full ScreenGui hierarchies with tweens', color: 'text-purple-400' },
+                { icon: Rocket, title: 'Game Systems', desc: 'Combat, inventory, quests, trading', color: 'text-green-400' },
+                { icon: Shield, title: 'Security', desc: 'Anti-cheat, validation, server auth', color: 'text-red-400' },
+                { icon: Zap, title: 'Optimization', desc: 'Memory, performance, profiling', color: 'text-yellow-400' },
+                { icon: Wrench, title: 'Bug Fixes', desc: 'Debug and fix any Luau code', color: 'text-orange-400' },
+              ].map(f => { const Icon = f.icon; return (
+                <div key={f.title} className="flex gap-2.5 group">
+                  <div className="w-7 h-7 rounded-lg bg-bg-elevated border border-border-primary flex items-center justify-center shrink-0 group-hover:border-accent-blue/30 transition-colors"><Icon size={12} className={f.color} /></div>
+                  <div><div className="text-[11px] font-medium text-text-primary">{f.title}</div><div className="text-[9px] text-text-dim">{f.desc}</div></div>
+                </div>
+              )})}
+            </div>
+          </div>
+          <div className="rounded-2xl bg-gradient-to-br from-accent-blue/10 to-accent-purple/10 border border-accent-blue/15 p-4">
+            <h3 className="text-xs font-semibold text-text-primary mb-2">Current Model</h3>
+            <div className="flex items-center gap-2">
+              <span className="text-lg">{currentModel?.emoji}</span>
+              <div>
+                <span className="text-[11px] text-text-secondary font-medium">{currentModel?.label || aiModel}</span>
+                {currentModel?.badge && <span className="text-[8px] px-1 py-0.5 rounded bg-accent-blue/15 text-accent-blue font-bold ml-1">{currentModel.badge}</span>}
+                <div className="text-[9px] text-text-dim">{currentModel?.desc}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {sidebarTab === 'tips' && (
+        <div className="space-y-3">
+          <div className="rounded-2xl bg-bg-secondary border border-border-primary p-4">
+            <h3 className="text-xs font-semibold text-text-primary mb-2.5 flex items-center gap-1.5"><BookOpen size={11} className="text-accent-blue" /> Pro Tips</h3>
+            <div className="space-y-2">
+              {[
+                'Paste your existing code to get targeted fixes',
+                'Describe the game type for better architecture',
+                'Ask for server AND client scripts together',
+                'Request full systems, not fragments',
+                'Say "fix this" and paste broken code',
+                'Ask "how does this work" for explanations',
+              ].map((tip, i) => (
+                <div key={i} className="flex items-start gap-2">
+                  <div className="w-1 h-1 rounded-full bg-accent-blue mt-1.5 shrink-0" />
+                  <span className="text-[10px] text-text-secondary leading-relaxed">{tip}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-2xl bg-bg-secondary border border-border-primary p-4">
+            <h3 className="text-xs font-semibold text-text-primary mb-2.5 flex items-center gap-1.5"><Terminal size={11} className="text-accent-blue" /> Shortcuts</h3>
+            <div className="space-y-1.5">
+              {[['Enter', 'Send'], ['Shift+Enter', 'New line'], ['Ctrl+V', 'Paste code']].map(([key, action]) => (
+                <div key={key} className="flex items-center justify-between">
+                  <span className="text-[10px] text-text-muted">{action}</span>
+                  <kbd className="text-[8px] px-1.5 py-0.5 rounded bg-bg-elevated border border-border-primary text-text-dim font-mono">{key}</kbd>
+                </div>
+              ))}
+            </div>
+          </div>
+          {hasMessages && (
+            <div className="rounded-2xl bg-bg-secondary border border-border-primary p-4">
+              <h3 className="text-xs font-semibold text-text-primary mb-2">Session Stats</h3>
+              <div className="space-y-1.5">
+                {[['Messages', chatMessages.length], ['Your Messages', chatMessages.filter(m => m.role === 'user').length], ['AI Responses', chatMessages.filter(m => m.role === 'assistant').length], ['Model', currentModel?.label]].map(([l, v]) => (
+                  <div key={String(l)} className="flex justify-between text-[10px]"><span className="text-text-dim">{String(l)}</span><span className="text-text-secondary font-medium">{String(v)}</span></div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="shrink-0 flex justify-center">
+        <AdBanner type="rectangle" />
+      </div>
     </div>
   )
 }
@@ -1635,6 +1465,4 @@ Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
 
 Tween:
 local tween = TweenService:Create(obj, TweenInfo.new(0.3, Enum.EasingStyle.Quint), {Property = value})
-tween:Play()
-
-Write working code. Every time.`
+tween:Play()`

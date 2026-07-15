@@ -143,11 +143,11 @@ export default function GameDetail() {
   const thumbId = extractYoutubeId(game.video_url)
 
   const handleShare = async () => {
-    const url = window.location.href
+    const shareUrl = `${window.location.origin}/p/${game.id}`
     if (navigator.share) {
-      try { await navigator.share({ title: game.title, text: game.description || game.title, url }) } catch {}
+      try { await navigator.share({ title: game.title, text: game.description || game.title, url: shareUrl }) } catch {}
     } else {
-      await navigator.clipboard.writeText(url)
+      await navigator.clipboard.writeText(shareUrl)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     }

@@ -1,4 +1,4 @@
-import { HashRouter, Routes, Route } from 'react-router-dom'
+import { HashRouter, BrowserRouter, Routes, Route } from 'react-router-dom'
 import { ToastProvider } from '@/components/ui/Toast'
 import Layout from '@/components/layout/Layout'
 import MetaUpdater from '@/components/MetaUpdater'
@@ -22,10 +22,12 @@ import Dashboard from '@/pages/Dashboard'
 import Tools from '@/pages/Tools'
 import NotFound from '@/pages/NotFound'
 
+const Router = import.meta.env.PROD ? BrowserRouter : HashRouter
+
 export default function App() {
   return (
     <ToastProvider>
-      <HashRouter>
+      <Router>
         <MetaUpdater />
         <Routes>
           <Route element={<Layout />}>
@@ -51,7 +53,7 @@ export default function App() {
             <Route path="*" element={<NotFound />} />
           </Route>
         </Routes>
-      </HashRouter>
+      </Router>
     </ToastProvider>
   )
 }

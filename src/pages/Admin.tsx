@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion } from 'framer-motion'
 import {
   Shield, Users, Gamepad2, FileText, BarChart3, Settings, Loader2, Trash2,
   UserCheck, UserX, Search, Eye, Heart, MessageSquare, Download, CheckCircle,
   XCircle, ExternalLink, ArrowLeft, Crown, Mail, Calendar, TrendingUp, RefreshCw,
-  Wrench, Plus, Clock, Sparkles, Save
+  Wrench, Plus, Clock, Sparkles, Save, Upload, Ban, ShieldOff, ImagePlus
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '@/store/useStore'
@@ -12,6 +12,7 @@ import { supabase } from '@/config/supabase'
 import { formatNumber, cn } from '@/lib/utils'
 import { useToast } from '@/components/ui/Toast'
 import RobloxAvatar from '@/components/ui/RobloxAvatar'
+import { uploadToGoogleDrive, toDirectImageUrl } from '@/lib/drive-upload'
 
 const ADMIN_USERNAME = 'ByocefS'
 
@@ -244,6 +245,31 @@ function UsersTab() {
     }
   }
 
+  const handleBan = async (userId: string, username: string, currentlyBanned: boolean) => {
+    if (currentlyBanned) {
+      if (!confirm(`Unban "${username}"?`)) return
+      try {
+        const { error } = await supabase.from('profiles').update({ is_banned: false, banned_until: null }).eq('id', userId)
+        if (error) throw error
+        toast(`Unbanned ${username}`, 'success')
+        load()
+      } catch (e: any) {
+        toast(e.message || 'Failed to unban', 'error')
+      }
+    } else {
+      const reason = prompt(`Ban reason for "${username}":`)
+      if (reason === null) return
+      try {
+        const { error } = await supabase.from('profiles').update({ is_banned: true, ban_reason: reason || 'No reason provided' }).eq('id', userId)
+        if (error) throw error
+        toast(`Banned ${username}`, 'success')
+        load()
+      } catch (e: any) {
+        toast(e.message || 'Failed to ban', 'error')
+      }
+    }
+  }
+
   const merged = profiles.map((p) => {
     const auth = users.find((u) => u.id === p.id)
     return { ...p, email: auth?.email || '', last_sign_in_at: auth?.last_sign_in_at }
@@ -266,20 +292,27 @@ function UsersTab() {
       </div>
       <div className="space-y-2">
         {merged.map((user) => (
-          <div key={user.id} className="flex items-center gap-3 p-3 rounded-xl bg-bg-secondary border border-border-primary hover:bg-bg-elevated/50 transition-colors">
+          <div key={user.id} className={cn('flex items-center gap-3 p-3 rounded-xl bg-bg-secondary border transition-colors', user.is_banned ? 'border-red-500/30 bg-red-500/5' : 'border-border-primary hover:bg-bg-elevated/50')}>
             <RobloxAvatar userId={user.roblox_id} username={user.username} avatarUrl={user.avatar_url} size="sm" />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold text-text-primary truncate">{user.username || 'Unknown'}</span>
                 {user.is_admin && <span className="px-1.5 py-0.5 rounded bg-yellow-500/15 text-yellow-400 text-[10px] font-bold border border-yellow-500/25">ADMIN</span>}
+                {user.is_banned && <span className="px-1.5 py-0.5 rounded bg-red-500/15 text-red-400 text-[10px] font-bold border border-red-500/25">BANNED</span>}
               </div>
               <div className="text-[11px] text-text-muted truncate">{user.email || user.id.slice(0, 8)}</div>
+              {user.is_banned && user.ban_reason && <div className="text-[10px] text-red-400/70 truncate mt-0.5">Reason: {user.ban_reason}</div>}
             </div>
             <div className="flex items-center gap-1 shrink-0">
               <button onClick={() => handleToggleAdmin(user.id, user.is_admin)}
                 className={cn('p-1.5 rounded-lg text-xs transition-colors', user.is_admin ? 'bg-yellow-500/15 text-yellow-400 hover:bg-yellow-500/25' : 'bg-bg-elevated text-text-muted hover:text-yellow-400')}
                 title={user.is_admin ? 'Remove admin' : 'Make admin'}>
                 <Crown size={14} />
+              </button>
+              <button onClick={() => handleBan(user.id, user.username || 'user', !!user.is_banned)}
+                className={cn('p-1.5 rounded-lg text-xs transition-colors', user.is_banned ? 'bg-green-500/10 text-green-400 hover:bg-green-500/20' : 'bg-bg-elevated text-text-muted hover:text-red-400 hover:bg-red-500/10')}
+                title={user.is_banned ? 'Unban user' : 'Ban user'}>
+                {user.is_banned ? <ShieldOff size={14} /> : <Ban size={14} />}
               </button>
               <button onClick={() => handleDelete(user.id, user.username || 'user')}
                 className="p-1.5 rounded-lg bg-bg-elevated text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
@@ -558,6 +591,9 @@ function ToolsTab() {
   const [editing, setEditing] = useState<string | null>(null)
   const [form, setForm] = useState<ToolForm>(emptyTool)
   const [saving, setSaving] = useState(false)
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const [imagePreview, setImagePreview] = useState('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
 
   const load = useCallback(async () => {
@@ -587,6 +623,7 @@ function ToolsTab() {
       setShowForm(false)
       setEditing(null)
       setForm(emptyTool)
+      setImagePreview('')
       load()
     } catch (e: any) {
       toast(e.message || 'Failed to save tool', 'error')
@@ -594,8 +631,27 @@ function ToolsTab() {
     setSaving(false)
   }
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 10 * 1024 * 1024) { toast('Image must be under 10MB', 'error'); return }
+    setUploadingImage(true)
+    try {
+      const result = await uploadToGoogleDrive(file, 'yobest-tools')
+      const directUrl = toDirectImageUrl(result.directLink || result.fileUrl)
+      setForm(f => ({ ...f, image_url: directUrl }))
+      setImagePreview(directUrl)
+      toast('Image uploaded!', 'success')
+    } catch (e: any) {
+      toast(e.message || 'Upload failed', 'error')
+    }
+    setUploadingImage(false)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
   const handleEdit = (tool: any) => {
     setForm({ name: tool.name, description: tool.description, image_url: tool.image_url || '', status: tool.status, download_url: tool.download_url || '', version: tool.version || '' })
+    setImagePreview(tool.image_url || '')
     setEditing(tool.id)
     setShowForm(true)
   }
@@ -656,9 +712,23 @@ function ToolsTab() {
                 className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50 transition-all resize-none" />
             </div>
             <div>
-              <label className="text-[10px] text-text-dim font-semibold uppercase tracking-wider block mb-1.5">Image URL (preview)</label>
-              <input value={form.image_url} onChange={e => setForm(f => ({ ...f, image_url: e.target.value }))} placeholder="https://..."
-                className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50 transition-all" />
+              <label className="text-[10px] text-text-dim font-semibold uppercase tracking-wider block mb-1.5">Image Preview</label>
+              <div className="flex gap-2">
+                <input value={form.image_url} onChange={e => { setForm(f => ({ ...f, image_url: e.target.value })); setImagePreview(e.target.value) }} placeholder="Paste image URL..."
+                  className="flex-1 px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50 transition-all" />
+                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                <button onClick={() => fileInputRef.current?.click()} disabled={uploadingImage}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-accent-purple/15 border border-accent-purple/25 text-accent-purple text-xs font-medium hover:bg-accent-purple/25 transition-colors disabled:opacity-50 shrink-0">
+                  {uploadingImage ? <Loader2 size={12} className="animate-spin" /> : <ImagePlus size={12} />}
+                  {uploadingImage ? 'Uploading...' : 'Upload'}
+                </button>
+              </div>
+              {(imagePreview || form.image_url) && (
+                <div className="mt-2 relative w-20 h-20 rounded-lg overflow-hidden border border-border-primary bg-bg-tertiary">
+                  <img src={imagePreview || form.image_url} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                  <button onClick={() => { setForm(f => ({ ...f, image_url: '' })); setImagePreview('') }} className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-red-500/80 flex items-center justify-center text-white text-[8px] hover:bg-red-500 transition-colors">X</button>
+                </div>
+              )}
             </div>
             <div>
               <label className="text-[10px] text-text-dim font-semibold uppercase tracking-wider block mb-1.5">Download URL</label>

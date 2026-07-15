@@ -775,46 +775,77 @@ function getSuggestionsForQuestion(question: string): string[] {
 
 function QuickReplyBar({ aiMessage, onReply }: { aiMessage: string; onReply: (text: string) => void }) {
   const questions = useMemo(() => detectQuestions(aiMessage), [aiMessage])
+  const [customInput, setCustomInput] = useState('')
+  const [selectedQ, setSelectedQ] = useState<number | null>(null)
 
   if (questions.length === 0) return null
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
+      initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, delay: 0.1 }}
-      className="ml-12 mt-1 mb-2"
+      transition={{ duration: 0.25, delay: 0.05 }}
+      className="ml-12 mt-1 mb-3 max-w-lg"
     >
-      <p className="text-[9px] text-text-dim mb-2 flex items-center gap-1">
-        <Sparkles size={9} className="text-accent-blue" /> Quick replies — click or type your own
-      </p>
-      <div className="flex flex-wrap gap-1.5">
+      <div className="rounded-xl bg-bg-elevated border border-border-primary overflow-hidden shadow-lg shadow-black/20">
         {questions.map((q, qi) => {
           const suggestions = getSuggestionsForQuestion(q)
+          const isOpen = selectedQ === qi
           return (
-            <div key={qi} className="flex flex-wrap gap-1">
-              {suggestions.map((s, si) => (
-                <motion.button
-                  key={si}
-                  whileHover={{ scale: 1.04, y: -1 }}
-                  whileTap={{ scale: 0.96 }}
-                  onClick={() => onReply(s)}
-                  className="px-2.5 py-1.5 rounded-lg bg-bg-elevated border border-border-primary text-[10px] text-text-secondary hover:text-accent-blue hover:border-accent-blue/30 hover:bg-accent-blue/5 transition-all font-medium"
-                >
-                  {s}
-                </motion.button>
-              ))}
+            <div key={qi} className={cn('border-b border-border-primary/50 last:border-b-0', isOpen && 'bg-bg-secondary/50')}>
+              <button
+                onClick={() => setSelectedQ(isOpen ? null : qi)}
+                className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-bg-tertiary/50 transition-colors"
+              >
+                <div className="w-5 h-5 rounded-md bg-accent-blue/15 flex items-center justify-center shrink-0">
+                  <span className="text-[9px] font-bold text-accent-blue">{qi + 1}</span>
+                </div>
+                <span className="text-[11px] text-text-secondary flex-1">{q}</span>
+                <ChevronRight size={10} className={cn('text-text-dim transition-transform', isOpen && 'rotate-90')} />
+              </button>
+              {isOpen && (
+                <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} className="overflow-hidden">
+                  <div className="px-3 pb-2.5 space-y-1.5">
+                    <div className="flex flex-wrap gap-1">
+                      {suggestions.map((s, si) => (
+                        <button
+                          key={si}
+                          onClick={() => { onReply(s); setSelectedQ(null) }}
+                          className="px-2.5 py-1.5 rounded-lg bg-bg-secondary border border-border-primary text-[10px] text-text-secondary hover:text-accent-blue hover:border-accent-blue/30 hover:bg-accent-blue/5 transition-all font-medium"
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex gap-1.5">
+                      <input
+                        value={customInput}
+                        onChange={(e) => setCustomInput(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter' && customInput.trim()) { onReply(customInput.trim()); setCustomInput(''); setSelectedQ(null) } }}
+                        placeholder="Type your answer..."
+                        className="flex-1 px-2.5 py-1.5 rounded-lg bg-bg-secondary border border-border-primary text-[10px] text-text-primary placeholder:text-text-dim focus:outline-none focus:border-accent-blue/50 transition-all"
+                      />
+                      <button
+                        onClick={() => { if (customInput.trim()) { onReply(customInput.trim()); setCustomInput(''); setSelectedQ(null) } }}
+                        disabled={!customInput.trim()}
+                        className="px-2 py-1.5 rounded-lg bg-accent-blue/15 text-accent-blue text-[10px] font-semibold hover:bg-accent-blue/25 disabled:opacity-30 transition-all"
+                      >
+                        Send
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
             </div>
           )
         })}
-        <motion.button
-          whileHover={{ scale: 1.04 }}
-          whileTap={{ scale: 0.96 }}
+        <button
           onClick={() => onReply('Just go ahead with sensible defaults, I trust you.')}
-          className="px-2.5 py-1.5 rounded-lg bg-accent-blue/10 border border-accent-blue/20 text-[10px] text-accent-blue font-semibold hover:bg-accent-blue/15 transition-all"
+          className="w-full flex items-center gap-2 px-3 py-2 text-accent-blue/80 hover:text-accent-blue hover:bg-accent-blue/5 transition-colors text-[10px] font-medium"
         >
-          Use defaults
-        </motion.button>
+          <Sparkles size={10} />
+          Use defaults for all
+        </button>
       </div>
     </motion.div>
   )
@@ -1175,7 +1206,7 @@ function SidebarContent({ sidebarTab, setSidebarTab, studioConnected, tokenInput
 }
 
 function getSystemPrompt(mode: string): string {
-  const base = `You are Yobest AI, a world-class Roblox Studio Luau coding assistant. You are an expert game developer with deep knowledge of Roblox APIs, networking, DataStore, tweening, UI design, and performance optimization.
+const base = `You are Yobest AI, a world-class Roblox Studio Luau coding assistant. You are an expert game developer with deep knowledge of Roblox APIs, networking, DataStore, tweening, UI design, and performance optimization.
 
 ## PERSONALITY
 - Be friendly, confident, and direct. Talk like a senior Roblox developer helping a friend.
@@ -1185,25 +1216,24 @@ function getSystemPrompt(mode: string): string {
 
 ## CORE RULES (ALL MODES)
 
-### Ask Before Writing (IMPORTANT)
-When a request is VAGUE (fewer than 3 specific details), ask 2-4 quick clarifying questions FIRST. This saves time and produces better code.
+### When to Ask vs When to Build (IMPORTANT)
+DEFAULT: If the request is reasonably clear, JUST BUILD IT. Do not over-think. Most requests are clear enough to start coding immediately.
 
-Vague examples that NEED questions:
-- "make a combat system" -> ask: melee or ranged? How many players? Health system? Effects?
-- "fix my code" -> ask: error message? Which line? What should it do vs what it does?
-- "create a GUI" -> ask: what kind? What elements? Theme/color?
+Only ask questions when the request is TRULY ambiguous and you genuinely cannot start without clarification:
+- The user gave zero specifics (e.g. just "help me" or "make something cool")
+- There are 2+ equally valid interpretations and picking the wrong one wastes time
+- The request contradicts itself
 
-Specific examples that DO NOT need questions:
-- "Create a DataStore wrapper with retry logic for a 4-player obby" -> just build it
-- "This code errors on line 42: attempt to index nil [pastes code]" -> just fix it
+When you DO need to ask, keep it SHORT - max 2-3 questions. Format as a numbered list:
+Quick questions before I build:
+1. [One specific question]
+2. [One specific question]
 
-When asking, format as numbered list:
-Before I build this, quick questions:
-1. [Question]
-2. [Question]
-3. [Question]
+Then the user can click options or type answers.
 
-Reply with your answers and I will build exactly what you need.
+NEVER ask questions like "what type of combat?" when the user already said "sword combat system". Just build it.
+NEVER ask "where should I place this?" - just pick the right location and mention it.
+NEVER ask about obvious defaults - just use good defaults and mention them.
 
 ### Code Formatting
 - ALL code goes inside triple backtick luau blocks

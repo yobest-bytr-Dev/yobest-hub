@@ -73,7 +73,7 @@ export default function Profile() {
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
         {/* Profile Header */}
         <div className="relative rounded-2xl overflow-hidden mb-6">
-          <div className="h-48 sm:h-56 bg-gradient-to-br from-accent-blue/30 via-accent-purple/20 to-accent-pink/30 relative">
+          <div className="h-32 sm:h-48 lg:h-56 bg-gradient-to-br from-accent-blue/30 via-accent-purple/20 to-accent-pink/30 relative">
             <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PHBhdGggZD0iTTM2IDM0djZoNnYtNmgtNnptMC0zMHY2aDZ2LTZoLTZ6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-50" />
             <div className="absolute inset-0 bg-gradient-to-t from-bg-primary via-transparent to-transparent" />
           </div>
@@ -138,7 +138,7 @@ export default function Profile() {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  'flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap',
+                  'flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap',
                   activeTab === tab.id
                     ? 'bg-accent-blue/15 text-accent-blue shadow-sm'
                     : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated/70'
@@ -379,7 +379,7 @@ export default function Profile() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-3">
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 sm:gap-3">
                 {avatarDecorations.map((deco) => {
                   const isActive = (currentUser.avatar_decoration || 'none') === deco.value
                   const decoUrl = getDecorationUrl(deco.value)
@@ -394,7 +394,7 @@ export default function Profile() {
                           : 'bg-bg-elevated border-border-primary hover:border-border-hover hover:bg-bg-tertiary'
                       )}
                     >
-                      <div className="relative w-12 h-12">
+                      <div className="relative w-10 h-10 sm:w-12 sm:h-12">
                         {decoUrl ? (
                           <img
                             src={decoUrl}

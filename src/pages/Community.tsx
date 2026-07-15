@@ -212,7 +212,7 @@ export default function Community() {
                         <RobloxAvatar userId={creator.roblox_id} username={creator.username} avatarUrl={creator.avatar_url} size="sm" />
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-medium text-text-primary truncate">{creator.username}</div>
-                          <div className="text-[11px] text-text-muted">{creator.games_count || 0} games · {creator.bio || 'Creator'}</div>
+                           <div className="text-[11px] text-text-muted truncate">{creator.games_count || 0} games · {creator.bio || 'Creator'}</div>
                         </div>
                         <div className="text-right">
                           <div className="text-xs font-medium text-text-primary">{formatNumber(creator.followers_count || 0)}</div>
@@ -265,7 +265,7 @@ export default function Community() {
                 </ul>
               </div>
 
-              <div className="flex justify-center">
+              <div className="hidden lg:flex justify-center">
                 <AdBanner type="skyscraper" />
               </div>
             </div>

@@ -74,14 +74,14 @@ export default function Home() {
   return (
     <div className="relative">
       <section className="relative overflow-hidden">
-        <div className="relative max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-16 lg:pt-28 lg:pb-24">
+        <div className="relative max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-16 sm:pt-20 pb-12 sm:pb-16 lg:pt-28 lg:pb-24">
           <motion.div className="text-center max-w-3xl mx-auto" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
             <div
               className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent-blue/10 border border-accent-blue/20 text-accent-blue text-xs font-medium mb-6"
             >
               <Sparkles size={14} /> <span>Powered by AI</span> <span className="w-1 h-1 rounded-full bg-accent-blue" />
             </div>
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-6">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-bold tracking-tight mb-6">
               The <span className="gradient-text">Roblox Creator</span><br />Platform
             </h1>
             <p className="text-text-secondary text-lg sm:text-xl leading-relaxed mb-8 max-w-2xl mx-auto">
@@ -141,7 +141,7 @@ export default function Home() {
           <h2 className="text-3xl sm:text-4xl font-bold mb-4">Four Pillars, One <span className="gradient-text">Platform</span> 🏗️</h2>
           <p className="text-text-secondary text-lg max-w-xl mx-auto">Everything a Roblox creator needs, from idea to published game.</p>
         </motion.div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {pillars.map((pillar, i) => {
             const Icon = pillar.icon
             return (
@@ -231,13 +231,13 @@ export default function Home() {
       </div>
 
       <section className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-24 border-t border-border-primary">
-        <motion.div className="text-center p-12 rounded-2xl bg-gradient-to-br from-bg-secondary to-bg-tertiary border border-border-primary relative overflow-hidden card-glow"
+        <motion.div className="text-center p-6 sm:p-8 lg:p-12 rounded-2xl bg-gradient-to-br from-bg-secondary to-bg-tertiary border border-border-primary relative overflow-hidden card-glow"
           initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
           <div className="relative">
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-accent-blue to-accent-purple flex items-center justify-center mx-auto mb-6 shadow-xl shadow-accent-blue/25">
               <Brain size={32} className="text-white" />
             </div>
-            <h2 className="text-3xl font-bold mb-4">Build with <span className="gradient-text">AI Power</span></h2>
+            <h2 className="text-2xl sm:text-3xl font-bold mb-4">Build with <span className="gradient-text">AI Power</span></h2>
             <p className="text-text-secondary text-lg max-w-lg mx-auto mb-8">
               Connect your Roblox Studio and let Yobest AI build for you. From scripts to full game systems — just describe what you want.
             </p>

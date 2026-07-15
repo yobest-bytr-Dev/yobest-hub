@@ -75,13 +75,13 @@ export default function AdBanner({ type, className = '' }: AdBannerProps) {
 
   if (type === 'leaderboard') {
     return (
-      <div ref={containerRef} className={`flex justify-center ${className}`} style={{ width: 728, minHeight: 90 }} />
+      <div ref={containerRef} className={`flex justify-center overflow-hidden max-w-full ${className}`} style={{ width: 728, minHeight: 90 }} />
     )
   }
 
   if (type === 'rectangle') {
     return (
-      <div ref={containerRef} className={`flex justify-center ${className}`} style={{ width: 300, minHeight: 250 }} />
+      <div ref={containerRef} className={`flex justify-center overflow-hidden max-w-full ${className}`} style={{ width: 300, minHeight: 250 }} />
     )
   }
 

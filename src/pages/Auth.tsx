@@ -130,7 +130,7 @@ export default function Auth() {
 
   if (success) {
     return (
-      <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4 py-12 relative">
+    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4 py-8 sm:py-12 relative">
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute top-1/3 left-1/4 w-96 h-96 bg-green-500/8 rounded-full blur-[120px]" />
           <div className="absolute bottom-1/3 right-1/4 w-96 h-96 bg-accent-blue/8 rounded-full blur-[120px]" />
@@ -165,7 +165,7 @@ export default function Auth() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4 py-12 relative">
+      <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4 py-8 sm:py-12 relative">
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute top-1/3 left-1/4 w-96 h-96 bg-accent-blue/8 rounded-full blur-[120px]" />
         <div className="absolute bottom-1/3 right-1/4 w-96 h-96 bg-accent-purple/8 rounded-full blur-[120px]" />
@@ -191,7 +191,7 @@ export default function Auth() {
           </p>
         </div>
 
-        <div className="rounded-2xl bg-bg-secondary border border-border-primary p-6">
+        <div className="rounded-2xl bg-bg-secondary border border-border-primary p-5 sm:p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             {mode === 'signup' && (
               <div>
@@ -205,7 +205,7 @@ export default function Auth() {
                     placeholder="e.g. ByocefS"
                     required
                     className={cn(
-                      'w-full pl-9 pr-10 py-2.5 rounded-xl bg-bg-elevated border text-text-primary text-sm placeholder:text-text-dim focus:outline-none transition-all',
+                      'w-full pl-8 sm:pl-9 pr-8 sm:pr-10 py-2.5 rounded-xl bg-bg-elevated border text-text-primary text-sm placeholder:text-text-dim focus:outline-none transition-all',
                       robloxVerified
                         ? 'border-green-500/50 focus:ring-1 focus:ring-green-500/25'
                         : robloxError

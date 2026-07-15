@@ -165,7 +165,7 @@ export default function Marketplace() {
 
         <div className="flex flex-col gap-4 mb-6">
           <div className="flex flex-col sm:flex-row gap-3">
-            <div className="flex gap-1.5">
+            <div className="flex flex-wrap gap-1.5">
               {(['all', 'script', 'model', 'uikit'] as const).map((t) => {
                 const count = t === 'all' ? assets.length : assets.filter(a => a.type === t).length
                 return (
@@ -177,7 +177,7 @@ export default function Marketplace() {
                 )
               })}
             </div>
-            <div className="flex gap-1.5">
+            <div className="flex flex-wrap gap-1.5">
               {(['all', 'free', 'paid'] as const).map((p) => (
                 <button key={p} onClick={() => setPriceFilter(p)}
                   className={cn('px-3 py-1.5 rounded-lg text-xs font-medium transition-all',
@@ -227,7 +227,7 @@ export default function Marketplace() {
             </div>
 
             {submitSuccess ? (
-              <div className="p-12 text-center">
+              <div className="p-6 sm:p-12 text-center">
                 <div className="w-16 h-16 rounded-full bg-green-500/15 border border-green-500/25 flex items-center justify-center mx-auto mb-4">
                   <Download size={24} className="text-green-400" />
                 </div>

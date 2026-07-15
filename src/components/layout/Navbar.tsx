@@ -54,7 +54,7 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-16">
           <Link to="/" className="flex items-center gap-2.5 shrink-0 group">
             <img src={`${import.meta.env.BASE_URL}YobestLogo.png`} alt="Yobest" className="w-9 h-9 rounded-xl shadow-lg shadow-accent-blue/20 group-hover:shadow-accent-blue/30 transition-shadow object-cover" />
-            <span className="text-xl font-bold tracking-tight">
+            <span className="text-lg sm:text-xl font-bold tracking-tight">
               <span className="gradient-text">YO</span>
               <span className="text-text-primary">BEST</span>
             </span>

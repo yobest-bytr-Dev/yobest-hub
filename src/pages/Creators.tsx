@@ -101,13 +101,13 @@ export default function Creators() {
             )}
           </div>
 
-          <div className="flex gap-1 p-1 rounded-xl bg-bg-secondary border border-border-primary">
+          <div className="flex gap-1 p-1 rounded-xl bg-bg-secondary border border-border-primary overflow-x-auto shrink-0">
             {(['newest', 'games', 'followers'] as const).map((s) => (
               <button
                 key={s}
                 onClick={() => setSortBy(s)}
                 className={cn(
-                  'px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all',
+                  'px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap',
                   sortBy === s
                     ? 'bg-accent-blue/15 text-accent-blue shadow-sm'
                     : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated/50'
@@ -176,17 +176,17 @@ export default function Creators() {
                       </p>
                     )}
 
-                    <div className="flex items-center gap-4 mb-4 text-xs">
-                      <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-accent-blue/10 text-accent-blue font-medium">
-                        <Gamepad2 size={12} />
-                        {profile.games_count || 0} games
+                    <div className="flex flex-wrap items-center gap-2 mb-4 text-xs">
+                      <span className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-accent-blue/10 text-accent-blue font-medium">
+                        <Gamepad2 size={11} />
+                        {profile.games_count || 0}
                       </span>
-                      <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-accent-purple/10 text-accent-purple font-medium">
-                        <Users size={12} />
+                      <span className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-accent-purple/10 text-accent-purple font-medium">
+                        <Users size={11} />
                         {formatNumber(profile.followers_count || 0)}
                       </span>
-                      <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-accent-pink/10 text-accent-pink font-medium">
-                        <Heart size={12} />
+                      <span className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-accent-pink/10 text-accent-pink font-medium">
+                        <Heart size={11} />
                         {formatNumber(profile.following_count || 0)}
                       </span>
                     </div>

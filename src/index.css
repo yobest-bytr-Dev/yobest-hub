@@ -35,7 +35,7 @@
 *::-webkit-scrollbar-thumb { background-color: #222240; border-radius: 3px; }
 *::-webkit-scrollbar-thumb:hover { background-color: #333360; }
 
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; overflow-x: hidden; }
 
 body {
   background-color: #08080f;

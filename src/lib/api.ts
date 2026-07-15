@@ -763,16 +763,42 @@ export async function getReleases(targetType: 'game' | 'asset', targetId: string
     .eq('target_id', targetId)
     .order('created_at', { ascending: false })
   if (error) return []
-  return (data || []) as Release[]
+
+  const releases = (data || []) as Release[]
+
+  const authorIds = [...new Set(releases.map(r => r.author_id).filter(Boolean))] as string[]
+  if (authorIds.length > 0) {
+    const { data: profiles } = await supabase.from('profiles').select('id, username').in('id', authorIds)
+    const profileMap = new Map((profiles || []).map((p: any) => [p.id, p.username]))
+    releases.forEach(r => { if (r.author_id) r.author_username = profileMap.get(r.author_id) || 'Unknown' })
+  }
+
+  return releases
 }
 
-export async function addRelease(targetType: 'game' | 'asset', targetId: string, version: string, title: string, description: string) {
+export async function addRelease(release: {
+  target_type: 'game' | 'asset'
+  target_id: string
+  version: string
+  title: string
+  body?: string
+  file_url?: string
+  file_name?: string
+  file_size?: string
+  is_prerelease?: boolean
+}) {
+  const user = await getCurrentUser()
   const { error } = await supabase.from('releases').insert({
-    target_type: targetType,
-    target_id: targetId,
-    version,
-    title,
-    description,
+    target_type: release.target_type,
+    target_id: release.target_id,
+    version: release.version,
+    title: release.title,
+    body: release.body || '',
+    file_url: release.file_url || '',
+    file_name: release.file_name || '',
+    file_size: release.file_size || '',
+    author_id: user?.id || null,
+    is_prerelease: release.is_prerelease || false,
   })
   if (error) throw error
 }

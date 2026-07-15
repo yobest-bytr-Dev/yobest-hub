@@ -144,20 +144,40 @@ function AssetDetailModal({ asset, onClose }: { asset: Asset; onClose: () => voi
 
           {releases.length > 0 && (
             <div className="p-3 rounded-lg bg-bg-elevated border border-border-primary">
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2 mb-3">
                 <Tag size={12} className="text-accent-green" />
                 <p className="text-[11px] text-accent-green font-semibold">Releases ({releases.length})</p>
               </div>
-              <div className="space-y-2">
-                {releases.slice(0, 5).map((r) => (
-                  <div key={r.id} className="p-2 rounded-lg bg-bg-secondary border border-border-primary/50">
-                    <div className="flex items-center gap-2">
-                      <span className="px-1.5 py-0.5 rounded bg-accent-blue/15 text-accent-blue text-[9px] font-bold">v{r.version}</span>
-                      <span className="text-[11px] font-semibold text-text-primary">{r.title}</span>
+              <div className="relative">
+                <div className="absolute left-[11px] top-3 bottom-3 w-px bg-border-primary" />
+                <div className="space-y-0">
+                  {releases.slice(0, 5).map((r, i) => (
+                    <div key={r.id} className="relative flex gap-2.5 group">
+                      <div className="relative z-10 shrink-0 mt-0.5">
+                        <div className={cn('w-[22px] h-[22px] rounded-full border-2 flex items-center justify-center text-[8px] font-bold',
+                          i === 0 ? 'bg-accent-green/15 border-accent-green text-accent-green' : 'bg-bg-secondary border-border-primary text-text-muted')} />
+                      </div>
+                      <div className="flex-1 pb-3 min-w-0">
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <span className="px-1.5 py-0.5 rounded bg-accent-blue/15 text-accent-blue text-[9px] font-bold">v{r.version}</span>
+                          {i === 0 && <span className="px-1.5 py-0.5 rounded bg-green-500/15 text-green-400 text-[9px] font-bold">Latest</span>}
+                        </div>
+                        <p className="text-[11px] font-semibold text-text-primary">{r.title}</p>
+                        {r.body && <p className="text-[10px] text-text-secondary leading-relaxed mt-0.5 whitespace-pre-wrap">{r.body}</p>}
+                        {r.file_url && (
+                          <a href={r.file_url} target="_blank" rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 mt-1 px-2 py-1 rounded bg-bg-elevated border border-border-primary text-[9px] font-medium text-accent-blue hover:border-accent-blue/30 transition-all">
+                            <Download size={9} /> {r.file_name || 'Download'} {r.file_size && <span className="text-text-dim">({r.file_size})</span>}
+                          </a>
+                        )}
+                        <div className="flex items-center gap-1.5 mt-0.5 text-[9px] text-text-dim">
+                          {r.author_username && <span>by {r.author_username}</span>}
+                          <span>{new Date(r.created_at).toLocaleDateString()}</span>
+                        </div>
+                      </div>
                     </div>
-                    {r.description && <p className="text-[10px] text-text-secondary mt-0.5">{r.description}</p>}
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </div>
           )}

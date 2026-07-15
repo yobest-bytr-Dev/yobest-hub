@@ -1,15 +1,21 @@
--- Releases table for games and assets
-CREATE TABLE IF NOT EXISTS releases (
+-- GitHub-style releases system for games and assets
+DROP TABLE IF EXISTS releases CASCADE;
+CREATE TABLE releases (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   target_type TEXT NOT NULL CHECK (target_type IN ('game', 'asset')),
   target_id UUID NOT NULL,
   version TEXT NOT NULL,
   title TEXT NOT NULL,
-  description TEXT DEFAULT '',
+  body TEXT DEFAULT '',
+  file_url TEXT DEFAULT '',
+  file_name TEXT DEFAULT '',
+  file_size TEXT DEFAULT '',
+  author_id UUID REFERENCES auth.users(id),
+  is_prerelease BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_releases_target ON releases (target_type, target_id, created_at DESC);
+CREATE INDEX idx_releases_target ON releases (target_type, target_id, created_at DESC);
 
 ALTER TABLE releases ENABLE ROW LEVEL SECURITY;
 

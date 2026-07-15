@@ -170,9 +170,11 @@ serve(async (req) => {
       }
 
       case "add_release": {
-        const { target_type, target_id, version, title, description } = body
+        const { target_type, target_id, version, title, body, file_url, file_name, file_size, is_prerelease } = body
         const { error } = await adminClient.from("releases").insert({
-          target_type, target_id, version, title, description: description || "",
+          target_type, target_id, version, title,
+          body: body || "", file_url: file_url || "", file_name: file_name || "",
+          file_size: file_size || "", author_id: user.id, is_prerelease: is_prerelease || false,
         })
         if (error) throw error
         return new Response(JSON.stringify({ success: true }), {

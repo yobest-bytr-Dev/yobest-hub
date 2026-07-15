@@ -539,8 +539,9 @@ function GamesTab() {
   const [filterType, setFilterType] = useState<'all' | 'official' | 'community'>('all')
   const [releaseGame, setReleaseGame] = useState<any>(null)
   const [releases, setReleases] = useState<any[]>([])
-  const [releaseForm, setReleaseForm] = useState({ version: '', title: '', description: '' })
+  const [releaseForm, setReleaseForm] = useState({ version: '', title: '', body: '', file_url: '', file_name: '', file_size: '', is_prerelease: false })
   const [releaseLoading, setReleaseLoading] = useState(false)
+  const [releaseUploading, setReleaseUploading] = useState(false)
   const { toast } = useToast()
 
   const load = useCallback(async () => {
@@ -612,22 +613,26 @@ function GamesTab() {
     setReleaseGame(game)
     const { data } = await supabase.from('releases').select('*').eq('target_type', 'game').eq('target_id', game.id).order('created_at', { ascending: false })
     setReleases(data || [])
-    setReleaseForm({ version: '', title: '', description: '' })
+    setReleaseForm({ version: '', title: '', body: '', file_url: '', file_name: '', file_size: '', is_prerelease: false })
   }
 
   const addReleaseHandler = async () => {
     if (!releaseForm.version.trim() || !releaseForm.title.trim()) { toast('Version and title required', 'error'); return }
     setReleaseLoading(true)
     try {
+      const user = currentUser
       const { error } = await supabase.from('releases').insert({
         target_type: 'game', target_id: releaseGame.id,
-        version: releaseForm.version, title: releaseForm.title, description: releaseForm.description,
+        version: releaseForm.version, title: releaseForm.title, body: releaseForm.body,
+        file_url: releaseForm.file_url, file_name: releaseForm.file_name,
+        file_size: releaseForm.file_size, author_id: user?.id || null,
+        is_prerelease: releaseForm.is_prerelease,
       })
       if (error) throw error
-      toast('Release added!', 'success')
+      toast('Release published!', 'success')
       const { data } = await supabase.from('releases').select('*').eq('target_type', 'game').eq('target_id', releaseGame.id).order('created_at', { ascending: false })
       setReleases(data || [])
-      setReleaseForm({ version: '', title: '', description: '' })
+      setReleaseForm({ version: '', title: '', body: '', file_url: '', file_name: '', file_size: '', is_prerelease: false })
     } catch (e: any) { toast(e.message || 'Failed', 'error') }
     setReleaseLoading(false)
   }
@@ -795,28 +800,83 @@ function GamesTab() {
             </h3>
             <button onClick={() => setReleaseGame(null)} className="text-xs text-text-muted hover:text-text-primary">Close</button>
           </div>
-          <div className="flex gap-2">
-            <input value={releaseForm.version} onChange={e => setReleaseForm(f => ({ ...f, version: e.target.value }))} placeholder="v1.0"
-              className="w-24 px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50" />
-            <input value={releaseForm.title} onChange={e => setReleaseForm(f => ({ ...f, title: e.target.value }))} placeholder="Release title"
-              className="flex-1 px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50" />
-            <input value={releaseForm.description} onChange={e => setReleaseForm(f => ({ ...f, description: e.target.value }))} placeholder="Description (optional)"
-              className="flex-1 px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50" />
-            <button onClick={addReleaseHandler} disabled={releaseLoading}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent-green/15 text-accent-green border border-accent-green/25 text-xs font-semibold hover:bg-accent-green/25 disabled:opacity-50 transition-all">
-              {releaseLoading ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />} Add
-            </button>
-          </div>
-          <div className="space-y-2 max-h-60 overflow-y-auto">
-            {releases.length > 0 ? releases.map(r => (
-              <div key={r.id} className="flex items-center gap-3 p-3 rounded-lg bg-bg-elevated border border-border-primary/50">
-                <span className="px-2 py-0.5 rounded bg-accent-blue/15 text-accent-blue text-[10px] font-bold shrink-0">v{r.version}</span>
-                <span className="text-xs font-semibold text-text-primary flex-1">{r.title}</span>
-                {r.description && <span className="text-[10px] text-text-muted flex-1 truncate">{r.description}</span>}
-                <span className="text-[10px] text-text-dim shrink-0">{new Date(r.created_at).toLocaleDateString()}</span>
-                <button onClick={() => deleteReleaseHandler(r.id)} className="p-1 rounded hover:bg-red-500/10 text-text-dim hover:text-red-400 transition-colors shrink-0"><Trash2 size={12} /></button>
+
+          <div className="p-4 rounded-xl bg-bg-elevated border border-border-primary space-y-3">
+            <h4 className="text-xs font-semibold text-text-primary">Create a new release</h4>
+            <div className="flex gap-2">
+              <div className="w-28">
+                <label className="text-[9px] text-text-dim font-semibold uppercase tracking-wider block mb-1">Version *</label>
+                <input value={releaseForm.version} onChange={e => setReleaseForm(f => ({ ...f, version: e.target.value }))} placeholder="v1.0.0"
+                  className="w-full px-3 py-2 rounded-lg bg-bg-secondary border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50" />
               </div>
-            )) : <p className="text-xs text-text-muted text-center py-4">No releases yet</p>}
+              <div className="flex-1">
+                <label className="text-[9px] text-text-dim font-semibold uppercase tracking-wider block mb-1">Title *</label>
+                <input value={releaseForm.title} onChange={e => setReleaseForm(f => ({ ...f, title: e.target.value }))} placeholder="Release title"
+                  className="w-full px-3 py-2 rounded-lg bg-bg-secondary border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50" />
+              </div>
+            </div>
+            <div>
+              <label className="text-[9px] text-text-dim font-semibold uppercase tracking-wider block mb-1">Release Notes</label>
+              <textarea value={releaseForm.body} onChange={e => setReleaseForm(f => ({ ...f, body: e.target.value }))} rows={4}
+                placeholder="What's new, what was fixed, changes list..."
+                className="w-full px-3 py-2 rounded-lg bg-bg-secondary border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50 resize-none font-mono text-xs" />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div className="sm:col-span-2">
+                <label className="text-[9px] text-text-dim font-semibold uppercase tracking-wider block mb-1">File URL (optional)</label>
+                <input value={releaseForm.file_url} onChange={e => setReleaseForm(f => ({ ...f, file_url: e.target.value }))}
+                  placeholder="https://drive.google.com/..."
+                  className="w-full px-3 py-2 rounded-lg bg-bg-secondary border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50" />
+              </div>
+              <div>
+                <label className="text-[9px] text-text-dim font-semibold uppercase tracking-wider block mb-1">File Name</label>
+                <input value={releaseForm.file_name} onChange={e => setReleaseForm(f => ({ ...f, file_name: e.target.value }))} placeholder="game-v1.zip"
+                  className="w-full px-3 py-2 rounded-lg bg-bg-secondary border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50" />
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 text-xs text-text-muted">
+                <input type="checkbox" checked={releaseForm.is_prerelease} onChange={e => setReleaseForm(f => ({ ...f, is_prerelease: e.target.checked }))} className="rounded" /> Pre-release
+              </label>
+              <button onClick={addReleaseHandler} disabled={releaseLoading}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent-green/15 text-accent-green border border-accent-green/25 text-xs font-semibold hover:bg-accent-green/25 disabled:opacity-50 transition-all">
+                {releaseLoading ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />} Publish Release
+              </button>
+            </div>
+          </div>
+
+          <div className="relative">
+            <div className="absolute left-[15px] top-4 bottom-4 w-px bg-border-primary" />
+            <div className="space-y-0">
+              {releases.length > 0 ? releases.map((r, i) => (
+                <div key={r.id} className="relative flex gap-3 group">
+                  <div className="relative z-10 shrink-0 mt-1">
+                    <div className={cn('w-[30px] h-[30px] rounded-full border-2 flex items-center justify-center text-[9px] font-bold',
+                      i === 0 ? 'bg-accent-green/15 border-accent-green text-accent-green' : 'bg-bg-elevated border-border-primary text-text-muted')} />
+                  </div>
+                  <div className="flex-1 pb-4 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="px-2 py-0.5 rounded-md bg-accent-blue/15 text-accent-blue text-[10px] font-bold border border-accent-blue/20">v{r.version}</span>
+                      {i === 0 && <span className="px-2 py-0.5 rounded-md bg-green-500/15 text-green-400 text-[10px] font-bold border border-green-500/20">Latest</span>}
+                      {r.is_prerelease && <span className="px-2 py-0.5 rounded-md bg-yellow-500/15 text-yellow-400 text-[10px] font-bold border border-yellow-500/20">Pre</span>}
+                    </div>
+                    <h4 className="text-xs font-semibold text-text-primary">{r.title}</h4>
+                    {r.body && <p className="text-[11px] text-text-secondary leading-relaxed mt-0.5 whitespace-pre-wrap">{r.body}</p>}
+                    {r.file_url && (
+                      <a href={r.file_url} target="_blank" rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 mt-1.5 px-2 py-1 rounded bg-bg-secondary border border-border-primary text-[10px] font-medium text-accent-blue hover:border-accent-blue/30 transition-all">
+                        <Download size={10} /> {r.file_name || 'Download'} {r.file_size && <span className="text-text-dim">({r.file_size})</span>}
+                      </a>
+                    )}
+                    <div className="flex items-center gap-2 mt-1 text-[10px] text-text-dim">
+                      <span>{new Date(r.created_at).toLocaleDateString()}</span>
+                      <button onClick={() => { if (confirm('Delete this release?')) deleteReleaseHandler(r.id) }}
+                        className="text-text-dim hover:text-red-400 transition-colors"><Trash2 size={10} /></button>
+                    </div>
+                  </div>
+                </div>
+              )) : <p className="text-xs text-text-muted text-center py-4 ml-8">No releases yet</p>}
+            </div>
           </div>
         </motion.div>
       )}

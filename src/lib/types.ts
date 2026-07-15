@@ -118,6 +118,12 @@ export interface Release {
   target_id: string
   version: string
   title: string
-  description: string
+  body: string
+  file_url: string
+  file_name: string
+  file_size: string
+  author_id?: string
+  author_username?: string
+  is_prerelease: boolean
   created_at: string
 }

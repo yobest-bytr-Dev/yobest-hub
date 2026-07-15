@@ -541,17 +541,37 @@ export default function GameDetail() {
               </div>
               <div className="p-4">
                 {releases.length > 0 ? (
-                  <div className="space-y-3">
-                    {releases.map((r) => (
-                      <div key={r.id} className="p-3 rounded-xl bg-bg-elevated border border-border-primary/50">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="px-2 py-0.5 rounded-md bg-accent-blue/15 text-accent-blue text-[10px] font-bold">v{r.version}</span>
-                          <span className="text-xs font-semibold text-text-primary">{r.title}</span>
+                  <div className="relative">
+                    <div className="absolute left-[15px] top-4 bottom-4 w-px bg-border-primary" />
+                    <div className="space-y-0">
+                      {releases.map((r, i) => (
+                        <div key={r.id} className="relative flex gap-3 group">
+                          <div className="relative z-10 shrink-0 mt-1">
+                            <div className={cn('w-[30px] h-[30px] rounded-full border-2 flex items-center justify-center text-[9px] font-bold',
+                              i === 0 ? 'bg-accent-green/15 border-accent-green text-accent-green' : 'bg-bg-elevated border-border-primary text-text-muted')} />
+                          </div>
+                          <div className="flex-1 pb-4 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                              <span className="px-2 py-0.5 rounded-md bg-accent-blue/15 text-accent-blue text-[10px] font-bold border border-accent-blue/20">v{r.version}</span>
+                              {i === 0 && <span className="px-2 py-0.5 rounded-md bg-green-500/15 text-green-400 text-[10px] font-bold border border-green-500/20">Latest</span>}
+                              {r.is_prerelease && <span className="px-2 py-0.5 rounded-md bg-yellow-500/15 text-yellow-400 text-[10px] font-bold border border-yellow-500/20">Pre-release</span>}
+                            </div>
+                            <h4 className="text-xs font-semibold text-text-primary mb-0.5">{r.title}</h4>
+                            {r.body && <p className="text-[11px] text-text-secondary leading-relaxed whitespace-pre-wrap">{r.body}</p>}
+                            {r.file_url && (
+                              <a href={r.file_url} target="_blank" rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 rounded-lg bg-bg-elevated border border-border-primary text-[11px] font-medium text-accent-blue hover:border-accent-blue/30 transition-all">
+                                <Download size={11} /> {r.file_name || 'Download'} {r.file_size && <span className="text-text-muted">({r.file_size})</span>}
+                              </a>
+                            )}
+                            <div className="flex items-center gap-2 mt-1.5 text-[10px] text-text-dim">
+                              {r.author_username && <span>by {r.author_username}</span>}
+                              <span>{timeAgo(r.created_at)}</span>
+                            </div>
+                          </div>
                         </div>
-                        {r.description && <p className="text-[11px] text-text-secondary leading-relaxed mt-1">{r.description}</p>}
-                        <p className="text-[10px] text-text-muted mt-1.5">{timeAgo(r.created_at)}</p>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 ) : (
                   <p className="text-xs text-text-muted text-center py-2">No releases yet</p>

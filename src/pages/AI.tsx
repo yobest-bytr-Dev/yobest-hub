@@ -724,6 +724,92 @@ function MessageBubble({ msg, isLast, onRegenerate }: { msg: ChatMessage; isLast
   )
 }
 
+const smartReplies: Record<string, string[]> = {
+  'type': ['Melee combat', 'Ranged/magic', 'Hybrid system'],
+  'what type': ['Melee combat', 'Ranged/magic', 'Hybrid system'],
+  'how many': ['2 players', '4 players', 'Solo/co-op'],
+  'players': ['2 players', '4 players', 'Solo/co-op'],
+  'hp': ['Simple HP bar', 'Health + stamina', 'Health + shields'],
+  'health': ['Simple HP bar', 'Health + stamina', 'Health + shields'],
+  'effect': ['Particles only', 'Particles + sound', 'Minimal/none'],
+  'gui': ['Main menu', 'Shop UI', 'HUD/overlay', 'Settings panel'],
+  'what kind': ['Main menu', 'Shop UI', 'HUD/overlay', 'Settings panel'],
+  'error': ['I have the error message', 'I will paste my code', "I don't have the error"],
+  'what line': ['Line 1-20', 'Line 20-50', 'Not sure exactly'],
+  'expecting': ['It should save data', 'It should display correctly', 'It should fire events'],
+}
+
+function detectQuestions(text: string): string[] {
+  const lines = text.split('\n')
+  const questions: string[] = []
+  for (const line of lines) {
+    const match = line.trim().match(/^\d+[\.\)]\s*(.+\??)$/)
+    if (match) questions.push(match[1])
+  }
+  return questions
+}
+
+function getSuggestionsForQuestion(question: string): string[] {
+  const q = question.toLowerCase()
+  for (const [key, values] of Object.entries(smartReplies)) {
+    if (q.includes(key)) return values
+  }
+  const words = q.split(' ').filter(w => w.length > 3)
+  for (const word of words) {
+    for (const [key, values] of Object.entries(smartReplies)) {
+      if (word.includes(key) || key.includes(word)) return values
+    }
+  }
+  return ['Go ahead with defaults', 'Let me specify', 'Ask me more']
+}
+
+function QuickReplyBar({ aiMessage, onReply }: { aiMessage: string; onReply: (text: string) => void }) {
+  const questions = useMemo(() => detectQuestions(aiMessage), [aiMessage])
+
+  if (questions.length === 0) return null
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay: 0.1 }}
+      className="ml-12 mt-1 mb-2"
+    >
+      <p className="text-[9px] text-text-dim mb-2 flex items-center gap-1">
+        <Sparkles size={9} className="text-accent-blue" /> Quick replies — click or type your own
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        {questions.map((q, qi) => {
+          const suggestions = getSuggestionsForQuestion(q)
+          return (
+            <div key={qi} className="flex flex-wrap gap-1">
+              {suggestions.map((s, si) => (
+                <motion.button
+                  key={si}
+                  whileHover={{ scale: 1.04, y: -1 }}
+                  whileTap={{ scale: 0.96 }}
+                  onClick={() => onReply(s)}
+                  className="px-2.5 py-1.5 rounded-lg bg-bg-elevated border border-border-primary text-[10px] text-text-secondary hover:text-accent-blue hover:border-accent-blue/30 hover:bg-accent-blue/5 transition-all font-medium"
+                >
+                  {s}
+                </motion.button>
+              ))}
+            </div>
+          )
+        })}
+        <motion.button
+          whileHover={{ scale: 1.04 }}
+          whileTap={{ scale: 0.96 }}
+          onClick={() => onReply('Just go ahead with sensible defaults, I trust you.')}
+          className="px-2.5 py-1.5 rounded-lg bg-accent-blue/10 border border-accent-blue/20 text-[10px] text-accent-blue font-semibold hover:bg-accent-blue/15 transition-all"
+        >
+          Use defaults
+        </motion.button>
+      </div>
+    </motion.div>
+  )
+}
+
 interface Attachment { name: string; type: string; size: number; preview?: string }
 
 export default function AI() {
@@ -947,7 +1033,14 @@ export default function AI() {
                 </div>
               ) : (
                 <>
-                  {chatMessages.map((msg, i) => <MessageBubble key={msg.id} msg={msg} isLast={i === chatMessages.length - 1 && msg.role === 'assistant'} onRegenerate={regenerate} />)}
+                  {chatMessages.map((msg, i) => (
+                    <div key={msg.id}>
+                      <MessageBubble msg={msg} isLast={i === chatMessages.length - 1 && msg.role === 'assistant'} onRegenerate={regenerate} />
+                      {msg.role === 'assistant' && msg.content && i === chatMessages.length - 1 && !loading && (
+                        <QuickReplyBar aiMessage={msg.content} onReply={(text) => sendMessage(text)} />
+                      )}
+                    </div>
+                  ))}
                   {loading && chatMessages[chatMessages.length - 1]?.content === '' && (
                     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3">
                       <div className="relative shrink-0 mt-1"><div className="w-9 h-9 rounded-xl bg-gradient-to-br from-accent-blue via-accent-purple to-accent-pink flex items-center justify-center shadow-lg shadow-accent-blue/25"><Brain size={16} className="text-white" /></div><div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-accent-blue border-2 border-bg-secondary animate-pulse" /></div>

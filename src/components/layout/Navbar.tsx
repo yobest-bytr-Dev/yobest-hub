@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Gamepad2, Brain, Users, ShoppingBag, Menu, X, LogIn, Zap, LogOut, MessageCircle, UserPlus, Shield, LayoutDashboard, Plus } from 'lucide-react'
+import { Gamepad2, Brain, Users, ShoppingBag, Menu, X, LogIn, Zap, LogOut, MessageCircle, UserPlus, Shield, LayoutDashboard, Plus, Wrench } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useStore } from '@/store/useStore'
 import { getCurrentProfile, signOut } from '@/lib/api'
@@ -11,6 +11,7 @@ import NotificationBell from '@/components/ui/NotificationBell'
 const navLinks = [
   { to: '/games', label: 'Games', icon: Gamepad2 },
   { to: '/ai', label: 'AI', icon: Brain },
+  { to: '/tools', label: 'Tools', icon: Wrench },
   { to: '/creators', label: 'Creators', icon: UserPlus },
   { to: '/community', label: 'Community', icon: Users },
   { to: '/marketplace', label: 'Marketplace', icon: ShoppingBag },

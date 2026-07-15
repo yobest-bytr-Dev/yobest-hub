@@ -3,7 +3,8 @@ import { motion } from 'framer-motion'
 import {
   Shield, Users, Gamepad2, FileText, BarChart3, Settings, Loader2, Trash2,
   UserCheck, UserX, Search, Eye, Heart, MessageSquare, Download, CheckCircle,
-  XCircle, ExternalLink, ArrowLeft, Crown, Mail, Calendar, TrendingUp, RefreshCw
+  XCircle, ExternalLink, ArrowLeft, Crown, Mail, Calendar, TrendingUp, RefreshCw,
+  Wrench, Plus, Clock, Sparkles, Save
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '@/store/useStore'
@@ -24,7 +25,7 @@ interface AdminUser {
   profile?: any
 }
 
-type Tab = 'dashboard' | 'users' | 'submissions' | 'settings'
+type Tab = 'dashboard' | 'users' | 'submissions' | 'tools' | 'settings'
 
 export default function Admin() {
   const navigate = useNavigate()
@@ -76,6 +77,7 @@ export default function Admin() {
     { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
     { id: 'users', label: 'Users', icon: Users },
     { id: 'submissions', label: 'Submissions', icon: FileText },
+    { id: 'tools', label: 'Tools', icon: Wrench },
     { id: 'settings', label: 'Settings', icon: Settings },
   ]
 
@@ -108,6 +110,7 @@ export default function Admin() {
         {tab === 'dashboard' && <DashboardTab />}
         {tab === 'users' && <UsersTab />}
         {tab === 'submissions' && <SubmissionsTab />}
+        {tab === 'tools' && <ToolsTab />}
         {tab === 'settings' && <SettingsTab />}
       </motion.div>
     </div>
@@ -530,6 +533,192 @@ function SettingsTab() {
                 />
               </div>
             ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+interface ToolForm {
+  name: string
+  description: string
+  image_url: string
+  status: 'ready' | 'soon' | 'beta' | 'deprecated'
+  download_url: string
+  version: string
+}
+
+const emptyTool: ToolForm = { name: '', description: '', image_url: '', status: 'ready', download_url: '', version: '' }
+
+function ToolsTab() {
+  const [tools, setTools] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [editing, setEditing] = useState<string | null>(null)
+  const [form, setForm] = useState<ToolForm>(emptyTool)
+  const [saving, setSaving] = useState(false)
+  const { toast } = useToast()
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const { data } = await supabase.from('yobest_tools' as any).select('*').order('created_at', { ascending: false })
+      setTools(data || [])
+    } catch {}
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const handleSave = async () => {
+    if (!form.name.trim()) { toast('Tool name is required', 'error'); return }
+    setSaving(true)
+    try {
+      if (editing) {
+        const { error } = await supabase.from('yobest_tools' as any).update(form).eq('id', editing)
+        if (error) throw error
+        toast('Tool updated!', 'success')
+      } else {
+        const { error } = await supabase.from('yobest_tools' as any).insert({ ...form, downloads_count: 0 })
+        if (error) throw error
+        toast('Tool created!', 'success')
+      }
+      setShowForm(false)
+      setEditing(null)
+      setForm(emptyTool)
+      load()
+    } catch (e: any) {
+      toast(e.message || 'Failed to save tool', 'error')
+    }
+    setSaving(false)
+  }
+
+  const handleEdit = (tool: any) => {
+    setForm({ name: tool.name, description: tool.description, image_url: tool.image_url || '', status: tool.status, download_url: tool.download_url || '', version: tool.version || '' })
+    setEditing(tool.id)
+    setShowForm(true)
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Delete this tool?')) return
+    try {
+      const { error } = await supabase.from('yobest_tools' as any).delete().eq('id', id)
+      if (error) throw error
+      toast('Tool deleted', 'success')
+      load()
+    } catch (e: any) {
+      toast(e.message || 'Failed', 'error')
+    }
+  }
+
+  const statusOpts = [
+    { value: 'ready', label: 'Ready', color: 'text-green-400' },
+    { value: 'beta', label: 'Beta', color: 'text-yellow-400' },
+    { value: 'soon', label: 'Coming Soon', color: 'text-blue-400' },
+    { value: 'deprecated', label: 'Deprecated', color: 'text-red-400' },
+  ]
+
+  if (loading) return <div className="flex items-center justify-center py-20"><Loader2 size={24} className="animate-spin text-accent-blue" /></div>
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-text-primary">Tools ({tools.length})</h2>
+        <div className="flex gap-2">
+          <button onClick={load} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-elevated border border-border-primary text-xs text-text-secondary hover:text-text-primary transition-colors">
+            <RefreshCw size={12} /> Refresh
+          </button>
+          <button onClick={() => { setShowForm(true); setEditing(null); setForm(emptyTool) }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-blue/15 text-accent-blue border border-accent-blue/25 text-xs font-medium hover:bg-accent-blue/25 transition-colors">
+            <Plus size={12} /> Add Tool
+          </button>
+        </div>
+      </div>
+
+      {/* Add/Edit Form */}
+      {showForm && (
+        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="rounded-xl bg-bg-secondary border border-border-primary p-5 space-y-4">
+          <h3 className="text-sm font-semibold text-text-primary">{editing ? 'Edit Tool' : 'Add New Tool'}</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-[10px] text-text-dim font-semibold uppercase tracking-wider block mb-1.5">Tool Name *</label>
+              <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Yobest Studio Plugin"
+                className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50 transition-all" />
+            </div>
+            <div>
+              <label className="text-[10px] text-text-dim font-semibold uppercase tracking-wider block mb-1.5">Version</label>
+              <input value={form.version} onChange={e => setForm(f => ({ ...f, version: e.target.value }))} placeholder="e.g. v1.0"
+                className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50 transition-all" />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="text-[10px] text-text-dim font-semibold uppercase tracking-wider block mb-1.5">Description</label>
+              <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="What does this tool do?" rows={3}
+                className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50 transition-all resize-none" />
+            </div>
+            <div>
+              <label className="text-[10px] text-text-dim font-semibold uppercase tracking-wider block mb-1.5">Image URL (preview)</label>
+              <input value={form.image_url} onChange={e => setForm(f => ({ ...f, image_url: e.target.value }))} placeholder="https://..."
+                className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50 transition-all" />
+            </div>
+            <div>
+              <label className="text-[10px] text-text-dim font-semibold uppercase tracking-wider block mb-1.5">Download URL</label>
+              <input value={form.download_url} onChange={e => setForm(f => ({ ...f, download_url: e.target.value }))} placeholder="https://..."
+                className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50 transition-all" />
+            </div>
+            <div>
+              <label className="text-[10px] text-text-dim font-semibold uppercase tracking-wider block mb-1.5">Status</label>
+              <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value as any }))}
+                className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50 transition-all">
+                {statusOpts.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="flex gap-2 pt-2">
+            <button onClick={handleSave} disabled={saving} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent-blue text-white text-xs font-semibold hover:opacity-90 disabled:opacity-50 transition-all">
+              {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+              {editing ? 'Update' : 'Create'} Tool
+            </button>
+            <button onClick={() => { setShowForm(false); setEditing(null); setForm(emptyTool) }} className="px-4 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-secondary text-xs font-medium hover:text-text-primary transition-colors">
+              Cancel
+            </button>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Tools List */}
+      <div className="space-y-2">
+        {tools.map((tool) => {
+          const sConf = statusOpts.find(s => s.value === tool.status) || statusOpts[1]
+          return (
+            <div key={tool.id} className="flex items-center gap-4 p-4 rounded-xl bg-bg-secondary border border-border-primary hover:bg-bg-elevated/50 transition-colors">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-accent-blue/20 to-accent-purple/20 flex items-center justify-center shrink-0 border border-accent-blue/10 overflow-hidden">
+                {tool.image_url ? <img src={tool.image_url} alt="" className="w-full h-full object-cover" /> : <Wrench size={18} className="text-accent-blue/60" />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-text-primary truncate">{tool.name}</span>
+                  {tool.version && <span className="text-[9px] px-1.5 py-0.5 rounded bg-bg-elevated text-text-dim font-mono">{tool.version}</span>}
+                  <span className={cn('text-[10px] font-bold px-1.5 py-0.5 rounded border', sConf.color, `${sConf.value === 'ready' ? 'bg-green-500/10 border-green-500/20' : sConf.value === 'beta' ? 'bg-yellow-500/10 border-yellow-500/20' : sConf.value === 'soon' ? 'bg-blue-500/10 border-blue-500/20' : 'bg-red-500/10 border-red-500/20'}`)}>
+                    {sConf.label}
+                  </span>
+                </div>
+                <p className="text-[11px] text-text-muted truncate">{tool.description || 'No description'}</p>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <button onClick={() => handleEdit(tool)} className="p-1.5 rounded-lg bg-bg-elevated text-text-muted hover:text-accent-blue hover:bg-accent-blue/10 transition-colors" title="Edit">
+                  <Eye size={14} />
+                </button>
+                <button onClick={() => handleDelete(tool.id)} className="p-1.5 rounded-lg bg-bg-elevated text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors" title="Delete">
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            </div>
+          )
+        })}
+        {tools.length === 0 && (
+          <div className="text-center py-12">
+            <Wrench size={36} className="mx-auto text-text-dim mb-3" />
+            <p className="text-sm text-text-muted">No tools yet. Click "Add Tool" to create one.</p>
           </div>
         )}
       </div>

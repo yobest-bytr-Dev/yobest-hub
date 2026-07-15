@@ -264,7 +264,7 @@ export default function Games() {
   const [sortBy, setSortBy] = useState<'newest' | 'popular' | 'az'>('newest')
   const [showFilters, setShowFilters] = useState(false)
   const [showSubmit, setShowSubmit] = useState(false)
-  const [submitForm, setSubmitForm] = useState({ title: '', description: '', category: 'Minigame', videoUrl: '', gameUrl: '', imageUrl: '', price: '0', gamepassUrl: '', gameFileUrl: '' })
+  const [submitForm, setSubmitForm] = useState({ title: '', description: '', category: 'Minigame', videoUrl: '', gameUrl: '', imageUrl: '', price: '0', gamepassUrl: '', gameFileUrl: '', galleryImages: [] as string[] })
   const [uploadingGameFile, setUploadingGameFile] = useState(false)
   const gameFileRef = useRef<HTMLInputElement>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -368,12 +368,13 @@ export default function Games() {
         thumbnail_url: submitForm.imageUrl,
         gamepass_url: submitForm.gamepassUrl,
         price: priceVal === 0 ? 'Free' : `${priceVal} Robux`,
+        gallery_images: submitForm.galleryImages,
       })
       setSubmitSuccess(true)
       setTimeout(() => {
         setShowSubmit(false)
         setSubmitSuccess(false)
-        setSubmitForm({ title: '', description: '', category: 'Minigame', videoUrl: '', gameUrl: '', imageUrl: '', price: '0', gamepassUrl: '', gameFileUrl: '' })
+        setSubmitForm({ title: '', description: '', category: 'Minigame', videoUrl: '', gameUrl: '', imageUrl: '', price: '0', gamepassUrl: '', gameFileUrl: '', galleryImages: [] })
       }, 2000)
     } catch {
       alert('Failed to submit. Make sure you are signed in.')
@@ -565,6 +566,18 @@ export default function Games() {
                 onChange={(url) => setSubmitForm({ ...submitForm, imageUrl: url })}
                 folder="yobest/thumbnails"
                 label="Thumbnail Image"
+              />
+            </div>
+            <div>
+              <ImagePicker
+                value=""
+                onChange={() => {}}
+                folder="yobest/thumbnails"
+                label="Gallery Images (optional)"
+                multiple
+                values={submitForm.galleryImages}
+                onMultipleChange={(urls) => setSubmitForm({ ...submitForm, galleryImages: urls })}
+                maxImages={8}
               />
             </div>
             <div>

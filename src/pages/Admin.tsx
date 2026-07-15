@@ -13,6 +13,7 @@ import { formatNumber, cn } from '@/lib/utils'
 import { useToast } from '@/components/ui/Toast'
 import RobloxAvatar from '@/components/ui/RobloxAvatar'
 import { uploadToGoogleDrive, toDirectImageUrl } from '@/lib/drive-upload'
+import ImagePicker from '@/components/ui/ImagePicker'
 
 const ADMIN_USERNAME = 'ByocefS'
 
@@ -26,7 +27,7 @@ interface AdminUser {
   profile?: any
 }
 
-type Tab = 'dashboard' | 'users' | 'submissions' | 'tools' | 'settings'
+type Tab = 'dashboard' | 'users' | 'submissions' | 'games' | 'tools' | 'settings'
 
 export default function Admin() {
   const navigate = useNavigate()
@@ -78,6 +79,7 @@ export default function Admin() {
     { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
     { id: 'users', label: 'Users', icon: Users },
     { id: 'submissions', label: 'Submissions', icon: FileText },
+    { id: 'games', label: 'Games', icon: Gamepad2 },
     { id: 'tools', label: 'Tools', icon: Wrench },
     { id: 'settings', label: 'Settings', icon: Settings },
   ]
@@ -111,6 +113,7 @@ export default function Admin() {
         {tab === 'dashboard' && <DashboardTab />}
         {tab === 'users' && <UsersTab />}
         {tab === 'submissions' && <SubmissionsTab />}
+        {tab === 'games' && <GamesTab />}
         {tab === 'tools' && <ToolsTab />}
         {tab === 'settings' && <SettingsTab />}
       </motion.div>
@@ -496,6 +499,258 @@ function SubmissionsTab() {
           </div>
         ))}
         {filtered.length === 0 && <p className="text-sm text-text-muted text-center py-8">No submissions</p>}
+      </div>
+    </div>
+  )
+}
+
+const GAME_CATEGORIES = ['Uncopylocked', 'Minigame', 'Anime', 'Paid', 'Tower Defense', 'Script Kit', 'Template', 'UI Kit', 'Core API']
+
+interface GameForm {
+  title: string
+  description: string
+  category: string
+  video_url: string
+  game_url: string
+  download_url: string
+  thumbnail_url: string
+  images: string[]
+  gamepass_id: string
+  price: string
+  is_official: boolean
+  game_play: boolean
+  download_enabled: boolean
+}
+
+const emptyGame: GameForm = {
+  title: '', description: '', category: 'Uncopylocked', video_url: '', game_url: '',
+  download_url: '', thumbnail_url: '', images: [], gamepass_id: '', price: 'Free',
+  is_official: true, game_play: false, download_enabled: true,
+}
+
+function GamesTab() {
+  const [games, setGames] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [editing, setEditing] = useState<string | null>(null)
+  const [form, setForm] = useState<GameForm>(emptyGame)
+  const [saving, setSaving] = useState(false)
+  const [search, setSearch] = useState('')
+  const [filterType, setFilterType] = useState<'all' | 'official' | 'community'>('all')
+  const { toast } = useToast()
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const { data } = await supabase.from('experiences').select('*').order('created_at', { ascending: false })
+      setGames(data || [])
+    } catch {}
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const handleSave = async () => {
+    if (!form.title.trim()) { toast('Title is required', 'error'); return }
+    setSaving(true)
+    try {
+      const payload = {
+        title: form.title, description: form.description, category: form.category,
+        video_url: form.video_url, game_url: form.game_url, download_url: form.download_url,
+        thumbnail_url: form.thumbnail_url, images: form.images || [], gamepass_id: form.gamepass_id,
+        price: form.price, is_official: form.is_official, game_play: form.game_play,
+        download_enabled: form.download_enabled,
+      }
+      if (editing) {
+        const { error } = await supabase.from('experiences').update(payload).eq('id', editing)
+        if (error) throw error
+        toast('Game updated!', 'success')
+      } else {
+        const { error } = await supabase.from('experiences').insert({ ...payload, views_count: 0, likes_count: 0 })
+        if (error) throw error
+        toast('Game created!', 'success')
+      }
+      setShowForm(false)
+      setEditing(null)
+      setForm(emptyGame)
+      load()
+    } catch (e: any) {
+      toast(e.message || 'Failed to save game', 'error')
+    }
+    setSaving(false)
+  }
+
+  const handleEdit = (game: any) => {
+    setForm({
+      title: game.title, description: game.description || '', category: game.category || 'Uncopylocked',
+      video_url: game.video_url || '', game_url: game.game_url || '', download_url: game.download_url || '',
+      thumbnail_url: game.thumbnail_url || '', images: game.images || [], gamepass_id: game.gamepass_id || '',
+      price: game.price || 'Free', is_official: game.is_official ?? true,
+      game_play: game.game_play ?? false, download_enabled: game.download_enabled ?? true,
+    })
+    setEditing(game.id)
+    setShowForm(true)
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Delete this game permanently?')) return
+    try {
+      const { error } = await supabase.from('experiences').delete().eq('id', id)
+      if (error) throw error
+      toast('Game deleted', 'success')
+      load()
+    } catch (e: any) {
+      toast(e.message || 'Failed', 'error')
+    }
+  }
+
+  const filtered = games.filter((g) => {
+    const matchSearch = !search || g.title.toLowerCase().includes(search.toLowerCase()) || (g.category || '').toLowerCase().includes(search.toLowerCase())
+    const matchType = filterType === 'all' || (filterType === 'official' && g.is_official) || (filterType === 'community' && !g.is_official)
+    return matchSearch && matchType
+  })
+
+  if (loading) return <div className="flex items-center justify-center py-20"><Loader2 size={24} className="animate-spin text-accent-blue" /></div>
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-text-primary">Games ({games.length})</h2>
+        <div className="flex gap-2">
+          <button onClick={load} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-elevated border border-border-primary text-xs text-text-secondary hover:text-text-primary transition-colors">
+            <RefreshCw size={12} /> Refresh
+          </button>
+          <button onClick={() => { setShowForm(true); setEditing(null); setForm(emptyGame) }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-blue/15 text-accent-blue border border-accent-blue/25 text-xs font-medium hover:bg-accent-blue/25 transition-colors">
+            <Plus size={12} /> Add Game
+          </button>
+        </div>
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search games..."
+            className="w-full pl-9 pr-4 py-2 rounded-lg bg-bg-secondary border border-border-primary text-sm text-text-primary placeholder:text-text-dim focus:outline-none focus:border-accent-blue/50" />
+        </div>
+        <div className="flex gap-1.5 p-1 bg-bg-secondary rounded-lg border border-border-primary">
+          {(['all', 'official', 'community'] as const).map((f) => (
+            <button key={f} onClick={() => setFilterType(f)}
+              className={cn('px-3 py-1.5 rounded-md text-xs font-medium capitalize transition-all',
+                filterType === f ? 'bg-accent-blue/15 text-accent-blue' : 'text-text-muted hover:text-text-primary')}>
+              {f}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {showForm && (
+        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="rounded-xl bg-bg-secondary border border-border-primary p-5 space-y-4">
+          <h3 className="text-sm font-semibold text-text-primary">{editing ? 'Edit Game' : 'Add New Game'}</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="sm:col-span-2">
+              <label className="text-[10px] text-text-dim font-semibold uppercase tracking-wider block mb-1.5">Title *</label>
+              <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Game title"
+                className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50" />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="text-[10px] text-text-dim font-semibold uppercase tracking-wider block mb-1.5">Description</label>
+              <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Game description" rows={2}
+                className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50 resize-none" />
+            </div>
+            <div>
+              <label className="text-[10px] text-text-dim font-semibold uppercase tracking-wider block mb-1.5">Category</label>
+              <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
+                className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50">
+                {GAME_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] text-text-dim font-semibold uppercase tracking-wider block mb-1.5">Price</label>
+              <input value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} placeholder="Free"
+                className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50" />
+            </div>
+            <div>
+              <label className="text-[10px] text-text-dim font-semibold uppercase tracking-wider block mb-1.5">YouTube Video URL</label>
+              <input value={form.video_url} onChange={e => setForm(f => ({ ...f, video_url: e.target.value }))} placeholder="https://youtube.com/watch?v=..."
+                className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50" />
+            </div>
+            <div>
+              <label className="text-[10px] text-text-dim font-semibold uppercase tracking-wider block mb-1.5">Roblox Game URL</label>
+              <input value={form.game_url} onChange={e => setForm(f => ({ ...f, game_url: e.target.value }))} placeholder="https://www.roblox.com/games/..."
+                className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50" />
+            </div>
+            <div>
+              <label className="text-[10px] text-text-dim font-semibold uppercase tracking-wider block mb-1.5">Download URL</label>
+              <input value={form.download_url} onChange={e => setForm(f => ({ ...f, download_url: e.target.value }))} placeholder="https://..."
+                className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50" />
+            </div>
+            <div>
+              <label className="text-[10px] text-text-dim font-semibold uppercase tracking-wider block mb-1.5">GamePass ID</label>
+              <input value={form.gamepass_id} onChange={e => setForm(f => ({ ...f, gamepass_id: e.target.value }))} placeholder="e.g. 12345678"
+                className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50" />
+              <p className="text-[9px] text-text-dim mt-1">Users must own this GamePass to download</p>
+            </div>
+            <div>
+              <ImagePicker value={form.thumbnail_url} onChange={(url) => setForm(f => ({ ...f, thumbnail_url: url }))} folder="yobest/thumbnails" label="Thumbnail Image" />
+            </div>
+            <div className="sm:col-span-2">
+              <ImagePicker value="" onChange={() => {}} folder="yobest/thumbnails" label="Gallery Images" multiple values={form.images}
+                onMultipleChange={(urls) => setForm(f => ({ ...f, images: urls }))} maxImages={12} />
+            </div>
+            <div className="sm:col-span-2 flex flex-wrap gap-4">
+              <label className="flex items-center gap-2 text-xs text-text-muted">
+                <input type="checkbox" checked={form.is_official} onChange={e => setForm(f => ({ ...f, is_official: e.target.checked }))} className="rounded" /> Official Game
+              </label>
+              <label className="flex items-center gap-2 text-xs text-text-muted">
+                <input type="checkbox" checked={form.game_play} onChange={e => setForm(f => ({ ...f, game_play: e.target.checked }))} className="rounded" /> Playable
+              </label>
+              <label className="flex items-center gap-2 text-xs text-text-muted">
+                <input type="checkbox" checked={form.download_enabled} onChange={e => setForm(f => ({ ...f, download_enabled: e.target.checked }))} className="rounded" /> Download Enabled
+              </label>
+            </div>
+          </div>
+          <div className="flex gap-2 pt-2">
+            <button onClick={handleSave} disabled={saving} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent-blue text-white text-xs font-semibold hover:opacity-90 disabled:opacity-50 transition-all">
+              {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+              {editing ? 'Update' : 'Create'} Game
+            </button>
+            <button onClick={() => { setShowForm(false); setEditing(null); setForm(emptyGame) }} className="px-4 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-secondary text-xs font-medium hover:text-text-primary transition-colors">
+              Cancel
+            </button>
+          </div>
+        </motion.div>
+      )}
+
+      <div className="space-y-2">
+        {filtered.map((game) => (
+          <div key={game.id} className="flex items-center gap-4 p-4 rounded-xl bg-bg-secondary border border-border-primary hover:bg-bg-elevated/50 transition-colors">
+            <div className="w-16 h-12 rounded-lg bg-gradient-to-br from-accent-blue/20 to-accent-purple/20 flex items-center justify-center shrink-0 border border-accent-blue/10 overflow-hidden">
+              {game.thumbnail_url ? <img src={toDirectImageUrl(game.thumbnail_url)} alt="" className="w-full h-full object-cover" /> :
+                game.video_url?.includes('youtube') ? <img src={`https://img.youtube.com/vi/${game.video_url.match(/v=([^&]+)/)?.[1] || ''}/default.jpg`} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).parentElement && ((e.target as HTMLImageElement).parentElement as HTMLElement).appendChild(Object.assign(document.createElement('div'), { className: 'text-accent-blue/60' })) }} /> :
+                <Gamepad2 size={18} className="text-accent-blue/60" />}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-text-primary truncate">{game.title}</span>
+                {game.is_official && <span className="text-[9px] px-1.5 py-0.5 rounded bg-yellow-500/15 text-yellow-400 border border-yellow-500/20 font-bold">OFFICIAL</span>}
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-bg-elevated text-text-dim font-mono">{game.category}</span>
+                {game.gamepass_id && <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400 border border-purple-500/20 font-bold">GAMEPASS</span>}
+                {game.images && game.images.length > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/20 font-bold">{game.images.length} imgs</span>}
+              </div>
+              <div className="flex items-center gap-3 text-[10px] text-text-muted mt-0.5">
+                <span>{game.price || 'Free'}</span>
+                <span>{formatNumber(game.views_count || 0)} views</span>
+                <span>{formatNumber(game.likes_count || 0)} likes</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              {game.game_url && <a href={game.game_url} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg bg-bg-elevated text-text-muted hover:text-accent-blue transition-colors" title="Play"><ExternalLink size={14} /></a>}
+              <button onClick={() => handleEdit(game)} className="p-1.5 rounded-lg bg-bg-elevated text-text-muted hover:text-accent-blue transition-colors" title="Edit"><Eye size={14} /></button>
+              <button onClick={() => handleDelete(game.id)} className="p-1.5 rounded-lg bg-bg-elevated text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors" title="Delete"><Trash2 size={14} /></button>
+            </div>
+          </div>
+        ))}
+        {filtered.length === 0 && <p className="text-sm text-text-muted text-center py-8">No games found</p>}
       </div>
     </div>
   )

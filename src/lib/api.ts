@@ -250,6 +250,7 @@ export async function submitGame(submission: {
   gamepass_url?: string
   thumbnail_url?: string
   price?: string
+  gallery_images?: string[]
 }) {
   const user = await getCurrentUser()
   if (!user) throw new Error('Not authenticated')
@@ -263,6 +264,9 @@ export async function submitGame(submission: {
     video_url: submission.video_url,
     game_url: submission.game_url,
     drive_file_url: submission.drive_file_url,
+    gamepass_url: submission.gamepass_url,
+    thumbnail_url: submission.thumbnail_url,
+    gallery_images: submission.gallery_images || [],
   }).select().single()
 
   if (error) throw error

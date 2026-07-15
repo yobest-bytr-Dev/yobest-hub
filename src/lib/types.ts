@@ -12,6 +12,8 @@ export interface Experience {
   price: string
   category: string
   thumbnail_url?: string
+  images?: string[]
+  gamepass_id?: string
   views_count?: number
   likes_count?: number
   is_official: boolean
@@ -29,6 +31,7 @@ export interface Submission {
   game_url: string
   drive_file_url: string
   gamepass_url?: string
+  gallery_images?: string[]
   thumbnail_url?: string
   screenshots_urls: string[]
   status: 'pending' | 'approved' | 'rejected'

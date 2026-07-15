@@ -145,6 +145,8 @@ serve(async (req) => {
           game_url: sub.game_url || "",
           download_url: sub.drive_file_url || "",
           thumbnail_url: sub.thumbnail_url || "",
+          images: sub.gallery_images || sub.screenshots_urls || [],
+          gamepass_id: sub.gamepass_url || "",
           is_official: false,
           game_play: false,
           download_enabled: true,

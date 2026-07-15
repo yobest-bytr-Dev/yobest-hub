@@ -166,6 +166,10 @@ function GamesTab() {
                     className="px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-xs focus:outline-none focus:border-accent-blue/50" placeholder="Price" />
                 </div>
                 <ImagePicker value={editForm.thumbnail_url || ''} onChange={(url) => setEditForm({ ...editForm, thumbnail_url: url })} folder="yobest/thumbnails" label="Thumbnail" />
+                <input value={(editForm as any).gamepass_id || ''} onChange={(e) => setEditForm({ ...editForm, gamepass_id: e.target.value } as any)}
+                  className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-xs focus:outline-none focus:border-accent-blue/50" placeholder="GamePass ID (if paid)" />
+                <ImagePicker value="" onChange={() => {}} folder="yobest/thumbnails" label="Gallery Images" multiple values={(editForm as any).images || []}
+                  onMultipleChange={(urls) => setEditForm({ ...editForm, images: urls } as any)} maxImages={12} />
                 <div className="flex gap-2">
                   <label className="flex items-center gap-1.5 text-xs text-text-muted">
                     <input type="checkbox" checked={!!editForm.game_play} onChange={(e) => setEditForm({ ...editForm, game_play: e.target.checked })} className="rounded" /> Playable
@@ -279,7 +283,11 @@ function SubmissionsTab() {
                   <input value={editForm.game_url || ''} onChange={(e) => setEditForm({ ...editForm, game_url: e.target.value })}
                     className="px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-xs focus:outline-none focus:border-accent-blue/50" placeholder="Game URL" />
                 </div>
+                <input value={(editForm as any).gamepass_url || ''} onChange={(e) => setEditForm({ ...editForm, gamepass_url: e.target.value } as any)}
+                  className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-xs focus:outline-none focus:border-accent-blue/50" placeholder="GamePass ID (if paid)" />
                 <ImagePicker value={editForm.thumbnail_url || ''} onChange={(url) => setEditForm({ ...editForm, thumbnail_url: url })} folder="yobest/thumbnails" label="Thumbnail" />
+                <ImagePicker value="" onChange={() => {}} folder="yobest/thumbnails" label="Gallery Images" multiple values={(editForm as any).gallery_images || []}
+                  onMultipleChange={(urls) => setEditForm({ ...editForm, gallery_images: urls } as any)} maxImages={8} />
                 <button onClick={() => handleSave(sub.id)}
                   className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent-blue text-white text-xs font-semibold hover:opacity-90 transition-opacity">
                   <Save size={12} /> Save Changes

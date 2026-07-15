@@ -166,13 +166,16 @@ export default function Marketplace() {
         <div className="flex flex-col gap-4 mb-6">
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="flex gap-1.5">
-              {(['all', 'script', 'model', 'uikit'] as const).map((t) => (
-                <button key={t} onClick={() => setTypeFilter(t)}
-                  className={cn('px-3 py-1.5 rounded-lg text-xs font-medium transition-all capitalize',
-                    typeFilter === t ? 'bg-accent-blue/15 text-accent-blue border border-accent-blue/25' : 'bg-bg-secondary text-text-secondary border border-border-primary hover:border-border-hover')}>
-                  {t === 'all' ? 'All Types' : typeLabels[t] + 's'}
-                </button>
-              ))}
+              {(['all', 'script', 'model', 'uikit'] as const).map((t) => {
+                const count = t === 'all' ? assets.length : assets.filter(a => a.type === t).length
+                return (
+                  <button key={t} onClick={() => setTypeFilter(t)}
+                    className={cn('px-3 py-1.5 rounded-lg text-xs font-medium transition-all capitalize',
+                      typeFilter === t ? 'bg-accent-blue/15 text-accent-blue border border-accent-blue/25' : 'bg-bg-secondary text-text-secondary border border-border-primary hover:border-border-hover')}>
+                    {t === 'all' ? 'All Types' : typeLabels[t] + 's'} <span className="text-[10px] opacity-60">({count})</span>
+                  </button>
+                )
+              })}
             </div>
             <div className="flex gap-1.5">
               {(['all', 'free', 'paid'] as const).map((p) => (
@@ -282,7 +285,11 @@ export default function Marketplace() {
                 <div>
                   <label className="text-xs text-text-muted font-medium mb-1.5 block">Asset File (optional)</label>
                   <p className="text-[10px] text-text-dim mb-2">Upload your script, model, or UI kit file (max 100MB)</p>
-                  <input type="file" accept=".lua,.luau,.rbxm,.rbxmx,.rbxmx,.json,.xml,.zip,.rar,.7z,.txt" onChange={handleAssetFileUpload} className="hidden" ref={assetFileRef} />
+                  <input type="file" accept={
+                    submitForm.type === 'script' ? '.lua,.luau,.txt' :
+                    submitForm.type === 'model' ? '.rbxm,.rbxmx,.obj,.fbx' :
+                    '.json,.xml,.lua,.luau,.png,.jpg'
+                  } onChange={handleAssetFileUpload} className="hidden" ref={assetFileRef} />
                   <button type="button" onClick={() => assetFileRef.current?.click()} disabled={uploadingFile}
                     className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-dashed border-border-primary hover:border-accent-blue/50 hover:bg-accent-blue/5 transition-all text-text-secondary hover:text-accent-blue text-sm">
                     {uploadingFile ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
@@ -294,6 +301,12 @@ export default function Marketplace() {
                       File uploaded successfully
                     </div>
                   )}
+                  <div className="mt-2">
+                    <p className="text-[10px] text-text-dim mb-1.5">Or paste a download link</p>
+                    <input type="url" value={assetFileUrl} onChange={(e) => setAssetFileUrl(e.target.value)}
+                      placeholder="https://drive.google.com/... or https://mega.nz/..."
+                      className="w-full px-3 py-2 rounded-xl bg-bg-elevated border border-border-primary text-text-primary text-sm placeholder:text-text-dim focus:outline-none focus:border-accent-blue/50 transition-all" />
+                  </div>
                 </div>
                 <button type="submit" disabled={submitting}
                   className="w-full py-3 rounded-xl bg-accent-blue text-white font-semibold text-sm hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2">

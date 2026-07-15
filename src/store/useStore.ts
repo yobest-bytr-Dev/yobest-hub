@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { ChatMessage, UserProfile } from '@/lib/types'
 import { sendDbMessage, fetchDbMessages, markDbMessagesRead, getCurrentUser, getProfile } from '@/lib/api'
+import { supabase } from '@/config/supabase'
 
 interface Message {
   id: string
@@ -60,7 +61,7 @@ interface AppState {
 
   following: string[]
   loadFollowing: () => void
-  toggleFollow: (userId: string) => void
+  toggleFollow: (userId: string) => Promise<void>
   isFollowing: (userId: string) => boolean
 
   messages: Message[]
@@ -166,13 +167,45 @@ export const useStore = create<AppState>((set, get) => ({
   loadFollowing: () => {
     set({ following: loadFromStorage<string[]>(FOLLOWING_KEY, []) })
   },
-  toggleFollow: (userId) => {
+  toggleFollow: async (userId) => {
     const { following } = get()
-    const next = following.includes(userId)
-      ? following.filter((id) => id !== userId)
-      : [...following, userId]
+    const isNowFollowing = !following.includes(userId)
+    const next = isNowFollowing
+      ? [...following, userId]
+      : following.filter((id) => id !== userId)
     saveToStorage(FOLLOWING_KEY, next)
     set({ following: next })
+    
+    // Update followers_count in DB
+    try {
+      if (isNowFollowing) {
+        const user = await supabase.auth.getUser()
+        if (user.data.user) {
+          await supabase.rpc('increment_field' as any, { table_name: 'profiles', field_name: 'followers_count', row_id: userId }).catch(() => {
+            supabase.from('profiles').select('followers_count').eq('id', userId).single().then(({ data }) => {
+              if (data) supabase.from('profiles').update({ followers_count: (data.followers_count || 0) + 1 }).eq('id', userId)
+            })
+          })
+          await supabase.rpc('increment_field' as any, { table_name: 'profiles', field_name: 'following_count', row_id: user.data.user.id }).catch(() => {
+            supabase.from('profiles').select('following_count').eq('id', user.data.user!.id).single().then(({ data }) => {
+              if (data) supabase.from('profiles').update({ following_count: (data.following_count || 0) + 1 }).eq('id', user.data.user!.id)
+            })
+          })
+        }
+      } else {
+        const user = await supabase.auth.getUser()
+        if (user.data.user) {
+          supabase.from('profiles').select('followers_count').eq('id', userId).single().then(({ data }) => {
+            if (data) supabase.from('profiles').update({ followers_count: Math.max(0, (data.followers_count || 0) - 1) }).eq('id', userId)
+          })
+          supabase.from('profiles').select('following_count').eq('id', user.data.user!.id).single().then(({ data }) => {
+            if (data) supabase.from('profiles').update({ following_count: Math.max(0, (data.following_count || 0) - 1) }).eq('id', user.data.user!.id)
+          })
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to update follow counts:', e)
+    }
   },
   isFollowing: (userId) => get().following.includes(userId),
 

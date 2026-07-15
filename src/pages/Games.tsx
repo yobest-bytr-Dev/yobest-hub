@@ -582,6 +582,12 @@ export default function Games() {
                   <button type="button" onClick={() => setSubmitForm({ ...submitForm, gameFileUrl: '' })} className="text-red-400 hover:text-red-300 ml-auto"><X size={12} /></button>
                 </div>
               )}
+              <div className="mt-2">
+                <p className="text-[10px] text-text-dim mb-1.5">Or paste a download link (Google Drive, Mega, MediaFire, etc.)</p>
+                <input type="url" value={submitForm.gameFileUrl} onChange={(e) => setSubmitForm({ ...submitForm, gameFileUrl: e.target.value })}
+                  placeholder="https://drive.google.com/file/d/... or https://mega.nz/..."
+                  className="w-full px-3 py-2 rounded-xl bg-bg-elevated border border-border-primary text-text-primary text-sm placeholder:text-text-dim focus:outline-none focus:border-accent-blue/50 transition-all" />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>

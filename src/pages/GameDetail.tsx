@@ -1,10 +1,10 @@
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { ArrowLeft, Globe, Download, Play, ExternalLink, Eye, Heart, Share2, Copy, Check, MessageSquare, Calendar, User, Loader2, Lock, MessageCircle, Pencil, Trash2 } from 'lucide-react'
+import { ArrowLeft, Globe, Download, Play, ExternalLink, Eye, Heart, Share2, Copy, Check, MessageSquare, Calendar, User, Loader2, Lock, MessageCircle, Pencil, Trash2, Tag, ShieldCheck, ShoppingCart } from 'lucide-react'
 import { experiences } from '@/data/official-games'
-import { getApprovedCommunityGames, getOfficialGames, toggleGameLike, hasUserLikedGame, getGameLikeCount, addGameComment, getGameComments, editGameComment, deleteGameComment, getReviewsStats, submitReview, getUserReview } from '@/lib/api'
-import type { Experience } from '@/lib/types'
+import { getApprovedCommunityGames, getOfficialGames, toggleGameLike, hasUserLikedGame, getGameLikeCount, addGameComment, getGameComments, editGameComment, deleteGameComment, getReviewsStats, submitReview, getUserReview, getReleases, verifyGamepassOwnership, isGamepassVerified, extractGamepassId } from '@/lib/api'
+import type { Experience, Release } from '@/lib/types'
 import { extractYoutubeId, formatNumber, getCategoryColor, cn } from '@/lib/utils'
 import { getYouTubeStats, getYouTubeComments, type YouTubeStats, type YouTubeComment } from '@/lib/youtube'
 import { trackGameView, getGameViewCount, trackExperienceDownload } from '@/lib/analytics'
@@ -55,6 +55,9 @@ export default function GameDetail() {
   const [reviewRating, setReviewRating] = useState(0)
   const [reviewComment, setReviewComment] = useState('')
   const [reviewSubmitting, setReviewSubmitting] = useState(false)
+  const [releases, setReleases] = useState<Release[]>([])
+  const [gamepassVerified, setGamepassVerified] = useState(false)
+  const [verifyingPurchase, setVerifyingPurchase] = useState(false)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -90,7 +93,14 @@ export default function GameDetail() {
     })
     getReviewsStats(id).then(setReviewStats)
     getUserReview(id).then(setMyReview)
+    getReleases('game', id).then(setReleases)
   }, [id])
+
+  useEffect(() => {
+    if (!game?.gamepass_id || !currentUser) return
+    const gpId = extractGamepassId(game.gamepass_id) || game.gamepass_id
+    isGamepassVerified(gpId).then(setGamepassVerified)
+  }, [game, currentUser])
 
   useEffect(() => {
     if (game) {
@@ -151,6 +161,25 @@ export default function GameDetail() {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     }
+  }
+
+  const handleVerifyPurchase = async () => {
+    if (!currentUser) { navigate('/auth'); return }
+    if (!game?.gamepass_id) { toast('No gamepass configured for this game', 'error'); return }
+    setVerifyingPurchase(true)
+    try {
+      const gpId = extractGamepassId(game.gamepass_id) || game.gamepass_id
+      const result = await verifyGamepassOwnership(gpId)
+      if (result.verified) {
+        setGamepassVerified(true)
+        toast('Purchase verified successfully!', 'success')
+      } else {
+        toast(result.error || 'Could not verify purchase', 'error')
+      }
+    } catch {
+      toast('Verification failed. Try again later.', 'error')
+    }
+    setVerifyingPurchase(false)
   }
 
   const handleLike = async () => {
@@ -316,6 +345,39 @@ export default function GameDetail() {
                   {copied ? <><Check size={16} className="text-green-400" /> Link Copied!</> : <><Share2 size={16} /> Share</>}
                 </button>
               </div>
+
+              {game.price !== 'Free' && game.gamepass_id && (
+                <div className="mt-4 p-4 rounded-xl bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20">
+                  <div className="flex items-center gap-2 mb-3">
+                    <ShoppingCart size={16} className="text-yellow-400" />
+                    <h4 className="text-sm font-semibold text-text-primary">Purchase Required</h4>
+                  </div>
+                  <p className="text-xs text-text-secondary mb-3">This game requires a gamepass to download ({game.price}).</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <a href={`https://www.roblox.com/game-pass/${extractGamepassId(game.gamepass_id) || game.gamepass_id}/`} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg bg-yellow-500 text-black text-xs font-bold hover:bg-yellow-400 transition-colors">
+                      <ShoppingCart size={14} /> Buy Gamepass
+                    </a>
+                    {currentUser ? (
+                      gamepassVerified ? (
+                        <span className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-500/15 border border-green-500/25 text-green-400 text-xs font-semibold">
+                          <ShieldCheck size={14} /> Verified
+                        </span>
+                      ) : (
+                        <button onClick={handleVerifyPurchase} disabled={verifyingPurchase}
+                          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-xs font-semibold hover:border-accent-blue/30 disabled:opacity-50 transition-all">
+                          {verifyingPurchase ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />} Verify Purchase
+                        </button>
+                      )
+                    ) : (
+                      <button onClick={() => navigate('/auth')}
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-secondary text-xs font-semibold hover:border-accent-blue/30 transition-all">
+                        <Lock size={14} /> Sign in to verify
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -467,6 +529,33 @@ export default function GameDetail() {
                     ))
                   )}
                 </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-bg-secondary border border-border-primary overflow-hidden">
+              <div className="px-5 py-4 border-b border-border-primary">
+                <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+                  <Tag size={16} className="text-accent-green" /> Releases
+                  {releases.length > 0 && <span className="text-[10px] text-text-muted font-normal">({releases.length})</span>}
+                </h3>
+              </div>
+              <div className="p-4">
+                {releases.length > 0 ? (
+                  <div className="space-y-3">
+                    {releases.map((r) => (
+                      <div key={r.id} className="p-3 rounded-xl bg-bg-elevated border border-border-primary/50">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="px-2 py-0.5 rounded-md bg-accent-blue/15 text-accent-blue text-[10px] font-bold">v{r.version}</span>
+                          <span className="text-xs font-semibold text-text-primary">{r.title}</span>
+                        </div>
+                        {r.description && <p className="text-[11px] text-text-secondary leading-relaxed mt-1">{r.description}</p>}
+                        <p className="text-[10px] text-text-muted mt-1.5">{timeAgo(r.created_at)}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-text-muted text-center py-2">No releases yet</p>
+                )}
               </div>
             </div>
 

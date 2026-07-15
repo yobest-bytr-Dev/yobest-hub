@@ -169,6 +169,38 @@ serve(async (req) => {
         })
       }
 
+      case "add_release": {
+        const { target_type, target_id, version, title, description } = body
+        const { error } = await adminClient.from("releases").insert({
+          target_type, target_id, version, title, description: description || "",
+        })
+        if (error) throw error
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        })
+      }
+
+      case "delete_release": {
+        const { releaseId } = body
+        const { error } = await adminClient.from("releases").delete().eq("id", releaseId)
+        if (error) throw error
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        })
+      }
+
+      case "get_all_releases": {
+        const { target_type, target_id } = body
+        let query = adminClient.from("releases").select("*").order("created_at", { ascending: false })
+        if (target_type) query = query.eq("target_type", target_type)
+        if (target_id) query = query.eq("target_id", target_id)
+        const { data, error } = await query
+        if (error) throw error
+        return new Response(JSON.stringify({ releases: data || [] }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        })
+      }
+
       default:
         throw new Error("Unknown action: " + action)
     }

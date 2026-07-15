@@ -4,7 +4,7 @@ import {
   Shield, Users, Gamepad2, FileText, BarChart3, Settings, Loader2, Trash2,
   UserCheck, UserX, Search, Eye, Heart, MessageSquare, Download, CheckCircle,
   XCircle, ExternalLink, ArrowLeft, Crown, Mail, Calendar, TrendingUp, RefreshCw,
-  Wrench, Plus, Clock, Sparkles, Save, Upload, Ban, ShieldOff, ImagePlus
+  Wrench, Plus, Clock, Sparkles, Save, Upload, Ban, ShieldOff, ImagePlus, Tag
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '@/store/useStore'
@@ -537,6 +537,10 @@ function GamesTab() {
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
   const [filterType, setFilterType] = useState<'all' | 'official' | 'community'>('all')
+  const [releaseGame, setReleaseGame] = useState<any>(null)
+  const [releases, setReleases] = useState<any[]>([])
+  const [releaseForm, setReleaseForm] = useState({ version: '', title: '', description: '' })
+  const [releaseLoading, setReleaseLoading] = useState(false)
   const { toast } = useToast()
 
   const load = useCallback(async () => {
@@ -602,6 +606,35 @@ function GamesTab() {
     } catch (e: any) {
       toast(e.message || 'Failed', 'error')
     }
+  }
+
+  const openReleases = async (game: any) => {
+    setReleaseGame(game)
+    const { data } = await supabase.from('releases').select('*').eq('target_type', 'game').eq('target_id', game.id).order('created_at', { ascending: false })
+    setReleases(data || [])
+    setReleaseForm({ version: '', title: '', description: '' })
+  }
+
+  const addReleaseHandler = async () => {
+    if (!releaseForm.version.trim() || !releaseForm.title.trim()) { toast('Version and title required', 'error'); return }
+    setReleaseLoading(true)
+    try {
+      const { error } = await supabase.from('releases').insert({
+        target_type: 'game', target_id: releaseGame.id,
+        version: releaseForm.version, title: releaseForm.title, description: releaseForm.description,
+      })
+      if (error) throw error
+      toast('Release added!', 'success')
+      const { data } = await supabase.from('releases').select('*').eq('target_type', 'game').eq('target_id', releaseGame.id).order('created_at', { ascending: false })
+      setReleases(data || [])
+      setReleaseForm({ version: '', title: '', description: '' })
+    } catch (e: any) { toast(e.message || 'Failed', 'error') }
+    setReleaseLoading(false)
+  }
+
+  const deleteReleaseHandler = async (id: string) => {
+    const { error } = await supabase.from('releases').delete().eq('id', id)
+    if (!error) setReleases(prev => prev.filter(r => r.id !== id))
   }
 
   const filtered = games.filter((g) => {
@@ -745,6 +778,7 @@ function GamesTab() {
             </div>
             <div className="flex items-center gap-1 shrink-0">
               {game.game_url && <a href={game.game_url} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg bg-bg-elevated text-text-muted hover:text-accent-blue transition-colors" title="Play"><ExternalLink size={14} /></a>}
+              <button onClick={() => openReleases(game)} className="p-1.5 rounded-lg bg-bg-elevated text-text-muted hover:text-accent-green transition-colors" title="Releases"><Tag size={14} /></button>
               <button onClick={() => handleEdit(game)} className="p-1.5 rounded-lg bg-bg-elevated text-text-muted hover:text-accent-blue transition-colors" title="Edit"><Eye size={14} /></button>
               <button onClick={() => handleDelete(game.id)} className="p-1.5 rounded-lg bg-bg-elevated text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors" title="Delete"><Trash2 size={14} /></button>
             </div>
@@ -752,6 +786,40 @@ function GamesTab() {
         ))}
         {filtered.length === 0 && <p className="text-sm text-text-muted text-center py-8">No games found</p>}
       </div>
+
+      {releaseGame && (
+        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="rounded-xl bg-bg-secondary border border-accent-green/25 p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+              <Tag size={14} className="text-accent-green" /> Releases for: {releaseGame.title}
+            </h3>
+            <button onClick={() => setReleaseGame(null)} className="text-xs text-text-muted hover:text-text-primary">Close</button>
+          </div>
+          <div className="flex gap-2">
+            <input value={releaseForm.version} onChange={e => setReleaseForm(f => ({ ...f, version: e.target.value }))} placeholder="v1.0"
+              className="w-24 px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50" />
+            <input value={releaseForm.title} onChange={e => setReleaseForm(f => ({ ...f, title: e.target.value }))} placeholder="Release title"
+              className="flex-1 px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50" />
+            <input value={releaseForm.description} onChange={e => setReleaseForm(f => ({ ...f, description: e.target.value }))} placeholder="Description (optional)"
+              className="flex-1 px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50" />
+            <button onClick={addReleaseHandler} disabled={releaseLoading}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent-green/15 text-accent-green border border-accent-green/25 text-xs font-semibold hover:bg-accent-green/25 disabled:opacity-50 transition-all">
+              {releaseLoading ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />} Add
+            </button>
+          </div>
+          <div className="space-y-2 max-h-60 overflow-y-auto">
+            {releases.length > 0 ? releases.map(r => (
+              <div key={r.id} className="flex items-center gap-3 p-3 rounded-lg bg-bg-elevated border border-border-primary/50">
+                <span className="px-2 py-0.5 rounded bg-accent-blue/15 text-accent-blue text-[10px] font-bold shrink-0">v{r.version}</span>
+                <span className="text-xs font-semibold text-text-primary flex-1">{r.title}</span>
+                {r.description && <span className="text-[10px] text-text-muted flex-1 truncate">{r.description}</span>}
+                <span className="text-[10px] text-text-dim shrink-0">{new Date(r.created_at).toLocaleDateString()}</span>
+                <button onClick={() => deleteReleaseHandler(r.id)} className="p-1 rounded hover:bg-red-500/10 text-text-dim hover:text-red-400 transition-colors shrink-0"><Trash2 size={12} /></button>
+              </div>
+            )) : <p className="text-xs text-text-muted text-center py-4">No releases yet</p>}
+          </div>
+        </motion.div>
+      )}
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { supabase } from '@/config/supabase'
-import type { Experience, Asset, UserProfile, Challenge, Submission } from './types'
+import type { Experience, Asset, UserProfile, Challenge, Submission, Release } from './types'
 
 export async function signUp(
   email: string,
@@ -751,4 +751,81 @@ export async function getAssetReviewsStats(assetId: string) {
   if (!data || data.length === 0) return { avg: 0, count: 0 }
   const avg = data.reduce((sum, r) => sum + r.rating, 0) / data.length
   return { avg: Math.round(avg * 10) / 10, count: data.length }
+}
+
+// ── Releases ──
+
+export async function getReleases(targetType: 'game' | 'asset', targetId: string): Promise<Release[]> {
+  const { data, error } = await supabase
+    .from('releases')
+    .select('*')
+    .eq('target_type', targetType)
+    .eq('target_id', targetId)
+    .order('created_at', { ascending: false })
+  if (error) return []
+  return (data || []) as Release[]
+}
+
+export async function addRelease(targetType: 'game' | 'asset', targetId: string, version: string, title: string, description: string) {
+  const { error } = await supabase.from('releases').insert({
+    target_type: targetType,
+    target_id: targetId,
+    version,
+    title,
+    description,
+  })
+  if (error) throw error
+}
+
+export async function deleteRelease(releaseId: string) {
+  const { error } = await supabase.from('releases').delete().eq('id', releaseId)
+  if (error) throw error
+}
+
+// ── Gamepass Purchase Verification ──
+
+export async function verifyGamepassOwnership(gamepassId: string): Promise<{ verified: boolean; error?: string }> {
+  const user = await getCurrentUser()
+  if (!user) return { verified: false, error: 'Not signed in' }
+
+  const profile = await getCurrentProfile()
+  if (!profile?.roblox_id) return { verified: false, error: 'Link your Roblox account first' }
+
+  try {
+    const res = await fetch(`https://inventory.roblox.com/v1/users/${profile.roblox_id}/items/GamePass/${gamepassId}`)
+    if (res.ok) {
+      const data = await res.json()
+      if (data.data && data.data.length > 0) {
+        await recordGamepassPurchase(gamepassId)
+        return { verified: true }
+      }
+    }
+  } catch {}
+
+  return { verified: false, error: 'Could not verify ownership. Make sure you own the gamepass.' }
+}
+
+export async function isGamepassVerified(gamepassId: string): Promise<boolean> {
+  return verifyGamepassPurchase(gamepassId)
+}
+
+export async function getVerifiedGamepassIds(gameIds: string[]): Promise<Record<string, boolean>> {
+  const user = await getCurrentUser()
+  if (!user) return {}
+  const result: Record<string, boolean> = {}
+  for (const gid of gameIds) {
+    result[gid] = false
+  }
+  const { data } = await supabase
+    .from('gamepass_purchases')
+    .select('gamepass_id, game_id, asset_id')
+    .eq('user_id', user.id)
+    .eq('verified', true)
+  if (data) {
+    for (const row of data) {
+      if (row.game_id && gameIds.includes(row.game_id)) result[row.game_id] = true
+      if (row.asset_id && gameIds.includes(row.asset_id)) result[row.asset_id] = true
+    }
+  }
+  return result
 }

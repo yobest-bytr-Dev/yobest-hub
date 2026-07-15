@@ -111,3 +111,13 @@ export type GameCategory =
   | 'UI Kit'
   | 'Core API'
   | 'Template'
+
+export interface Release {
+  id: string
+  target_type: 'game' | 'asset'
+  target_id: string
+  version: string
+  title: string
+  description: string
+  created_at: string
+}

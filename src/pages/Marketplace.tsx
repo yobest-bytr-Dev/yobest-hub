@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ShoppingBag, Search, Download, Code, Box, Palette, X, Loader2, Plus, Upload, ExternalLink, Calendar } from 'lucide-react'
-import { getAssets, submitAsset, submitAssetReview, getUserAssetReview, getAssetReviewsStats } from '@/lib/api'
+import { ShoppingBag, Search, Download, Code, Box, Palette, X, Loader2, Plus, Upload, ExternalLink, Calendar, Tag, ShieldCheck, ShoppingCart, Lock } from 'lucide-react'
+import { getAssets, submitAsset, submitAssetReview, getUserAssetReview, getAssetReviewsStats, getReleases, verifyGamepassOwnership, isGamepassVerified } from '@/lib/api'
 import { toDirectImageUrl, uploadToGoogleDrive } from '@/lib/drive-upload'
 import { trackAssetDownload } from '@/lib/analytics'
 import ImagePicker from '@/components/ui/ImagePicker'
 import StarRating from '@/components/ui/StarRating'
 import { useStore } from '@/store/useStore'
-import type { Asset } from '@/lib/types'
+import type { Asset, Release } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { useNavigate } from 'react-router-dom'
 import AdBanner from '@/components/AdBanner'
@@ -29,15 +29,37 @@ function AssetDetailModal({ asset, onClose }: { asset: Asset; onClose: () => voi
   const [reviewComment, setReviewComment] = useState('')
   const [reviewSubmitting, setReviewSubmitting] = useState(false)
   const [localDownloads, setLocalDownloads] = useState(asset.downloads_count || 0)
+  const [releases, setReleases] = useState<Release[]>([])
+  const [gamepassVerified, setGamepassVerified] = useState(false)
+  const [verifyingPurchase, setVerifyingPurchase] = useState(false)
 
   useEffect(() => {
     getAssetReviewsStats(asset.id).then(setReviewStats)
     getUserAssetReview(asset.id).then(setMyReview)
-  }, [asset.id])
+    getReleases('asset', asset.id).then(setReleases)
+    if (asset.gamepass_id && currentUser) {
+      isGamepassVerified(asset.gamepass_id).then(setGamepassVerified)
+    }
+  }, [asset.id, currentUser])
 
   const handleDownload = async () => {
     setLocalDownloads(prev => prev + 1)
     trackAssetDownload(asset.id)
+  }
+
+  const handleVerifyPurchase = async () => {
+    if (!currentUser) { navigate('/auth'); return }
+    if (!asset.gamepass_id) return
+    setVerifyingPurchase(true)
+    try {
+      const result = await verifyGamepassOwnership(asset.gamepass_id)
+      if (result.verified) {
+        setGamepassVerified(true)
+      } else {
+        alert(result.error || 'Could not verify purchase')
+      }
+    } catch { alert('Verification failed.') }
+    setVerifyingPurchase(false)
   }
 
   return (
@@ -93,8 +115,50 @@ function AssetDetailModal({ asset, onClose }: { asset: Asset; onClose: () => voi
 
           {asset.gamepass_id && (
             <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
-              <p className="text-[10px] text-purple-400 font-medium">GamePass Required</p>
-              <p className="text-xs text-text-secondary">You must own GamePass #{asset.gamepass_id} to download</p>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[10px] text-purple-400 font-medium">GamePass Required</p>
+                {gamepassVerified && <span className="flex items-center gap-1 text-[10px] text-green-400 font-medium"><ShieldCheck size={10} /> Verified</span>}
+              </div>
+              <p className="text-xs text-text-secondary mb-2">You must own GamePass #{asset.gamepass_id} to download</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <a href={`https://www.roblox.com/game-pass/${asset.gamepass_id}/`} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-yellow-500 text-black text-[11px] font-bold hover:bg-yellow-400 transition-colors">
+                  <ShoppingCart size={12} /> Buy Gamepass
+                </a>
+                {currentUser ? (
+                  gamepassVerified ? null : (
+                    <button onClick={handleVerifyPurchase} disabled={verifyingPurchase}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-[11px] font-semibold hover:border-accent-blue/30 disabled:opacity-50 transition-all">
+                      {verifyingPurchase ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={12} />} Verify
+                    </button>
+                  )
+                ) : (
+                  <button onClick={() => navigate('/auth')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-elevated border border-border-primary text-text-secondary text-[11px] font-semibold hover:border-accent-blue/30 transition-all">
+                    <Lock size={12} /> Sign in
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {releases.length > 0 && (
+            <div className="p-3 rounded-lg bg-bg-elevated border border-border-primary">
+              <div className="flex items-center gap-2 mb-2">
+                <Tag size={12} className="text-accent-green" />
+                <p className="text-[11px] text-accent-green font-semibold">Releases ({releases.length})</p>
+              </div>
+              <div className="space-y-2">
+                {releases.slice(0, 5).map((r) => (
+                  <div key={r.id} className="p-2 rounded-lg bg-bg-secondary border border-border-primary/50">
+                    <div className="flex items-center gap-2">
+                      <span className="px-1.5 py-0.5 rounded bg-accent-blue/15 text-accent-blue text-[9px] font-bold">v{r.version}</span>
+                      <span className="text-[11px] font-semibold text-text-primary">{r.title}</span>
+                    </div>
+                    {r.description && <p className="text-[10px] text-text-secondary mt-0.5">{r.description}</p>}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

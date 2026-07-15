@@ -79,31 +79,36 @@ const GameGallery = ({ officialGames }: { officialGames: Experience[] }) => {
   const doubled = [...allImages, ...allImages]
 
   return (
-    <div className="relative group/gallery overflow-hidden">
-      <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-bg-primary to-transparent z-10 pointer-events-none" />
-      <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-bg-primary to-transparent z-10 pointer-events-none" />
-      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-accent-blue/30 to-transparent" />
-      <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-accent-purple/30 to-transparent" />
+    <div className="relative group/gallery">
+      <div className="absolute left-0 top-0 bottom-0 w-32 bg-gradient-to-r from-bg-primary via-bg-primary/80 to-transparent z-10 pointer-events-none" />
+      <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-l from-bg-primary via-bg-primary/80 to-transparent z-10 pointer-events-none" />
+      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-accent-blue/40 to-transparent" />
+      <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-accent-purple/40 to-transparent" />
 
-      <div className="game-gallery-track flex gap-5 py-4 group-hover/gallery:[animation-play-state:paused]">
+      <div className="game-gallery-track flex gap-6 py-6 group-hover/gallery:[animation-play-state:paused]">
         {doubled.map((img, i) => (
           <Link key={`${img.id}-${i}`} to={`/games/${img.id.split('-')[0]}`}
-            className="shrink-0 w-[280px] sm:w-[320px] block rounded-2xl overflow-hidden bg-bg-secondary border border-border-primary/60 card-hover group/card relative aspect-[16/10] transition-all duration-300 hover:border-accent-blue/40 hover:shadow-[0_0_30px_-5px_rgba(59,130,246,0.3)]">
+            className="shrink-0 w-[260px] sm:w-[300px] block rounded-2xl overflow-hidden bg-bg-secondary border border-border-primary/40 group/card relative aspect-[16/10] transition-all duration-500 hover:border-accent-blue/50 hover:shadow-[0_0_40px_-8px_rgba(59,130,246,0.4)] hover:-translate-y-1">
             <img src={img.src} alt={img.title} loading="lazy"
-              className="w-full h-full object-cover transition-transform duration-700 group-hover/card:scale-110"
+              className="w-full h-full object-cover transition-all duration-700 group-hover/card:scale-110 group-hover/card:brightness-110"
               onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-60 group-hover/card:opacity-80 transition-opacity duration-300" />
-            <div className="absolute inset-0 bg-gradient-to-r from-accent-blue/0 via-accent-blue/5 to-accent-purple/0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-500" />
-            <div className="absolute bottom-0 left-0 right-0 p-4 translate-y-1 group-hover/card:translate-y-0 transition-transform duration-300">
-              <p className="text-sm font-bold text-white truncate drop-shadow-lg">{img.title}</p>
-              <div className="flex items-center gap-2 mt-1 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300 delay-75">
-                <span className="text-[11px] text-white/70 font-medium">View Game</span>
-                <ArrowRight size={11} className="text-white/70" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent opacity-50 group-hover/card:opacity-80 transition-all duration-500" />
+            <div className="absolute inset-0 bg-gradient-to-r from-accent-blue/0 via-cyan-400/5 to-accent-purple/0 opacity-0 group-hover/card:opacity-100 transition-opacity duration-700" />
+            <div className="absolute top-3 right-3 opacity-0 group-hover/card:opacity-100 transition-all duration-500 translate-y-1 group-hover/card:translate-y-0">
+              <div className="w-8 h-8 rounded-full bg-white/10 backdrop-blur-xl flex items-center justify-center border border-white/15 shadow-lg">
+                <ArrowRight size={14} className="text-white/80" />
               </div>
             </div>
-            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/card:opacity-100 transition-all duration-300">
-              <div className="w-14 h-14 rounded-full bg-white/10 backdrop-blur-xl flex items-center justify-center border border-white/20 shadow-2xl group-hover/card:scale-110 transition-transform duration-300">
-                <Play size={22} className="text-white ml-0.5" fill="white" />
+            <div className="absolute bottom-0 left-0 right-0 p-4 translate-y-2 group-hover/card:translate-y-0 transition-all duration-500">
+              <p className="text-sm font-bold text-white truncate drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]">{img.title}</p>
+              <div className="flex items-center gap-1.5 mt-1.5 opacity-0 group-hover/card:opacity-100 transition-all duration-500 delay-100">
+                <div className="w-1.5 h-1.5 rounded-full bg-accent-green animate-pulse" />
+                <span className="text-[11px] text-white/60 font-medium">View Game</span>
+              </div>
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/card:opacity-100 transition-all duration-500 scale-75 group-hover/card:scale-100">
+              <div className="w-16 h-16 rounded-full bg-white/10 backdrop-blur-2xl flex items-center justify-center border border-white/20 shadow-[0_0_30px_rgba(255,255,255,0.1)] group-hover/card:shadow-[0_0_40px_rgba(255,255,255,0.15)] transition-shadow duration-500">
+                <Play size={24} className="text-white ml-0.5" fill="white" />
               </div>
             </div>
           </Link>
@@ -116,8 +121,11 @@ const GameGallery = ({ officialGames }: { officialGames: Experience[] }) => {
           100% { transform: translateX(-50%); }
         }
         .game-gallery-track {
-          animation: gallery-scroll 40s linear infinite;
+          animation: gallery-scroll 50s linear infinite;
           width: max-content;
+        }
+        .game-gallery-track:hover {
+          animation-play-state: paused;
         }
       `}</style>
     </div>

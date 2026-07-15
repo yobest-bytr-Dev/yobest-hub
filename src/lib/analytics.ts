@@ -21,6 +21,27 @@ export async function trackDownload(_gameId?: string): Promise<void> {
   } catch {}
 }
 
+export async function trackAssetDownload(assetId: string): Promise<void> {
+  try {
+    await supabase.rpc('increment_stat', { p_key: 'downloads' })
+    await supabase.rpc('increment_asset_downloads', { p_asset_id: assetId })
+  } catch {}
+}
+
+export async function trackExperienceDownload(expId: string): Promise<void> {
+  try {
+    await supabase.rpc('increment_stat', { p_key: 'downloads' })
+    await supabase.rpc('increment_experience_downloads', { p_exp_id: expId })
+  } catch {}
+}
+
+export async function trackToolDownload(toolId: string): Promise<void> {
+  try {
+    await supabase.rpc('increment_stat', { p_key: 'downloads' })
+    await supabase.rpc('increment_tool_downloads', { p_tool_id: toolId })
+  } catch {}
+}
+
 export async function trackAiSession(): Promise<void> {
   try {
     await supabase.rpc('increment_stat', { p_key: 'ai_sessions' })

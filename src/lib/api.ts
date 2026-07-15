@@ -686,6 +686,7 @@ export async function submitReview(experienceId: string, rating: number, comment
     .from('reviews')
     .upsert({ user_id: user.id, experience_id: experienceId, rating, comment }, { onConflict: 'user_id,experience_id' })
   if (error) throw error
+  try { await supabase.rpc('update_experience_rating', { p_exp_id: experienceId }) } catch {}
 }
 
 export async function getReviews(experienceId: string) {
@@ -720,11 +721,34 @@ export async function getReviewsStats(experienceId: string) {
   return { avg: Math.round(avg * 10) / 10, count: data.length }
 }
 
-export async function getAssetsReviewsStats(assetIds: string[]) {
-  if (assetIds.length === 0) return {}
-  const stats: Record<string, { avg: number; count: number }> = {}
-  for (const id of assetIds) {
-    stats[id] = { avg: 0, count: 0 }
-  }
-  return stats
+export async function submitAssetReview(assetId: string, rating: number, comment: string = '') {
+  const user = await getCurrentUser()
+  if (!user) throw new Error('Not authenticated')
+  const { error } = await supabase
+    .from('asset_reviews')
+    .upsert({ user_id: user.id, asset_id: assetId, rating, comment }, { onConflict: 'user_id,asset_id' })
+  if (error) throw error
+  try { await supabase.rpc('update_asset_rating', { p_asset_id: assetId }) } catch {}
+}
+
+export async function getUserAssetReview(assetId: string) {
+  const user = await getCurrentUser()
+  if (!user) return null
+  const { data } = await supabase
+    .from('asset_reviews')
+    .select('rating, comment')
+    .eq('asset_id', assetId)
+    .eq('user_id', user.id)
+    .single()
+  return data
+}
+
+export async function getAssetReviewsStats(assetId: string) {
+  const { data } = await supabase
+    .from('asset_reviews')
+    .select('rating')
+    .eq('asset_id', assetId)
+  if (!data || data.length === 0) return { avg: 0, count: 0 }
+  const avg = data.reduce((sum, r) => sum + r.rating, 0) / data.length
+  return { avg: Math.round(avg * 10) / 10, count: data.length }
 }

@@ -1,12 +1,14 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Gamepad2, Brain, Users, ShoppingBag, ArrowRight, Download, Play, Sparkles, Eye, Heart, Rocket, Trophy } from 'lucide-react'
+import { Gamepad2, Brain, Users, ShoppingBag, ArrowRight, Download, Play, Sparkles, Eye, Heart, Rocket, Trophy, ChevronLeft, ChevronRight } from 'lucide-react'
 import { experiences } from '@/data/official-games'
 import { extractYoutubeId, formatNumber, cn } from '@/lib/utils'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { getPlatformStats, getOfficialGames } from '@/lib/api'
 import { getSiteAnalytics } from '@/lib/analytics'
 import { useStore } from '@/store/useStore'
+import { toDirectImageUrl } from '@/lib/drive-upload'
+import type { Experience } from '@/lib/types'
 import AdBanner from '@/components/AdBanner'
 
 const pillars = [
@@ -51,6 +53,86 @@ const pillars = [
     glow: 'glow-pink',
   },
 ]
+
+const GameGallery = ({ officialGames }: { officialGames: Experience[] }) => {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(true)
+
+  const allImages: { src: string; title: string; id: string }[] = []
+  officialGames.forEach((game) => {
+    if (game.thumbnail_url) {
+      allImages.push({ src: toDirectImageUrl(game.thumbnail_url), title: game.title, id: game.id })
+    }
+    if (game.images && game.images.length > 0) {
+      game.images.forEach((img, i) => {
+        allImages.push({ src: toDirectImageUrl(img), title: `${game.title} #${i + 1}`, id: `${game.id}-${i}` })
+      })
+    }
+  })
+
+  const checkScroll = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return
+    setCanScrollLeft(el.scrollLeft > 10)
+    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 10)
+  }, [])
+
+  useEffect(() => {
+    checkScroll()
+    const el = scrollRef.current
+    if (el) el.addEventListener('scroll', checkScroll, { passive: true })
+    return () => { if (el) el.removeEventListener('scroll', checkScroll) }
+  }, [checkScroll])
+
+  const scroll = (dir: 'left' | 'right') => {
+    const el = scrollRef.current
+    if (!el) return
+    el.scrollBy({ left: dir === 'left' ? -340 : 340, behavior: 'smooth' })
+  }
+
+  if (allImages.length === 0) return null
+
+  return (
+    <div className="relative group">
+      {canScrollLeft && (
+        <button onClick={() => scroll('left')}
+          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-bg-secondary/90 border border-border-primary flex items-center justify-center text-text-primary hover:bg-bg-elevated transition-all shadow-lg opacity-0 group-hover:opacity-100">
+          <ChevronLeft size={20} />
+        </button>
+      )}
+      {canScrollRight && (
+        <button onClick={() => scroll('right')}
+          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-bg-secondary/90 border border-border-primary flex items-center justify-center text-text-primary hover:bg-bg-elevated transition-all shadow-lg opacity-0 group-hover:opacity-100">
+          <ChevronRight size={20} />
+        </button>
+      )}
+      <div ref={scrollRef} className="flex gap-4 overflow-x-auto scrollbar-hide snap-x snap-mandatory pb-4" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        {allImages.map((img, i) => (
+          <motion.div key={img.id} initial={{ opacity: 0, scale: 0.9 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }}
+            transition={{ delay: i * 0.05 }}
+            className="shrink-0 w-[300px] sm:w-[340px] snap-start">
+            <Link to={`/games/${img.id.split('-')[0]}`} className="block rounded-2xl overflow-hidden bg-bg-secondary border border-border-primary card-hover group/card relative aspect-[16/10]">
+              <img src={img.src} alt={img.title} loading="lazy"
+                className="w-full h-full object-cover transition-transform duration-500 group-hover/card:scale-105"
+                onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+              <div className="absolute bottom-3 left-3 right-3">
+                <p className="text-sm font-semibold text-white truncate">{img.title}</p>
+              </div>
+              <div className="absolute inset-0 bg-black/0 group-hover/card:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover/card:opacity-100">
+                <div className="w-12 h-12 rounded-full bg-white/15 backdrop-blur-md flex items-center justify-center border border-white/20">
+                  <Play size={20} className="text-white ml-0.5" fill="white" />
+                </div>
+              </div>
+            </Link>
+          </motion.div>
+        ))}
+      </div>
+      <style>{`.scrollbar-hide::-webkit-scrollbar { display: none; }`}</style>
+    </div>
+  )
+}
 
 export default function Home() {
   const [officialGames, setOfficialGames] = useState(experiences)
@@ -129,6 +211,17 @@ export default function Home() {
             })}
           </motion.div>
         </div>
+      </section>
+
+      <section className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-12 overflow-hidden">
+        <motion.div className="mb-8" initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent-blue/10 border border-accent-blue/20 text-accent-blue text-xs font-medium mb-3">
+            <Eye size={14} /> Gallery
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-bold mb-2">Game <span className="gradient-text">Gallery</span></h2>
+          <p className="text-text-secondary">Screenshots and images from our games</p>
+        </motion.div>
+        <GameGallery officialGames={officialGames} />
       </section>
 
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-center">

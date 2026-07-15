@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ShoppingBag, Search, Star, Download, Code, Box, Palette, X, Loader2, Plus, Upload, ExternalLink, Eye, Calendar } from 'lucide-react'
-import { getAssets, submitAsset } from '@/lib/api'
+import { ShoppingBag, Search, Download, Code, Box, Palette, X, Loader2, Plus, Upload, ExternalLink, Calendar } from 'lucide-react'
+import { getAssets, submitAsset, submitAssetReview, getUserAssetReview, getAssetReviewsStats } from '@/lib/api'
 import { toDirectImageUrl, uploadToGoogleDrive } from '@/lib/drive-upload'
+import { trackAssetDownload } from '@/lib/analytics'
 import ImagePicker from '@/components/ui/ImagePicker'
 import StarRating from '@/components/ui/StarRating'
-import ImagePicker from '@/components/ui/ImagePicker'
 import { useStore } from '@/store/useStore'
 import type { Asset } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -19,12 +19,32 @@ function AssetDetailModal({ asset, onClose }: { asset: Asset; onClose: () => voi
   const Icon = typeIcons[asset.type]
   const isFree = asset.price_robux === 0
   const thumbnailSrc = asset.thumbnail_url ? toDirectImageUrl(asset.thumbnail_url) : ''
+  const currentUser = useStore((s) => s.currentUser)
+  const navigate = useNavigate()
+
+  const [reviewStats, setReviewStats] = useState({ avg: asset.rating || 0, count: asset.rating_count || 0 })
+  const [myReview, setMyReview] = useState<{ rating: number; comment: string } | null>(null)
+  const [showReviewForm, setShowReviewForm] = useState(false)
+  const [reviewRating, setReviewRating] = useState(0)
+  const [reviewComment, setReviewComment] = useState('')
+  const [reviewSubmitting, setReviewSubmitting] = useState(false)
+  const [localDownloads, setLocalDownloads] = useState(asset.downloads_count || 0)
+
+  useEffect(() => {
+    getAssetReviewsStats(asset.id).then(setReviewStats)
+    getUserAssetReview(asset.id).then(setMyReview)
+  }, [asset.id])
+
+  const handleDownload = async () => {
+    setLocalDownloads(prev => prev + 1)
+    trackAssetDownload(asset.id)
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
-        className="w-full max-w-lg rounded-2xl bg-bg-secondary border border-border-primary shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
-        <div className="relative aspect-video bg-gradient-to-br from-bg-tertiary to-bg-elevated">
+        className="w-full max-w-lg max-h-[85vh] flex flex-col rounded-2xl bg-bg-secondary border border-border-primary shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="relative aspect-video bg-gradient-to-br from-bg-tertiary to-bg-elevated shrink-0">
           {thumbnailSrc ? (
             <img src={thumbnailSrc} alt={asset.title} className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
           ) : (
@@ -42,13 +62,16 @@ function AssetDetailModal({ asset, onClose }: { asset: Asset; onClose: () => voi
             <h2 className="text-lg font-bold text-white mb-1">{asset.title}</h2>
           </div>
         </div>
-        <div className="p-5 space-y-4">
+
+        <div className="p-5 space-y-4 overflow-y-auto flex-1">
           <p className="text-sm text-text-secondary leading-relaxed">{asset.description || 'No description provided.'}</p>
+
           <div className="flex items-center gap-4 text-xs text-text-muted">
-            <StarRating rating={asset.rating || 0} count={asset.rating_count || 0} size={12} />
-            <span className="flex items-center gap-1"><Download size={12} /> {asset.downloads_count || 0} downloads</span>
+            <StarRating rating={reviewStats.avg} count={reviewStats.count} size={12} />
+            <span className="flex items-center gap-1"><Download size={12} /> {localDownloads} downloads</span>
             {asset.created_at && <span className="flex items-center gap-1"><Calendar size={12} /> {new Date(asset.created_at).toLocaleDateString()}</span>}
           </div>
+
           <div className="flex items-center gap-3 pt-2 border-t border-border-primary">
             {isFree ? (
               <span className="text-lg font-bold text-green-400">Free</span>
@@ -57,7 +80,7 @@ function AssetDetailModal({ asset, onClose }: { asset: Asset; onClose: () => voi
             )}
             <div className="flex-1" />
             {asset.drive_file_url ? (
-              <a href={asset.drive_file_url} target="_blank" rel="noopener noreferrer"
+              <a href={asset.drive_file_url} target="_blank" rel="noopener noreferrer" onClick={handleDownload}
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-accent-blue to-accent-purple text-white text-sm font-semibold hover:opacity-90 transition-opacity shadow-md shadow-accent-blue/20">
                 <Download size={14} /> {isFree ? 'Download' : 'Get Asset'} <ExternalLink size={11} />
               </a>
@@ -67,12 +90,63 @@ function AssetDetailModal({ asset, onClose }: { asset: Asset; onClose: () => voi
               </span>
             )}
           </div>
+
           {asset.gamepass_id && (
             <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
               <p className="text-[10px] text-purple-400 font-medium">GamePass Required</p>
               <p className="text-xs text-text-secondary">You must own GamePass #{asset.gamepass_id} to download</p>
             </div>
           )}
+
+          <div className="pt-3 border-t border-border-primary">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-sm font-semibold text-text-primary">{myReview ? 'Your Rating' : 'Rate this Asset'}</h4>
+              {!showReviewForm && !myReview && currentUser && (
+                <button onClick={() => { setShowReviewForm(true); setReviewRating(0); setReviewComment('') }}
+                  className="text-xs text-accent-blue hover:underline">Rate it</button>
+              )}
+            </div>
+            {myReview && !showReviewForm && (
+              <div>
+                <StarRating rating={myReview.rating} size={18} />
+                {myReview.comment && <p className="text-xs text-text-secondary mt-2">{myReview.comment}</p>}
+                {currentUser && (
+                  <button onClick={() => { setShowReviewForm(true); setReviewRating(myReview.rating); setReviewComment(myReview.comment || '') }}
+                    className="text-[11px] text-text-muted hover:text-accent-blue mt-2">Edit your rating</button>
+                )}
+              </div>
+            )}
+            {showReviewForm && (
+              <form onSubmit={async (e) => {
+                e.preventDefault()
+                if (!reviewRating) return
+                setReviewSubmitting(true)
+                try {
+                  await submitAssetReview(asset.id, reviewRating, reviewComment)
+                  setMyReview({ rating: reviewRating, comment: reviewComment })
+                  getAssetReviewsStats(asset.id).then(setReviewStats)
+                  setShowReviewForm(false)
+                } catch { alert('Failed to save rating. Make sure you are signed in.') }
+                finally { setReviewSubmitting(false) }
+              }} className="space-y-3">
+                <StarRating rating={reviewRating} interactive onChange={setReviewRating} size={24} />
+                <textarea value={reviewComment} onChange={e => setReviewComment(e.target.value)} rows={2}
+                  placeholder="Optional comment..."
+                  className="w-full px-3 py-2 rounded-xl bg-bg-elevated border border-border-primary text-text-primary text-sm placeholder:text-text-dim focus:outline-none focus:border-accent-blue/50 transition-all resize-none" />
+                <div className="flex gap-2">
+                  <button type="submit" disabled={!reviewRating || reviewSubmitting}
+                    className="px-4 py-2 rounded-xl bg-accent-blue text-white text-sm font-medium hover:bg-blue-600 disabled:opacity-50 transition-colors flex items-center gap-2">
+                    {reviewSubmitting ? <Loader2 size={14} className="animate-spin" /> : 'Submit'}
+                  </button>
+                  <button type="button" onClick={() => setShowReviewForm(false)}
+                    className="px-4 py-2 rounded-xl bg-bg-elevated text-text-secondary text-sm font-medium hover:bg-bg-tertiary transition-colors">Cancel</button>
+                </div>
+              </form>
+            )}
+            {!currentUser && !myReview && (
+              <button onClick={() => navigate('/auth')} className="text-xs text-accent-blue hover:underline">Sign in to rate</button>
+            )}
+          </div>
         </div>
       </motion.div>
     </div>
@@ -119,7 +193,8 @@ function AssetCard({ asset, onClick }: { asset: Asset; onClick: () => void }) {
               <Download size={12} /> {isFree ? 'Download' : 'Get'}
             </a>
           ) : (
-            <button className="px-3 py-1.5 rounded-lg bg-accent-blue/15 text-accent-blue text-xs font-semibold hover:bg-accent-blue/25 transition-colors">
+            <button onClick={e => { e.stopPropagation(); onClick() }}
+              className="px-3 py-1.5 rounded-lg bg-accent-blue/15 text-accent-blue text-xs font-semibold hover:bg-accent-blue/25 transition-colors">
               View Details
             </button>
           )}

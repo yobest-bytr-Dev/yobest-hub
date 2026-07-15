@@ -577,12 +577,13 @@ interface ToolForm {
   name: string
   description: string
   image_url: string
+  images: string[]
   status: 'ready' | 'soon' | 'beta' | 'deprecated'
   download_url: string
   version: string
 }
 
-const emptyTool: ToolForm = { name: '', description: '', image_url: '', status: 'ready', download_url: '', version: '' }
+const emptyTool: ToolForm = { name: '', description: '', image_url: '', images: [], status: 'ready', download_url: '', version: '' }
 
 function ToolsTab() {
   const [tools, setTools] = useState<any[]>([])
@@ -592,8 +593,10 @@ function ToolsTab() {
   const [form, setForm] = useState<ToolForm>(emptyTool)
   const [saving, setSaving] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
+  const [uploadingGallery, setUploadingGallery] = useState(false)
   const [imagePreview, setImagePreview] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const galleryInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
 
   const load = useCallback(async () => {
@@ -612,11 +615,11 @@ function ToolsTab() {
     setSaving(true)
     try {
       if (editing) {
-        const { error } = await supabase.from('yobest_tools' as any).update(form).eq('id', editing)
+        const { error } = await supabase.from('yobest_tools' as any).update({ ...form, images: form.images || [] }).eq('id', editing)
         if (error) throw error
         toast('Tool updated!', 'success')
       } else {
-        const { error } = await supabase.from('yobest_tools' as any).insert({ ...form, downloads_count: 0 })
+        const { error } = await supabase.from('yobest_tools' as any).insert({ ...form, images: form.images || [], downloads_count: 0 })
         if (error) throw error
         toast('Tool created!', 'success')
       }
@@ -649,8 +652,31 @@ function ToolsTab() {
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
+  const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+    setUploadingGallery(true)
+    for (const file of Array.from(files)) {
+      if (file.size > 10 * 1024 * 1024) { toast(`${file.name} is over 10MB, skipped`, 'error'); continue }
+      try {
+        const result = await uploadToGoogleDrive(file, 'yobest-tools')
+        const directUrl = toDirectImageUrl(result.directLink || result.fileUrl)
+        setForm(f => ({ ...f, images: [...(f.images || []), directUrl] }))
+        toast(`${file.name} uploaded!`, 'success')
+      } catch (err: any) {
+        toast(err.message || `Failed to upload ${file.name}`, 'error')
+      }
+    }
+    setUploadingGallery(false)
+    if (galleryInputRef.current) galleryInputRef.current.value = ''
+  }
+
+  const removeGalleryImage = (idx: number) => {
+    setForm(f => ({ ...f, images: f.images.filter((_, i) => i !== idx) }))
+  }
+
   const handleEdit = (tool: any) => {
-    setForm({ name: tool.name, description: tool.description, image_url: tool.image_url || '', status: tool.status, download_url: tool.download_url || '', version: tool.version || '' })
+    setForm({ name: tool.name, description: tool.description, image_url: tool.image_url || '', images: tool.images || [], status: tool.status, download_url: tool.download_url || '', version: tool.version || '' })
     setImagePreview(tool.image_url || '')
     setEditing(tool.id)
     setShowForm(true)
@@ -685,7 +711,7 @@ function ToolsTab() {
           <button onClick={load} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-elevated border border-border-primary text-xs text-text-secondary hover:text-text-primary transition-colors">
             <RefreshCw size={12} /> Refresh
           </button>
-          <button onClick={() => { setShowForm(true); setEditing(null); setForm(emptyTool) }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-blue/15 text-accent-blue border border-accent-blue/25 text-xs font-medium hover:bg-accent-blue/25 transition-colors">
+          <button onClick={() => { setShowForm(true); setEditing(null); setForm({ ...emptyTool, images: [] }) }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-blue/15 text-accent-blue border border-accent-blue/25 text-xs font-medium hover:bg-accent-blue/25 transition-colors">
             <Plus size={12} /> Add Tool
           </button>
         </div>
@@ -730,6 +756,28 @@ function ToolsTab() {
                 </div>
               )}
             </div>
+            <div className="sm:col-span-2">
+              <label className="text-[10px] text-text-dim font-semibold uppercase tracking-wider block mb-1.5">Gallery Images</label>
+              <div className="flex items-center gap-2 mb-2">
+                <input ref={galleryInputRef} type="file" accept="image/*" multiple onChange={handleGalleryUpload} className="hidden" />
+                <button onClick={() => galleryInputRef.current?.click()} disabled={uploadingGallery}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-accent-purple/15 border border-accent-purple/25 text-accent-purple text-xs font-medium hover:bg-accent-purple/25 transition-colors disabled:opacity-50">
+                  {uploadingGallery ? <Loader2 size={12} className="animate-spin" /> : <ImagePlus size={12} />}
+                  {uploadingGallery ? 'Uploading...' : 'Add Images'}
+                </button>
+                <span className="text-[10px] text-text-dim">{form.images?.length || 0} images</span>
+              </div>
+              {form.images && form.images.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {form.images.map((img, i) => (
+                    <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden border border-border-primary bg-bg-tertiary group/img">
+                      <img src={img} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                      <button onClick={() => removeGalleryImage(i)} className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-red-500/80 flex items-center justify-center text-white text-[8px] hover:bg-red-500 transition-colors opacity-0 group-hover/img:opacity-100">X</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             <div>
               <label className="text-[10px] text-text-dim font-semibold uppercase tracking-wider block mb-1.5">Download URL</label>
               <input value={form.download_url} onChange={e => setForm(f => ({ ...f, download_url: e.target.value }))} placeholder="https://..."
@@ -748,7 +796,7 @@ function ToolsTab() {
               {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
               {editing ? 'Update' : 'Create'} Tool
             </button>
-            <button onClick={() => { setShowForm(false); setEditing(null); setForm(emptyTool) }} className="px-4 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-secondary text-xs font-medium hover:text-text-primary transition-colors">
+            <button onClick={() => { setShowForm(false); setEditing(null); setForm({ ...emptyTool, images: [] }) }} className="px-4 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-secondary text-xs font-medium hover:text-text-primary transition-colors">
               Cancel
             </button>
           </div>

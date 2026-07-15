@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { Home, Gamepad2, Brain, Users, ShoppingBag, User, UserPlus, MessageCircle, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Home, Gamepad2, Brain, Users, ShoppingBag, User, UserPlus, MessageCircle, ChevronLeft, ChevronRight, Wrench, LayoutDashboard, Shield } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { cn } from '@/lib/utils'
 
@@ -7,11 +7,14 @@ const sidebarLinks = [
   { to: '/', label: 'Home', icon: Home },
   { to: '/games', label: 'Games', icon: Gamepad2 },
   { to: '/ai', label: 'AI Architect', icon: Brain },
+  { to: '/tools', label: 'Tools', icon: Wrench },
   { to: '/creators', label: 'Creators', icon: UserPlus },
   { to: '/community', label: 'Community', icon: Users },
   { to: '/marketplace', label: 'Marketplace', icon: ShoppingBag },
-  { to: '/messages', label: 'Messages', icon: MessageCircle },
-  { to: '/profile', label: 'Profile', icon: User },
+  { to: '/messages', label: 'Messages', icon: MessageCircle, authOnly: true },
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, authOnly: true },
+  { to: '/admin', label: 'Admin', icon: Shield, adminOnly: true },
+  { to: '/profile', label: 'Profile', icon: User, authOnly: true },
 ]
 
 export default function Sidebar() {
@@ -23,7 +26,8 @@ export default function Sidebar() {
   const totalUnread = conversations.reduce((sum, c) => sum + c.unread, 0)
 
   const visibleLinks = sidebarLinks.filter((link) => {
-    if ((link.to === '/messages' || link.to === '/profile') && !currentUser) return false
+    if (link.authOnly && !currentUser) return false
+    if (link.adminOnly && !(currentUser?.is_admin || currentUser?.username?.toLowerCase() === 'byocefs')) return false
     return true
   })
 
@@ -35,34 +39,41 @@ export default function Sidebar() {
       )}
     >
       <div className="absolute top-0 right-0 bottom-0 w-px bg-gradient-to-b from-transparent via-accent-blue/10 to-transparent" />
-      <nav className="flex-1 py-4 px-3 space-y-1">
-        {visibleLinks.map((link) => {
+      <nav className="flex-1 py-4 px-3 space-y-0.5">
+        {visibleLinks.map((link, i) => {
           const Icon = link.icon
           const isActive = location.pathname === link.to || (link.to !== '/' && location.pathname.startsWith(link.to))
           const unread = link.to === '/messages' ? totalUnread : 0
+          const isAdmin = link.to === '/admin'
+          const showDivider = (link.to === '/tools') || (link.to === '/messages') || (link.to === '/admin')
           return (
-            <Link
-              key={link.to}
-              to={link.to}
-              className={cn(
-                'flex items-center gap-3 rounded-xl text-sm font-medium transition-all duration-200',
-                sidebarOpen ? 'px-3 py-2.5' : 'px-0 py-2.5 justify-center',
-                isActive
-                  ? 'bg-accent-blue/15 text-accent-blue'
-                  : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated'
-              )}
-              title={!sidebarOpen ? link.label : undefined}
-            >
-              <div className="relative shrink-0">
-                <Icon size={18} />
-                {unread > 0 && (
-                  <div className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-accent-blue flex items-center justify-center">
-                    <span className="text-[9px] font-bold text-white">{unread > 9 ? '9+' : unread}</span>
-                  </div>
+            <div key={link.to}>
+              {showDivider && sidebarOpen && i > 0 && <div className="my-2 border-t border-border-primary/60" />}
+              {showDivider && !sidebarOpen && i > 0 && <div className="my-1.5 mx-2 border-t border-border-primary/60" />}
+              <Link
+                to={link.to}
+                className={cn(
+                  'flex items-center gap-3 rounded-xl text-sm font-medium transition-all duration-200',
+                  sidebarOpen ? 'px-3 py-2.5' : 'px-0 py-2.5 justify-center',
+                  isActive
+                    ? isAdmin
+                      ? 'bg-yellow-500/15 text-yellow-400'
+                      : 'bg-accent-blue/15 text-accent-blue'
+                    : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated'
                 )}
-              </div>
-              {sidebarOpen && <span>{link.label}</span>}
-            </Link>
+                title={!sidebarOpen ? link.label : undefined}
+              >
+                <div className="relative shrink-0">
+                  <Icon size={18} className={isAdmin ? 'text-yellow-400' : undefined} />
+                  {unread > 0 && (
+                    <div className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-accent-blue flex items-center justify-center">
+                      <span className="text-[9px] font-bold text-white">{unread > 9 ? '9+' : unread}</span>
+                    </div>
+                  )}
+                </div>
+                {sidebarOpen && <span>{link.label}</span>}
+              </Link>
+            </div>
           )
         })}
       </nav>

@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
-import { motion } from 'framer-motion'
-import { ShoppingBag, Search, Star, Download, Code, Box, Palette, X, Loader2, Plus, Upload } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { ShoppingBag, Search, Star, Download, Code, Box, Palette, X, Loader2, Plus, Upload, ExternalLink, Eye, Calendar } from 'lucide-react'
 import { getAssets, submitAsset } from '@/lib/api'
 import { toDirectImageUrl, uploadToGoogleDrive } from '@/lib/drive-upload'
+import ImagePicker from '@/components/ui/ImagePicker'
+import StarRating from '@/components/ui/StarRating'
 import ImagePicker from '@/components/ui/ImagePicker'
 import { useStore } from '@/store/useStore'
 import type { Asset } from '@/lib/types'
@@ -13,13 +15,77 @@ import AdBanner from '@/components/AdBanner'
 const typeIcons = { script: Code, model: Box, uikit: Palette }
 const typeLabels = { script: 'Script', model: 'Model', uikit: 'UI Kit' }
 
-function AssetCard({ asset }: { asset: Asset }) {
+function AssetDetailModal({ asset, onClose }: { asset: Asset; onClose: () => void }) {
   const Icon = typeIcons[asset.type]
   const isFree = asset.price_robux === 0
   const thumbnailSrc = asset.thumbnail_url ? toDirectImageUrl(asset.thumbnail_url) : ''
 
   return (
-    <div className="rounded-xl bg-bg-secondary border border-border-primary overflow-hidden card-hover group">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
+      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+        className="w-full max-w-lg rounded-2xl bg-bg-secondary border border-border-primary shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="relative aspect-video bg-gradient-to-br from-bg-tertiary to-bg-elevated">
+          {thumbnailSrc ? (
+            <img src={thumbnailSrc} alt={asset.title} className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center"><Icon size={48} className="text-text-dim" /></div>
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+          <button onClick={onClose} className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/60 transition-colors">
+            <X size={16} />
+          </button>
+          <div className="absolute top-3 left-3 flex items-center gap-2">
+            <span className="px-2 py-1 rounded-md bg-bg-elevated/90 border border-border-primary text-[11px] font-medium text-text-secondary backdrop-blur-sm">{typeLabels[asset.type]}</span>
+            {isFree && <span className="px-2 py-1 rounded-md bg-green-500/90 text-white text-xs font-bold">FREE</span>}
+          </div>
+          <div className="absolute bottom-3 left-3 right-3">
+            <h2 className="text-lg font-bold text-white mb-1">{asset.title}</h2>
+          </div>
+        </div>
+        <div className="p-5 space-y-4">
+          <p className="text-sm text-text-secondary leading-relaxed">{asset.description || 'No description provided.'}</p>
+          <div className="flex items-center gap-4 text-xs text-text-muted">
+            <StarRating rating={asset.rating || 0} count={asset.rating_count || 0} size={12} />
+            <span className="flex items-center gap-1"><Download size={12} /> {asset.downloads_count || 0} downloads</span>
+            {asset.created_at && <span className="flex items-center gap-1"><Calendar size={12} /> {new Date(asset.created_at).toLocaleDateString()}</span>}
+          </div>
+          <div className="flex items-center gap-3 pt-2 border-t border-border-primary">
+            {isFree ? (
+              <span className="text-lg font-bold text-green-400">Free</span>
+            ) : (
+              <span className="text-lg font-bold text-yellow-400">{asset.price_robux} Robux</span>
+            )}
+            <div className="flex-1" />
+            {asset.drive_file_url ? (
+              <a href={asset.drive_file_url} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-accent-blue to-accent-purple text-white text-sm font-semibold hover:opacity-90 transition-opacity shadow-md shadow-accent-blue/20">
+                <Download size={14} /> {isFree ? 'Download' : 'Get Asset'} <ExternalLink size={11} />
+              </a>
+            ) : (
+              <span className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-bg-elevated border border-border-primary text-text-dim text-sm font-medium">
+                <Download size={14} /> No file available
+              </span>
+            )}
+          </div>
+          {asset.gamepass_id && (
+            <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
+              <p className="text-[10px] text-purple-400 font-medium">GamePass Required</p>
+              <p className="text-xs text-text-secondary">You must own GamePass #{asset.gamepass_id} to download</p>
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </div>
+  )
+}
+
+function AssetCard({ asset, onClick }: { asset: Asset; onClick: () => void }) {
+  const Icon = typeIcons[asset.type]
+  const isFree = asset.price_robux === 0
+  const thumbnailSrc = asset.thumbnail_url ? toDirectImageUrl(asset.thumbnail_url) : ''
+
+  return (
+    <div className="rounded-xl bg-bg-secondary border border-border-primary overflow-hidden card-hover group cursor-pointer" onClick={onClick}>
       <div className="aspect-[4/3] bg-gradient-to-br from-bg-tertiary to-bg-elevated flex items-center justify-center relative">
         {thumbnailSrc ? (
           <img src={thumbnailSrc} alt={asset.title} className="w-full h-full object-cover"
@@ -35,18 +101,11 @@ function AssetCard({ asset }: { asset: Asset }) {
         {isFree && <div className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-green-500/90 text-white text-xs font-bold">FREE</div>}
       </div>
       <div className="p-4">
-        <h3 className="text-sm font-semibold text-text-primary line-clamp-1 mb-1">{asset.title}</h3>
+        <h3 className="text-sm font-semibold text-text-primary line-clamp-1 mb-1 group-hover:text-accent-blue transition-colors">{asset.title}</h3>
         <p className="text-xs text-text-secondary line-clamp-2 mb-3 leading-relaxed">{asset.description}</p>
         <div className="flex items-center gap-2 mb-3">
-          <div className="flex items-center gap-0.5">
-            <Star size={12} className="text-yellow-400 fill-yellow-400" />
-            <span className="text-xs font-medium text-text-primary">{asset.rating || 0}</span>
-          </div>
-          <span className="text-xs text-text-muted">·</span>
-          <div className="flex items-center gap-1 text-text-muted">
-            <Download size={11} />
-            <span className="text-xs">{asset.downloads_count || 0}</span>
-          </div>
+          <StarRating rating={asset.rating || 0} count={asset.rating_count || 0} size={12} />
+          <span className="text-xs text-text-muted flex items-center gap-1"><Download size={11} /> {asset.downloads_count || 0}</span>
         </div>
         <div className="flex items-center justify-between">
           {isFree ? (
@@ -54,9 +113,16 @@ function AssetCard({ asset }: { asset: Asset }) {
           ) : (
             <span className="text-sm font-bold text-yellow-400">{asset.price_robux} Robux</span>
           )}
-          <button className="px-3 py-1.5 rounded-lg bg-accent-blue/15 text-accent-blue text-xs font-semibold hover:bg-accent-blue/25 transition-colors">
-            {isFree ? 'Download' : 'Get Asset'}
-          </button>
+          {asset.drive_file_url ? (
+            <a href={asset.drive_file_url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+              className="px-3 py-1.5 rounded-lg bg-accent-blue/15 text-accent-blue text-xs font-semibold hover:bg-accent-blue/25 transition-colors flex items-center gap-1">
+              <Download size={12} /> {isFree ? 'Download' : 'Get'}
+            </a>
+          ) : (
+            <button className="px-3 py-1.5 rounded-lg bg-accent-blue/15 text-accent-blue text-xs font-semibold hover:bg-accent-blue/25 transition-colors">
+              View Details
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -78,6 +144,7 @@ export default function Marketplace() {
   const assetFileRef = useRef<HTMLInputElement>(null)
   const currentUser = useStore((s) => s.currentUser)
   const navigate = useNavigate()
+  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null)
 
   useEffect(() => {
     getAssets().then((data) => {
@@ -199,7 +266,7 @@ export default function Marketplace() {
           <div className="flex items-center justify-center py-20"><Loader2 size={32} className="animate-spin text-accent-blue" /></div>
         ) : filtered.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filtered.map((asset) => <AssetCard key={asset.id} asset={asset} />)}
+            {filtered.map((asset) => <AssetCard key={asset.id} asset={asset} onClick={() => setSelectedAsset(asset)} />)}
           </div>
         ) : (
           <div className="text-center py-20">
@@ -317,6 +384,10 @@ export default function Marketplace() {
           </motion.div>
         </div>
       )}
+
+      <AnimatePresence>
+        {selectedAsset && <AssetDetailModal asset={selectedAsset} onClose={() => setSelectedAsset(null)} />}
+      </AnimatePresence>
     </div>
   )
 }

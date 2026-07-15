@@ -525,7 +525,7 @@ export default function Games() {
         </div>
       </motion.div>
 
-      <Modal open={showSubmit} onClose={() => { setShowSubmit(false); setSubmitSuccess(false) }} title="Submit a Game" maxWidth="max-w-lg">
+      <Modal open={showSubmit} onClose={() => { setShowSubmit(false); setSubmitSuccess(false) }} title="Submit a Game" maxWidth="max-w-xl">
         {submitSuccess ? (
           <div className="text-center py-8">
             <div className="w-16 h-16 rounded-full bg-yellow-500/20 flex items-center justify-center mx-auto mb-4">

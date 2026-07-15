@@ -43,7 +43,7 @@ export default function Modal({ open, onClose, title, children, className, maxWi
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
           <motion.div
             className={cn(
-              'relative w-full rounded-2xl bg-bg-secondary border border-border-primary shadow-2xl',
+              'relative w-full rounded-2xl bg-bg-secondary border border-border-primary shadow-2xl max-h-[85vh] flex flex-col',
               maxWidth,
               className
             )}
@@ -53,7 +53,7 @@ export default function Modal({ open, onClose, title, children, className, maxWi
             transition={{ duration: 0.2 }}
           >
             {title && (
-              <div className="flex items-center justify-between px-6 py-4 border-b border-border-primary">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-border-primary shrink-0">
                 <h2 className="text-lg font-semibold text-text-primary">{title}</h2>
                 <button
                   onClick={onClose}
@@ -63,7 +63,7 @@ export default function Modal({ open, onClose, title, children, className, maxWi
                 </button>
               </div>
             )}
-            <div className="p-6">{children}</div>
+            <div className="p-6 overflow-y-auto flex-1">{children}</div>
           </motion.div>
         </motion.div>
       )}

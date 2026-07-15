@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { ArrowLeft, Globe, Download, Play, ExternalLink, Eye, Heart, Share2, Copy, Check, MessageSquare, Calendar, User, Loader2, Lock, MessageCircle, Pencil, Trash2 } from 'lucide-react'
 import { experiences } from '@/data/official-games'
-import { getApprovedCommunityGames, getOfficialGames, toggleGameLike, hasUserLikedGame, getGameLikeCount, addGameComment, getGameComments, editGameComment, deleteGameComment } from '@/lib/api'
+import { getApprovedCommunityGames, getOfficialGames, toggleGameLike, hasUserLikedGame, getGameLikeCount, addGameComment, getGameComments, editGameComment, deleteGameComment, getReviewsStats, submitReview, getUserReview } from '@/lib/api'
 import type { Experience } from '@/lib/types'
 import { extractYoutubeId, formatNumber, getCategoryColor, cn } from '@/lib/utils'
 import { getYouTubeStats, getYouTubeComments, type YouTubeStats, type YouTubeComment } from '@/lib/youtube'
@@ -11,6 +11,7 @@ import { trackGameView, getGameViewCount, trackDownload } from '@/lib/analytics'
 import { useStore } from '@/store/useStore'
 import { toDirectImageUrl } from '@/lib/drive-upload'
 import RobloxAvatar from '@/components/ui/RobloxAvatar'
+import StarRating from '@/components/ui/StarRating'
 import { useToast } from '@/components/ui/Toast'
 import { addNotification } from '@/lib/notifications'
 
@@ -48,6 +49,12 @@ export default function GameDetail() {
   const [ytCommentsLoading, setYtCommentsLoading] = useState(false)
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
   const [editCommentText, setEditCommentText] = useState('')
+  const [reviewStats, setReviewStats] = useState({ avg: 0, count: 0 })
+  const [myReview, setMyReview] = useState<{ rating: number; comment: string } | null>(null)
+  const [showReviewForm, setShowReviewForm] = useState(false)
+  const [reviewRating, setReviewRating] = useState(0)
+  const [reviewComment, setReviewComment] = useState('')
+  const [reviewSubmitting, setReviewSubmitting] = useState(false)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -81,6 +88,8 @@ export default function GameDetail() {
       setComments(data)
       setCommentsLoading(false)
     })
+    getReviewsStats(id).then(setReviewStats)
+    getUserReview(id).then(setMyReview)
   }, [id])
 
   useEffect(() => {
@@ -260,6 +269,9 @@ export default function GameDetail() {
                 {game.creator && (
                   <span className="flex items-center gap-1.5"><User size={14} /> {game.creator}</span>
                 )}
+                {reviewStats.count > 0 && (
+                  <span className="flex items-center gap-1.5"><StarRating rating={reviewStats.avg} count={reviewStats.count} size={14} /></span>
+                )}
                 <span className="flex items-center gap-1.5"><Heart size={14} /> {formatNumber(likes)} likes</span>
                 <span className="flex items-center gap-1.5"><Eye size={14} /> {formatNumber(siteViews)} views</span>
                 <span className="flex items-center gap-1.5"><MessageSquare size={14} /> {comments.length} comments</span>
@@ -308,6 +320,75 @@ export default function GameDetail() {
           </div>
 
           <div className="space-y-6">
+            {reviewStats.count > 0 && (
+              <div className="rounded-2xl bg-bg-secondary border border-border-primary p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-text-primary">Ratings</h3>
+                  <StarRating rating={reviewStats.avg} count={reviewStats.count} size={16} />
+                </div>
+              </div>
+            )}
+
+            <div className="rounded-2xl bg-bg-secondary border border-border-primary p-5">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-text-primary">{myReview ? 'Your Rating' : 'Rate this Game'}</h3>
+                {!showReviewForm && !myReview && currentUser && (
+                  <button onClick={() => { setShowReviewForm(true); setReviewRating(0); setReviewComment('') }}
+                    className="text-xs text-accent-blue hover:underline">
+                    Rate it
+                  </button>
+                )}
+              </div>
+              {myReview && (
+                <div>
+                  <StarRating rating={myReview.rating} size={18} />
+                  {myReview.comment && <p className="text-xs text-text-secondary mt-2">{myReview.comment}</p>}
+                  {currentUser && (
+                    <button onClick={() => { setShowReviewForm(true); setReviewRating(myReview.rating); setReviewComment(myReview.comment || '') }}
+                      className="text-[11px] text-text-muted hover:text-accent-blue mt-2">
+                      Edit your rating
+                    </button>
+                  )}
+                </div>
+              )}
+              {showReviewForm && (
+                <form onSubmit={async (e) => {
+                  e.preventDefault()
+                  if (!reviewRating || !id) return
+                  setReviewSubmitting(true)
+                  try {
+                    await submitReview(id, reviewRating, reviewComment)
+                    setMyReview({ rating: reviewRating, comment: reviewComment })
+                    getReviewsStats(id).then(setReviewStats)
+                    setShowReviewForm(false)
+                    toast({ title: 'Rating saved!', type: 'success' })
+                  } catch {
+                    toast({ title: 'Failed to save rating', type: 'error' })
+                  } finally {
+                    setReviewSubmitting(false)
+                  }
+                }} className="space-y-3">
+                  <StarRating rating={reviewRating} interactive onChange={setReviewRating} size={24} />
+                  <textarea value={reviewComment} onChange={e => setReviewComment(e.target.value)} rows={2}
+                    placeholder="Optional comment..."
+                    className="w-full px-3 py-2 rounded-xl bg-bg-elevated border border-border-primary text-text-primary text-sm placeholder:text-text-dim focus:outline-none focus:border-accent-blue/50 transition-all resize-none" />
+                  <div className="flex gap-2">
+                    <button type="submit" disabled={!reviewRating || reviewSubmitting}
+                      className="px-4 py-2 rounded-xl bg-accent-blue text-white text-sm font-medium hover:bg-blue-600 disabled:opacity-50 transition-colors">
+                      {reviewSubmitting ? <Loader2 size={14} className="animate-spin" /> : 'Submit'}
+                    </button>
+                    <button type="button" onClick={() => setShowReviewForm(false)}
+                      className="px-4 py-2 rounded-xl bg-bg-elevated text-text-secondary text-sm font-medium hover:bg-bg-tertiary transition-colors">
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              )}
+              {!currentUser && !myReview && (
+                <p className="text-xs text-text-muted">Sign in to rate this game</p>
+              )}
+            </div>
+
             <div className="rounded-2xl bg-bg-secondary border border-border-primary overflow-hidden">
               <div className="px-5 py-4 border-b border-border-primary">
                 <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">

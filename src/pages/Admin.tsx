@@ -775,9 +775,9 @@ function SettingsTab() {
       const data = await apiCall('update_site_stats', { statName: name, value })
       if (data.error) throw new Error(data.error)
       setStats((prev) => {
-        const existing = prev.find((s) => s.name === name)
-        if (existing) return prev.map((s) => s.name === name ? { ...s, value } : s)
-        return [...prev, { name, value }]
+        const existing = prev.find((s: any) => (s.key || s.name) === name)
+        if (existing) return prev.map((s: any) => (s.key || s.name) === name ? { ...s, value, key: name } : s)
+        return [...prev, { key: name, value }]
       })
       toast('Saved!', 'success')
     } catch (e: any) {
@@ -788,7 +788,7 @@ function SettingsTab() {
 
   if (loading) return <div className="flex items-center justify-center py-20"><Loader2 size={24} className="animate-spin text-accent-blue" /></div>
 
-  const knownStats = ['visitors', 'downloads', 'ai_sessions']
+  const knownStats = ['visits', 'downloads', 'ai_sessions']
 
   return (
     <div className="space-y-6">
@@ -797,7 +797,7 @@ function SettingsTab() {
         <h3 className="text-sm font-semibold text-text-primary mb-4">Site Statistics</h3>
         <div className="space-y-3">
           {knownStats.map((name) => {
-            const stat = stats.find((s) => s.name === name)
+            const stat = stats.find((s: any) => (s.key || s.name) === name)
             return (
               <div key={name} className="flex items-center gap-3">
                 <span className="text-xs text-text-muted w-28 capitalize">{name.replace('_', ' ')}</span>
@@ -809,14 +809,14 @@ function SettingsTab() {
             )
           })}
         </div>
-        {stats.filter((s) => !knownStats.includes(s.name)).length > 0 && (
+        {stats.filter((s: any) => !knownStats.includes(s.key || s.name)).length > 0 && (
           <div className="mt-4 pt-4 border-t border-border-primary space-y-3">
             <h4 className="text-xs text-text-muted font-medium uppercase tracking-wider">Other Stats</h4>
-            {stats.filter((s) => !knownStats.includes(s.name)).map((s) => (
-              <div key={s.name} className="flex items-center gap-3">
-                <span className="text-xs text-text-muted w-28">{s.name}</span>
+            {stats.filter((s: any) => !knownStats.includes(s.key || s.name)).map((s: any) => (
+              <div key={s.key || s.name} className="flex items-center gap-3">
+                <span className="text-xs text-text-muted w-28">{s.key || s.name}</span>
                 <input type="number" defaultValue={s.value || 0}
-                  onBlur={(e) => handleSave(s.name, parseInt(e.target.value) || 0)}
+                  onBlur={(e) => handleSave(s.key || s.name, parseInt(e.target.value) || 0)}
                   className="flex-1 px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50 transition-all"
                 />
               </div>

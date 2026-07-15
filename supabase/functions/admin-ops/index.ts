@@ -102,7 +102,7 @@ serve(async (req) => {
         const { statName, value } = body
         const { error } = await adminClient
           .from("site_stats")
-          .upsert({ name: statName, value, updated_at: new Date().toISOString() }, { onConflict: "name" })
+          .upsert({ key: statName, value, updated_at: new Date().toISOString() }, { onConflict: "key" })
         if (error) throw error
         return new Response(JSON.stringify({ success: true }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },

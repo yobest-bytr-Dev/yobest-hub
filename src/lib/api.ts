@@ -678,3 +678,53 @@ export async function deleteSubmission(id: string) {
     .eq('user_id', user.id)
   if (error) throw error
 }
+
+export async function submitReview(experienceId: string, rating: number, comment: string = '') {
+  const user = await getCurrentUser()
+  if (!user) throw new Error('Not authenticated')
+  const { error } = await supabase
+    .from('reviews')
+    .upsert({ user_id: user.id, experience_id: experienceId, rating, comment }, { onConflict: 'user_id,experience_id' })
+  if (error) throw error
+}
+
+export async function getReviews(experienceId: string) {
+  const { data, error } = await supabase
+    .from('reviews')
+    .select('*, profiles:user_id(username, avatar_url, roblox_id)')
+    .eq('experience_id', experienceId)
+    .order('created_at', { ascending: false })
+  if (error) return []
+  return data || []
+}
+
+export async function getUserReview(experienceId: string) {
+  const user = await getCurrentUser()
+  if (!user) return null
+  const { data } = await supabase
+    .from('reviews')
+    .select('rating, comment')
+    .eq('experience_id', experienceId)
+    .eq('user_id', user.id)
+    .single()
+  return data
+}
+
+export async function getReviewsStats(experienceId: string) {
+  const { data } = await supabase
+    .from('reviews')
+    .select('rating')
+    .eq('experience_id', experienceId)
+  if (!data || data.length === 0) return { avg: 0, count: 0 }
+  const avg = data.reduce((sum, r) => sum + r.rating, 0) / data.length
+  return { avg: Math.round(avg * 10) / 10, count: data.length }
+}
+
+export async function getAssetsReviewsStats(assetIds: string[]) {
+  if (assetIds.length === 0) return {}
+  const stats: Record<string, { avg: number; count: number }> = {}
+  for (const id of assetIds) {
+    stats[id] = { avg: 0, count: 0 }
+  }
+  return stats
+}

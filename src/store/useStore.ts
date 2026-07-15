@@ -34,6 +34,9 @@ interface AppState {
   aiModel: string
   setAiModel: (model: string) => void
 
+  aiMode: string
+  setAiMode: (mode: string) => void
+
   studioConnected: boolean
   studioToken: string
   setStudioConnected: (connected: boolean) => void
@@ -140,6 +143,9 @@ export const useStore = create<AppState>((set, get) => ({
 
   aiModel: 'google/gemini-2.5-flash',
   setAiModel: (model) => set({ aiModel: model }),
+
+  aiMode: 'build',
+  setAiMode: (mode) => set({ aiMode: mode }),
 
   studioConnected: false,
   studioToken: '',

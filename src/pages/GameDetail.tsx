@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { ArrowLeft, Globe, Download, Play, ExternalLink, Eye, Heart, Share2, Copy, Check, MessageSquare, Calendar, User, Loader2, Lock, MessageCircle, Pencil, Trash2 } from 'lucide-react'
 import { experiences } from '@/data/official-games'
-import { getApprovedCommunityGames, toggleGameLike, hasUserLikedGame, getGameLikeCount, addGameComment, getGameComments, editGameComment, deleteGameComment } from '@/lib/api'
+import { getApprovedCommunityGames, getOfficialGames, toggleGameLike, hasUserLikedGame, getGameLikeCount, addGameComment, getGameComments, editGameComment, deleteGameComment } from '@/lib/api'
 import type { Experience } from '@/lib/types'
 import { extractYoutubeId, formatNumber, getCategoryColor, cn } from '@/lib/utils'
 import { getYouTubeStats, getYouTubeComments, type YouTubeStats, type YouTubeComment } from '@/lib/youtube'
@@ -57,9 +57,10 @@ export default function GameDetail() {
       setGame(found)
       setLoading(false)
     } else {
-      getApprovedCommunityGames().then((community) => {
-        const foundCommunity = community.find((e) => e.id === id)
-        if (foundCommunity) setGame(foundCommunity)
+      Promise.all([getOfficialGames(), getApprovedCommunityGames()]).then(([official, community]) => {
+        const all = [...official, ...community]
+        const foundDb = all.find((e) => e.id === id)
+        if (foundDb) setGame(foundDb)
         setLoading(false)
       })
     }

@@ -177,6 +177,17 @@ export async function getExperiences(options?: { official?: boolean; category?: 
   return (data || []) as Experience[]
 }
 
+export async function getOfficialGames(): Promise<Experience[]> {
+  const { data, error } = await supabase
+    .from('experiences')
+    .select('*')
+    .eq('is_official', true)
+    .order('created_at', { ascending: false })
+
+  if (error) return []
+  return (data || []) as Experience[]
+}
+
 export async function getApprovedCommunityGames(): Promise<Experience[]> {
   const { data, error } = await supabase
     .from('submissions')

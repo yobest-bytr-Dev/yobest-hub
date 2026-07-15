@@ -3,8 +3,8 @@ import { motion } from 'framer-motion'
 import { Gamepad2, Brain, Users, ShoppingBag, ArrowRight, Download, Play, Sparkles, Eye, Heart, Rocket, Trophy } from 'lucide-react'
 import { experiences } from '@/data/official-games'
 import { extractYoutubeId, formatNumber, cn } from '@/lib/utils'
-import { useEffect } from 'react'
-import { getPlatformStats } from '@/lib/api'
+import { useEffect, useState } from 'react'
+import { getPlatformStats, getOfficialGames } from '@/lib/api'
 import { getSiteAnalytics } from '@/lib/analytics'
 import { useStore } from '@/store/useStore'
 import AdBanner from '@/components/AdBanner'
@@ -53,7 +53,8 @@ const pillars = [
 ]
 
 export default function Home() {
-  const featured = experiences.filter((g) => g.game_play).slice(0, 4)
+  const [officialGames, setOfficialGames] = useState(experiences)
+  const featured = officialGames.filter((g) => g.game_play).slice(0, 4)
   const platformStats = useStore((s) => s.platformStats)
   const setPlatformStats = useStore((s) => s.setPlatformStats)
   const siteAnalytics = useStore((s) => s.siteAnalytics)
@@ -62,10 +63,11 @@ export default function Home() {
   useEffect(() => {
     getPlatformStats().then(setPlatformStats)
     getSiteAnalytics().then(setSiteAnalytics)
+    getOfficialGames().then((data) => { if (data.length > 0) setOfficialGames(data) })
   }, [setPlatformStats, setSiteAnalytics])
 
   const stats = [
-    { label: 'Official Games', value: String(platformStats.officialGames || experiences.length), icon: Gamepad2, color: 'text-green-400', bg: 'bg-green-400/10', emoji: '🎮' },
+    { label: 'Official Games', value: String(platformStats.officialGames || officialGames.length), icon: Gamepad2, color: 'text-green-400', bg: 'bg-green-400/10', emoji: '🎮' },
     { label: 'Site Visitors', value: siteAnalytics.visitors > 0 ? formatNumber(siteAnalytics.visitors) : '0', icon: Eye, color: 'text-blue-400', bg: 'bg-blue-400/10', emoji: '👁️' },
     { label: 'Total Downloads', value: siteAnalytics.downloads > 0 ? formatNumber(siteAnalytics.downloads) : '0', icon: Download, color: 'text-cyan-400', bg: 'bg-cyan-400/10', emoji: '📥' },
     { label: 'AI Sessions', value: siteAnalytics.aiSessions > 0 ? formatNumber(siteAnalytics.aiSessions) : '0', icon: Sparkles, color: 'text-purple-400', bg: 'bg-purple-400/10', emoji: '✨' },

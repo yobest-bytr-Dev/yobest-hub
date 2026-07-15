@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Users, Trophy, Award, Target, Crown, Medal, TrendingUp, Gamepad2, Download, Heart, MessageSquare, Eye, Clock, Loader2, ExternalLink, ShoppingBag, Calendar } from 'lucide-react'
 import { useNavigate, Link } from 'react-router-dom'
-import { getPlatformStats, getLeaderboard, getChallenges, getApprovedCommunityGames, getAssets } from '@/lib/api'
+import { getPlatformStats, getLeaderboard, getChallenges, getApprovedCommunityGames, getAssets, getOfficialGames } from '@/lib/api'
 import { formatNumber, cn } from '@/lib/utils'
 import RobloxAvatar from '@/components/ui/RobloxAvatar'
-import type { UserProfile, Challenge } from '@/lib/types'
+import type { UserProfile, Challenge, Experience } from '@/lib/types'
 import { experiences } from '@/data/official-games'
 import AdBanner from '@/components/AdBanner'
 
@@ -26,6 +26,7 @@ export default function Community() {
   const [challenges, setChallenges] = useState<Challenge[]>([])
   const [recentGames, setRecentGames] = useState<any[]>([])
   const [assetCount, setAssetCount] = useState(0)
+  const [officialGames, setOfficialGames] = useState<Experience[]>(experiences)
 
   useEffect(() => {
     setLoading(true)
@@ -35,12 +36,14 @@ export default function Community() {
       getChallenges(),
       getApprovedCommunityGames(),
       getAssets(),
-    ]).then(([statsRes, leadRes, challRes, gamesRes, assetsRes]) => {
+      getOfficialGames(),
+    ]).then(([statsRes, leadRes, challRes, gamesRes, assetsRes, officialRes]) => {
       if (statsRes.status === 'fulfilled') setStats(statsRes.value)
       if (leadRes.status === 'fulfilled') setLeaderboard(leadRes.value)
       if (challRes.status === 'fulfilled') setChallenges(challRes.value)
       if (gamesRes.status === 'fulfilled') setRecentGames(gamesRes.value.slice(0, 10))
       if (assetsRes.status === 'fulfilled') setAssetCount(assetsRes.value.length)
+      if (officialRes.status === 'fulfilled' && officialRes.value.length > 0) setOfficialGames(officialRes.value)
       setLoading(false)
     })
   }, [])
@@ -149,11 +152,11 @@ export default function Community() {
                 </div>
               )}
 
-              {experiences.length > 0 && (
+              {officialGames.length > 0 && (
                 <div>
                   <h2 className="text-xl font-bold text-text-primary mb-4">Top Official Games</h2>
                   <div className="space-y-2">
-                    {experiences.sort((a, b) => (b.views_count || 0) - (a.views_count || 0)).slice(0, 5).map((game, i) => (
+                    {officialGames.sort((a, b) => (b.views_count || 0) - (a.views_count || 0)).slice(0, 5).map((game, i) => (
                       <Link key={game.id} to={`/games/${game.id}`}
                         className="flex items-center gap-3 p-3 rounded-xl bg-bg-secondary border border-border-primary hover:bg-bg-elevated/50 transition-colors group cursor-pointer">
                         <div className="w-7 text-center">

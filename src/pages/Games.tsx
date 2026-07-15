@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Search, SlidersHorizontal, Play, Eye, X, ChevronDown, Plus, Loader2, Heart, MessageSquare, ExternalLink, Upload, Check, Clock } from 'lucide-react'
 import { experiences } from '@/data/official-games'
-import { getApprovedCommunityGames, submitGame, getSubmissions } from '@/lib/api'
+import { getApprovedCommunityGames, getOfficialGames, submitGame, getSubmissions } from '@/lib/api'
 import { toDirectImageUrl, uploadToGoogleDrive } from '@/lib/drive-upload'
 import ImagePicker from '@/components/ui/ImagePicker'
 import type { Experience, GameCategory } from '@/lib/types'
@@ -271,6 +271,7 @@ export default function Games() {
   const [submitSuccess, setSubmitSuccess] = useState(false)
 
   const [communityData, setCommunityData] = useState<Experience[]>([])
+  const [officialData, setOfficialData] = useState<Experience[]>([])
   const [loadingCommunity, setLoadingCommunity] = useState(false)
 
   // YouTube stats for all games
@@ -317,6 +318,12 @@ export default function Games() {
     }
   }, [activeTab])
 
+  useEffect(() => {
+    getOfficialGames().then((data) => {
+      if (data.length > 0) setOfficialData(data)
+    })
+  }, [])
+
   // Fetch YouTube stats for all visible games
   useEffect(() => {
     const games = activeTab === 'official' ? experiences : communityData
@@ -336,7 +343,7 @@ export default function Games() {
     })
   }, [activeTab, communityData])
 
-  const allGames = activeTab === 'official' ? experiences : communityData
+  const allGames = activeTab === 'official' ? (officialData.length > 0 ? officialData : experiences) : communityData
 
   const filteredGames = useMemo(() => {
     let result = [...allGames]
@@ -397,7 +404,7 @@ export default function Games() {
           <div className="flex items-center justify-between">
             <Tabs
               tabs={[
-                { id: 'official', label: 'Official Games', count: experiences.length },
+                { id: 'official', label: 'Official Games', count: officialData.length || experiences.length },
                 { id: 'community', label: 'Community Games', count: communityData.length },
               ]}
               activeTab={activeTab}

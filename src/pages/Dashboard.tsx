@@ -4,22 +4,22 @@ import { useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Gamepad2, Package, FileText, Loader2, Trash2, Pencil,
   Save, X, Eye, Heart, ExternalLink, Search, RefreshCw, CheckCircle,
-  XCircle, Clock, AlertTriangle, Plus
+  XCircle, Clock, AlertTriangle, Plus, Tag, Download
 } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import {
   getOwnerExperiences, getOwnerSubmissions, getAssets,
   updateExperience, deleteExperience, updateAsset, deleteAsset,
-  updateSubmission, deleteSubmission
+  updateSubmission, deleteSubmission, getReleases, addRelease, deleteRelease
 } from '@/lib/api'
 import { supabase } from '@/config/supabase'
 import { formatNumber, cn } from '@/lib/utils'
 import { toDirectImageUrl } from '@/lib/drive-upload'
 import { useToast } from '@/components/ui/Toast'
 import ImagePicker from '@/components/ui/ImagePicker'
-import type { Experience, Submission, Asset } from '@/lib/types'
+import type { Experience, Submission, Asset, Release } from '@/lib/types'
 
-type Tab = 'games' | 'submissions' | 'assets'
+type Tab = 'games' | 'submissions' | 'assets' | 'releases'
 
 export default function Dashboard() {
   const navigate = useNavigate()
@@ -43,6 +43,7 @@ export default function Dashboard() {
     { id: 'games', label: 'My Games', icon: Gamepad2 },
     { id: 'submissions', label: 'My Submissions', icon: FileText },
     { id: 'assets', label: 'My Assets', icon: Package },
+    { id: 'releases', label: 'Releases', icon: Tag },
   ]
 
   return (
@@ -74,6 +75,7 @@ export default function Dashboard() {
         {tab === 'games' && <GamesTab />}
         {tab === 'submissions' && <SubmissionsTab />}
         {tab === 'assets' && <AssetsTab />}
+        {tab === 'releases' && <ReleasesTab />}
       </motion.div>
     </div>
   )
@@ -436,6 +438,250 @@ function AssetsTab() {
           </div>
         ))}
         {assets.length === 0 && <p className="text-sm text-text-muted text-center py-8">No assets yet. Go to Marketplace to submit one!</p>}
+      </div>
+    </div>
+  )
+}
+
+function ReleasesTab() {
+  const { toast } = useToast()
+  const currentUser = useStore((s) => s.currentUser)
+  const [games, setGames] = useState<Experience[]>([])
+  const [assets, setAssets] = useState<Asset[]>([])
+  const [releases, setReleases] = useState<Release[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedTarget, setSelectedTarget] = useState<{ type: 'game' | 'asset'; id: string; title: string } | null>(null)
+  const [releaseForm, setReleaseForm] = useState({ version: '', title: '', body: '', file_url: '', file_name: '', file_size: '', is_prerelease: false })
+  const [saving, setSaving] = useState(false)
+  const [search, setSearch] = useState('')
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const [ownerGames, ownerAssets] = await Promise.all([
+      getOwnerExperiences(),
+      supabase.from('assets').select('*').eq('creator_id', currentUser?.id || '').order('created_at', { ascending: false }).then(r => (r.data || []) as Asset[]),
+    ])
+    setGames(ownerGames)
+    setAssets(ownerAssets)
+
+    const allReleases: Release[] = []
+    for (const g of ownerGames) {
+      const r = await getReleases('game', g.id)
+      allReleases.push(...r)
+    }
+    for (const a of ownerAssets) {
+      const r = await getReleases('asset', a.id)
+      allReleases.push(...r)
+    }
+    allReleases.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    setReleases(allReleases)
+    setLoading(false)
+  }, [currentUser])
+
+  useEffect(() => { load() }, [load])
+
+  const openCreateRelease = (type: 'game' | 'asset', id: string, title: string) => {
+    setSelectedTarget({ type, id, title })
+    setReleaseForm({ version: '', title: '', body: '', file_url: '', file_name: '', file_size: '', is_prerelease: false })
+  }
+
+  const handlePublishRelease = async () => {
+    if (!selectedTarget || !releaseForm.version.trim() || !releaseForm.title.trim()) {
+      toast('Version and title are required', 'error')
+      return
+    }
+    setSaving(true)
+    try {
+      await addRelease({
+        target_type: selectedTarget.type,
+        target_id: selectedTarget.id,
+        version: releaseForm.version,
+        title: releaseForm.title,
+        body: releaseForm.body,
+        file_url: releaseForm.file_url,
+        file_name: releaseForm.file_name,
+        file_size: releaseForm.file_size,
+        is_prerelease: releaseForm.is_prerelease,
+      })
+      toast('Release published!', 'success')
+      setSelectedTarget(null)
+      setReleaseForm({ version: '', title: '', body: '', file_url: '', file_name: '', file_size: '', is_prerelease: false })
+      load()
+    } catch (e: any) {
+      toast(e.message || 'Failed to publish release', 'error')
+    }
+    setSaving(false)
+  }
+
+  const handleDeleteRelease = async (id: string) => {
+    if (!confirm('Delete this release?')) return
+    try {
+      await deleteRelease(id)
+      toast('Release deleted', 'success')
+      load()
+    } catch (e: any) {
+      toast(e.message || 'Failed to delete', 'error')
+    }
+  }
+
+  const getTargetTitle = (r: Release) => {
+    if (r.target_type === 'game') {
+      const g = games.find(g => g.id === r.target_id)
+      return g?.title || 'Unknown Game'
+    }
+    const a = assets.find(a => a.id === r.target_id)
+    return a?.title || 'Unknown Asset'
+  }
+
+  const allTargets = [
+    ...games.map(g => ({ type: 'game' as const, id: g.id, title: g.title })),
+    ...assets.map(a => ({ type: 'asset' as const, id: a.id, title: a.title })),
+  ]
+
+  const filteredTargets = allTargets.filter(t => !search || t.title.toLowerCase().includes(search.toLowerCase()))
+  const filteredReleases = releases.filter(r => {
+    if (!search) return true
+    const targetTitle = getTargetTitle(r).toLowerCase()
+    return targetTitle.includes(search.toLowerCase()) || r.title.toLowerCase().includes(search.toLowerCase()) || r.version.toLowerCase().includes(search.toLowerCase())
+  })
+
+  if (loading) return <div className="flex items-center justify-center py-20"><Loader2 size={24} className="animate-spin text-accent-blue" /></div>
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-text-primary">Releases ({filteredReleases.length})</h2>
+          <p className="text-xs text-text-muted">Create and manage releases for your games and assets</p>
+        </div>
+        <button onClick={load} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-elevated border border-border-primary text-xs text-text-secondary hover:text-text-primary transition-colors">
+          <RefreshCw size={12} /> Refresh
+        </button>
+      </div>
+
+      <div className="relative">
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search games, assets, or releases..."
+          className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-bg-secondary border border-border-primary text-sm text-text-primary placeholder:text-text-dim focus:outline-none focus:border-accent-blue/50 transition-all" />
+      </div>
+
+      {selectedTarget && (
+        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="rounded-xl bg-bg-secondary border border-accent-green/25 p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+              <Tag size={14} className="text-accent-green" /> New Release for: <span className="text-accent-blue">{selectedTarget.title}</span>
+            </h3>
+            <button onClick={() => setSelectedTarget(null)} className="text-xs text-text-muted hover:text-text-primary"><X size={14} /></button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-[9px] text-text-dim font-semibold uppercase tracking-wider block mb-1">Version *</label>
+              <input value={releaseForm.version} onChange={e => setReleaseForm(f => ({ ...f, version: e.target.value }))} placeholder="v1.0.0"
+                className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50" />
+            </div>
+            <div>
+              <label className="text-[9px] text-text-dim font-semibold uppercase tracking-wider block mb-1">Title *</label>
+              <input value={releaseForm.title} onChange={e => setReleaseForm(f => ({ ...f, title: e.target.value }))} placeholder="What's new in this release"
+                className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50" />
+            </div>
+          </div>
+          <div>
+            <label className="text-[9px] text-text-dim font-semibold uppercase tracking-wider block mb-1">Release Notes</label>
+            <textarea value={releaseForm.body} onChange={e => setReleaseForm(f => ({ ...f, body: e.target.value }))} rows={4}
+              placeholder="- Added new feature&#10;- Fixed bug in X&#10;- Improved performance"
+              className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50 resize-none font-mono text-xs" />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="sm:col-span-2">
+              <label className="text-[9px] text-text-dim font-semibold uppercase tracking-wider block mb-1">File URL (optional)</label>
+              <input value={releaseForm.file_url} onChange={e => setReleaseForm(f => ({ ...f, file_url: e.target.value }))}
+                placeholder="https://drive.google.com/..."
+                className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50" />
+            </div>
+            <div>
+              <label className="text-[9px] text-text-dim font-semibold uppercase tracking-wider block mb-1">File Name</label>
+              <input value={releaseForm.file_name} onChange={e => setReleaseForm(f => ({ ...f, file_name: e.target.value }))} placeholder="game-v1.zip"
+                className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50" />
+            </div>
+          </div>
+          <div className="flex items-center justify-between">
+            <label className="flex items-center gap-2 text-xs text-text-muted">
+              <input type="checkbox" checked={releaseForm.is_prerelease} onChange={e => setReleaseForm(f => ({ ...f, is_prerelease: e.target.checked }))} className="rounded" /> Pre-release
+            </label>
+            <button onClick={handlePublishRelease} disabled={saving}
+              className="flex items-center gap-1.5 px-5 py-2.5 rounded-lg bg-accent-green text-white text-xs font-bold hover:bg-green-600 disabled:opacity-50 transition-all">
+              {saving ? <Loader2 size={12} className="animate-spin" /> : <Tag size={12} />} Publish Release
+            </button>
+          </div>
+        </motion.div>
+      )}
+
+      <div className="space-y-3">
+        <h3 className="text-xs font-semibold text-text-dim uppercase tracking-wider">Your Games & Assets — Create a Release</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+          {filteredTargets.map(t => (
+            <div key={`${t.type}-${t.id}`} className="flex items-center gap-2 p-3 rounded-xl bg-bg-secondary border border-border-primary hover:bg-bg-elevated/50 transition-colors">
+              <div className="shrink-0">
+                {t.type === 'game' ? <Gamepad2 size={14} className="text-accent-blue" /> : <Package size={14} className="text-accent-purple" />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-semibold text-text-primary truncate">{t.title}</div>
+                <div className="text-[10px] text-text-muted capitalize">{t.type}</div>
+              </div>
+              <button onClick={() => openCreateRelease(t.type, t.id, t.title)}
+                className="px-2.5 py-1 rounded-lg bg-accent-green/15 text-accent-green text-[10px] font-bold border border-accent-green/25 hover:bg-accent-green/25 transition-colors shrink-0 flex items-center gap-1">
+                <Plus size={10} /> Release
+              </button>
+            </div>
+          ))}
+          {filteredTargets.length === 0 && <p className="text-xs text-text-muted text-center py-4 col-span-full">No games or assets found</p>}
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <h3 className="text-xs font-semibold text-text-dim uppercase tracking-wider">All Releases</h3>
+        {filteredReleases.length > 0 ? (
+          <div className="relative">
+            <div className="absolute left-[15px] top-4 bottom-4 w-px bg-border-primary" />
+            <div className="space-y-0">
+              {filteredReleases.map((r, i) => (
+                <div key={r.id} className="relative flex gap-3 group">
+                  <div className="relative z-10 shrink-0 mt-1">
+                    <div className={cn('w-[30px] h-[30px] rounded-full border-2 flex items-center justify-center text-[9px] font-bold',
+                      i === 0 ? 'bg-accent-green/15 border-accent-green text-accent-green' : 'bg-bg-elevated border-border-primary text-text-muted')}>
+                      {r.target_type === 'game' ? <Gamepad2 size={12} /> : <Package size={12} />}
+                    </div>
+                  </div>
+                  <div className="flex-1 pb-4 min-w-0">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <span className="px-2 py-0.5 rounded-md bg-accent-blue/15 text-accent-blue text-[10px] font-bold border border-accent-blue/20">v{r.version}</span>
+                      {i === 0 && <span className="px-2 py-0.5 rounded-md bg-green-500/15 text-green-400 text-[10px] font-bold border border-green-500/20">Latest</span>}
+                      {r.is_prerelease && <span className="px-2 py-0.5 rounded-md bg-yellow-500/15 text-yellow-400 text-[10px] font-bold border border-yellow-500/20">Pre</span>}
+                      <span className="text-[9px] text-text-dim capitalize px-1.5 py-0.5 rounded bg-bg-elevated border border-border-primary">{r.target_type}</span>
+                    </div>
+                    <h4 className="text-xs font-semibold text-text-primary">{r.title}</h4>
+                    <p className="text-[10px] text-accent-blue/70 font-medium">{getTargetTitle(r)}</p>
+                    {r.body && <p className="text-[11px] text-text-secondary leading-relaxed whitespace-pre-wrap mt-1">{r.body}</p>}
+                    {r.file_url && (
+                      <a href={r.file_url} target="_blank" rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 mt-1.5 px-2.5 py-1 rounded-lg bg-bg-elevated border border-border-primary text-[10px] font-medium text-accent-blue hover:border-accent-blue/30 transition-all">
+                        <Download size={10} /> {r.file_name || 'Download'} {r.file_size && <span className="text-text-dim">({r.file_size})</span>}
+                      </a>
+                    )}
+                    <div className="flex items-center gap-2 mt-1.5 text-[10px] text-text-dim">
+                      {r.author_username && <span>by {r.author_username}</span>}
+                      <span>{new Date(r.created_at).toLocaleDateString()}</span>
+                      <button onClick={() => handleDeleteRelease(r.id)}
+                        className="ml-auto opacity-0 group-hover:opacity-100 text-text-dim hover:text-red-400 transition-all"><Trash2 size={11} /></button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-text-muted text-center py-8">No releases yet. Create one above!</p>
+        )}
       </div>
     </div>
   )

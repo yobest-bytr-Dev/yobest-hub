@@ -361,9 +361,9 @@ export default function GameDetail() {
                     setMyReview({ rating: reviewRating, comment: reviewComment })
                     getReviewsStats(id).then(setReviewStats)
                     setShowReviewForm(false)
-                    toast({ title: 'Rating saved!', type: 'success' })
+                    toast('Rating saved!', 'success')
                   } catch {
-                    toast({ title: 'Failed to save rating', type: 'error' })
+                    toast('Failed to save rating', 'error')
                   } finally {
                     setReviewSubmitting(false)
                   }

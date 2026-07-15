@@ -1,6 +1,7 @@
 import { HashRouter, Routes, Route } from 'react-router-dom'
 import { ToastProvider } from '@/components/ui/Toast'
 import Layout from '@/components/layout/Layout'
+import MetaUpdater from '@/components/MetaUpdater'
 import Home from '@/pages/Home'
 import Games from '@/pages/Games'
 import GameDetail from '@/pages/GameDetail'
@@ -25,6 +26,7 @@ export default function App() {
   return (
     <ToastProvider>
       <HashRouter>
+        <MetaUpdater />
         <Routes>
           <Route element={<Layout />}>
             <Route path="/" element={<Home />} />

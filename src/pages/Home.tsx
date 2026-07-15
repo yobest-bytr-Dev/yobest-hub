@@ -63,10 +63,17 @@ const GameGallery = ({ officialGames }: { officialGames: Experience[] }) => {
   officialGames.forEach((game) => {
     if (game.thumbnail_url) {
       allImages.push({ src: toDirectImageUrl(game.thumbnail_url), title: game.title, id: game.id })
+    } else if (game.video_url) {
+      const thumbId = extractYoutubeId(game.video_url)
+      if (thumbId) {
+        allImages.push({ src: `https://img.youtube.com/vi/${thumbId}/mqdefault.jpg`, title: game.title, id: game.id })
+      }
     }
-    if (game.images && game.images.length > 0) {
+    if (game.images && Array.isArray(game.images) && game.images.length > 0) {
       game.images.forEach((img, i) => {
-        allImages.push({ src: toDirectImageUrl(img), title: `${game.title} #${i + 1}`, id: `${game.id}-${i}` })
+        if (typeof img === 'string') {
+          allImages.push({ src: toDirectImageUrl(img), title: `${game.title} #${i + 2}`, id: `${game.id}-${i}` })
+        }
       })
     }
   })

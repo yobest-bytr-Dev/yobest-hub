@@ -542,6 +542,7 @@ function GamesTab() {
   const [releaseForm, setReleaseForm] = useState({ version: '', title: '', body: '', file_url: '', file_name: '', file_size: '', is_prerelease: false })
   const [releaseLoading, setReleaseLoading] = useState(false)
   const [releaseUploading, setReleaseUploading] = useState(false)
+  const releaseFileRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
 
   const load = useCallback(async () => {
@@ -614,6 +615,24 @@ function GamesTab() {
     const { data } = await supabase.from('releases').select('*').eq('target_type', 'game').eq('target_id', game.id).order('created_at', { ascending: false })
     setReleases(data || [])
     setReleaseForm({ version: '', title: '', body: '', file_url: '', file_name: '', file_size: '', is_prerelease: false })
+  }
+
+  const handleReleaseFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 100 * 1024 * 1024) { toast('File too large. Max 100MB.', 'error'); return }
+    setReleaseUploading(true)
+    try {
+      const { uploadToGoogleDrive } = await import('@/lib/drive-upload')
+      const result = await uploadToGoogleDrive(file, 'yobest/releases')
+      const sizeMB = (file.size / (1024 * 1024)).toFixed(1)
+      setReleaseForm(f => ({ ...f, file_url: result.directLink, file_name: result.fileName, file_size: `${sizeMB} MB` }))
+      toast('File uploaded!', 'success')
+    } catch (err: any) {
+      toast('Upload failed: ' + (err.message || 'Unknown error'), 'error')
+    }
+    setReleaseUploading(false)
+    if (releaseFileRef.current) releaseFileRef.current.value = ''
   }
 
   const addReleaseHandler = async () => {
@@ -821,16 +840,34 @@ function GamesTab() {
                 placeholder="What's new, what was fixed, changes list..."
                 className="w-full px-3 py-2 rounded-lg bg-bg-secondary border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50 resize-none font-mono text-xs" />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <div className="sm:col-span-2">
-                <label className="text-[9px] text-text-dim font-semibold uppercase tracking-wider block mb-1">File URL (optional)</label>
+            <div>
+              <label className="text-[9px] text-text-dim font-semibold uppercase tracking-wider block mb-1">Attachment</label>
+              <div className="flex gap-2">
+                <input type="file" ref={releaseFileRef} onChange={handleReleaseFileUpload} className="hidden"
+                  accept=".lua,.luau,.txt,.rbxm,.rbxmx,.obj,.fbx,.json,.xml,.png,.jpg,.jpeg,.gif,.zip,.rar,.7z,.mp3,.wav,.mp4" />
+                <button type="button" onClick={() => releaseFileRef.current?.click()} disabled={releaseUploading}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg border-2 border-dashed border-border-primary hover:border-accent-green/50 hover:bg-accent-green/5 transition-all text-text-secondary hover:text-accent-green text-xs disabled:opacity-50">
+                  {releaseUploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                  {releaseForm.file_name ? releaseForm.file_name : 'Upload File'}
+                </button>
+                {releaseForm.file_url && (
+                  <button onClick={() => setReleaseForm(f => ({ ...f, file_url: '', file_name: '', file_size: '' }))}
+                    className="px-3 py-2 rounded-lg bg-red-500/10 text-red-400 text-xs font-medium hover:bg-red-500/20 transition-colors">
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+              {releaseForm.file_url && (
+                <div className="flex items-center gap-2 mt-2 px-3 py-2 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-xs">
+                  <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                  <span className="truncate">{releaseForm.file_name}</span>
+                  {releaseForm.file_size && <span className="text-green-400/60 shrink-0">({releaseForm.file_size})</span>}
+                </div>
+              )}
+              <div className="mt-2">
+                <p className="text-[9px] text-text-dim mb-1">Or paste a download link</p>
                 <input value={releaseForm.file_url} onChange={e => setReleaseForm(f => ({ ...f, file_url: e.target.value }))}
                   placeholder="https://drive.google.com/..."
-                  className="w-full px-3 py-2 rounded-lg bg-bg-secondary border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50" />
-              </div>
-              <div>
-                <label className="text-[9px] text-text-dim font-semibold uppercase tracking-wider block mb-1">File Name</label>
-                <input value={releaseForm.file_name} onChange={e => setReleaseForm(f => ({ ...f, file_name: e.target.value }))} placeholder="game-v1.zip"
                   className="w-full px-3 py-2 rounded-lg bg-bg-secondary border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50" />
               </div>
             </div>

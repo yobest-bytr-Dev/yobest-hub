@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Gamepad2, Package, FileText, Loader2, Trash2, Pencil,
   Save, X, Eye, Heart, ExternalLink, Search, RefreshCw, CheckCircle,
-  XCircle, Clock, AlertTriangle, Plus, Tag, Download
+  XCircle, Clock, AlertTriangle, Plus, Tag, Download, Upload
 } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import {
@@ -14,7 +14,7 @@ import {
 } from '@/lib/api'
 import { supabase } from '@/config/supabase'
 import { formatNumber, cn } from '@/lib/utils'
-import { toDirectImageUrl } from '@/lib/drive-upload'
+import { toDirectImageUrl, uploadToGoogleDrive } from '@/lib/drive-upload'
 import { useToast } from '@/components/ui/Toast'
 import ImagePicker from '@/components/ui/ImagePicker'
 import type { Experience, Submission, Asset, Release } from '@/lib/types'
@@ -454,6 +454,8 @@ function ReleasesTab() {
   const [releaseForm, setReleaseForm] = useState({ version: '', title: '', body: '', file_url: '', file_name: '', file_size: '', is_prerelease: false })
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
+  const [uploadingFile, setUploadingFile] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -545,6 +547,23 @@ function ReleasesTab() {
     return targetTitle.includes(search.toLowerCase()) || r.title.toLowerCase().includes(search.toLowerCase()) || r.version.toLowerCase().includes(search.toLowerCase())
   })
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 100 * 1024 * 1024) { toast('File too large. Max 100MB.', 'error'); return }
+    setUploadingFile(true)
+    try {
+      const result = await uploadToGoogleDrive(file, 'yobest/releases')
+      const sizeMB = (file.size / (1024 * 1024)).toFixed(1)
+      setReleaseForm(f => ({ ...f, file_url: result.directLink, file_name: result.fileName, file_size: `${sizeMB} MB` }))
+      toast('File uploaded!', 'success')
+    } catch (err: any) {
+      toast('Upload failed: ' + (err.message || 'Unknown error'), 'error')
+    }
+    setUploadingFile(false)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
   if (loading) return <div className="flex items-center justify-center py-20"><Loader2 size={24} className="animate-spin text-accent-blue" /></div>
 
   return (
@@ -591,16 +610,34 @@ function ReleasesTab() {
               placeholder="- Added new feature&#10;- Fixed bug in X&#10;- Improved performance"
               className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50 resize-none font-mono text-xs" />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="sm:col-span-2">
-              <label className="text-[9px] text-text-dim font-semibold uppercase tracking-wider block mb-1">File URL (optional)</label>
+          <div>
+            <label className="text-[9px] text-text-dim font-semibold uppercase tracking-wider block mb-1">Attachment</label>
+            <div className="flex gap-2">
+              <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden"
+                accept=".lua,.luau,.txt,.rbxm,.rbxmx,.obj,.fbx,.json,.xml,.png,.jpg,.jpeg,.gif,.zip,.rar,.7z,.mp3,.wav,.mp4" />
+              <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploadingFile}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg border-2 border-dashed border-border-primary hover:border-accent-green/50 hover:bg-accent-green/5 transition-all text-text-secondary hover:text-accent-green text-xs disabled:opacity-50">
+                {uploadingFile ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                {releaseForm.file_name ? releaseForm.file_name : 'Upload File'}
+              </button>
+              {releaseForm.file_url && (
+                <button onClick={() => setReleaseForm(f => ({ ...f, file_url: '', file_name: '', file_size: '' }))}
+                  className="px-3 py-2 rounded-lg bg-red-500/10 text-red-400 text-xs font-medium hover:bg-red-500/20 transition-colors">
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+            {releaseForm.file_url && (
+              <div className="flex items-center gap-2 mt-2 px-3 py-2 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-xs">
+                <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                <span className="truncate">{releaseForm.file_name}</span>
+                {releaseForm.file_size && <span className="text-green-400/60 shrink-0">({releaseForm.file_size})</span>}
+              </div>
+            )}
+            <div className="mt-2">
+              <p className="text-[9px] text-text-dim mb-1">Or paste a download link</p>
               <input value={releaseForm.file_url} onChange={e => setReleaseForm(f => ({ ...f, file_url: e.target.value }))}
                 placeholder="https://drive.google.com/..."
-                className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50" />
-            </div>
-            <div>
-              <label className="text-[9px] text-text-dim font-semibold uppercase tracking-wider block mb-1">File Name</label>
-              <input value={releaseForm.file_name} onChange={e => setReleaseForm(f => ({ ...f, file_name: e.target.value }))} placeholder="game-v1.zip"
                 className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50" />
             </div>
           </div>

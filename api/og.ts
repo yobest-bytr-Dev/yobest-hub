@@ -5,8 +5,8 @@ const BASE = 'https://yobest-bytr.vercel.app'
 const DEFAULT_IMG = `${BASE}/YobestLogo.png`
 const DEFAULT_DESC = 'Build games with AI assistance, share with the community, and monetize your creations.'
 
-const SB_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://pohslivolczprxacroje.supabase.co'
-const SB_KEY = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || ''
+const SB_URL = process.env.SUPABASE_URL || 'https://pohslivolczprxacroje.supabase.co'
+const SB_KEY = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || 'sb_publishable_zg1KBuWhnqVm8GM8q4siIA_M1BC1vyG'
 const supabase = createClient(SB_URL, SB_KEY)
 
 function esc(s: string) {

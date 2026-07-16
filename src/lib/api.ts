@@ -727,35 +727,37 @@ export async function updateExperience(id: string, updates: Partial<Experience>)
   if (!user) throw new Error('Not authenticated')
   const gamepassId = updates.gamepass_id || ''
   const price = gamepassId.trim() ? (updates.price === 'Free' || !updates.price ? 'Gamepass Required' : updates.price) : (updates.price === 'Gamepass Required' ? 'Free' : updates.price || 'Free')
-  const payload: Record<string, any> = {
-    title: updates.title,
-    description: updates.description,
-    category: updates.category,
-    price,
-    video_url: updates.video_url,
-    game_url: updates.game_url,
-    download_url: updates.download_url,
-    thumbnail_url: updates.thumbnail_url,
-    download_enabled: updates.download_enabled,
-    game_play: updates.game_play,
-    gamepass_id: gamepassId,
-    images: updates.images || [],
-  }
-  let { data, error } = await supabase
-    .from('experiences')
-    .update(payload)
-    .eq('id', id)
-    .eq('creator_id', user.id)
-    .select('id')
-  if (error) {
-    const safe: Record<string, any> = { ...payload }
-    delete safe.images
-    delete safe.gamepass_id
-    let retry = await supabase.from('experiences').update(safe).eq('id', id).eq('creator_id', user.id).select('id')
-    if (retry.error) throw retry.error
-    data = retry.data
-  }
-  if (data && data.length === 0) throw new Error('Update blocked — please run the SQL migration in Supabase Dashboard SQL Editor')
+
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) throw new Error('Not authenticated')
+
+  const res = await fetch(`${supabaseUrl}/functions/v1/update-record`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${session.access_token}`,
+      'apikey': supabaseAnonKey,
+    },
+    body: JSON.stringify({
+      table: 'experiences',
+      id,
+      fields: {
+        title: updates.title || '',
+        description: updates.description || '',
+        category: updates.category || '',
+        price,
+        video_url: updates.video_url || '',
+        game_url: updates.game_url || '',
+        download_url: updates.download_url || '',
+        thumbnail_url: updates.thumbnail_url || '',
+        download_enabled: updates.download_enabled ?? true,
+        game_play: updates.game_play ?? false,
+        gamepass_id: gamepassId,
+      },
+    }),
+  })
+  const result = await res.json()
+  if (!res.ok || result.error) throw new Error(result.error || 'Update failed')
   return {}
 }
 
@@ -805,40 +807,35 @@ export async function updateSubmission(id: string, updates: Partial<Submission>)
   if (!user) throw new Error('Not authenticated')
   const gamepassUrl = updates.gamepass_url || ''
   const price = gamepassUrl.trim() ? (updates.price === 'Free' || !updates.price ? 'Gamepass Required' : updates.price) : (updates.price === 'Gamepass Required' ? 'Free' : updates.price || 'Free')
-  const payload: Record<string, any> = {
-    title: updates.title,
-    description: updates.description,
-    category: updates.category,
-    price,
-    video_url: updates.video_url,
-    game_url: updates.game_url,
-    drive_file_url: updates.drive_file_url,
-    thumbnail_url: updates.thumbnail_url,
-    gamepass_url: gamepassUrl,
-    gallery_images: updates.gallery_images || [],
-  }
-  let { data, error } = await supabase
-    .from('submissions')
-    .update(payload)
-    .eq('id', id)
-    .eq('user_id', user.id)
-    .select('id')
-  if (error) {
-    const safe: Record<string, any> = { ...payload }
-    delete safe.gallery_images
-    let retry = await supabase.from('submissions').update(safe).eq('id', id).eq('user_id', user.id).select('id')
-    if (retry.error) {
-      delete safe.gamepass_url
-      retry = await supabase.from('submissions').update(safe).eq('id', id).eq('user_id', user.id).select('id')
-      if (retry.error) {
-        delete safe.thumbnail_url
-        retry = await supabase.from('submissions').update(safe).eq('id', id).eq('user_id', user.id).select('id')
-        if (retry.error) throw retry.error
-      }
-    }
-    data = retry.data
-  }
-  if (data && data.length === 0) throw new Error('Update blocked — please run the SQL migration in Supabase Dashboard SQL Editor')
+
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) throw new Error('Not authenticated')
+
+  const res = await fetch(`${supabaseUrl}/functions/v1/update-record`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${session.access_token}`,
+      'apikey': supabaseAnonKey,
+    },
+    body: JSON.stringify({
+      table: 'submissions',
+      id,
+      fields: {
+        title: updates.title || '',
+        description: updates.description || '',
+        category: updates.category || '',
+        price,
+        video_url: updates.video_url || '',
+        game_url: updates.game_url || '',
+        drive_file_url: updates.drive_file_url || '',
+        thumbnail_url: updates.thumbnail_url || '',
+        gamepass_url: gamepassUrl,
+      },
+    }),
+  })
+  const result = await res.json()
+  if (!res.ok || result.error) throw new Error(result.error || 'Update failed')
   return {}
 }
 

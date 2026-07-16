@@ -19,24 +19,57 @@ serve(async (req) => {
 
     const gpId = String(gamepass_id).trim()
 
-    // Fetch gamepass info from Roblox API to get name and price
+    // Fetch gamepass info using the Roblox marketplace API
     let gamepassInfo: any = null
+    let exists = false
+
     try {
       const gpRes = await fetch(
-        `https://apis.roblox.com/game-passes/v1/game-passes/${gpId}`,
+        `https://api.roblox.com/marketplace/game-pass-product-info?gamePassId=${gpId}`,
         { headers: { "Accept": "application/json" } }
       )
       if (gpRes.ok) {
-        gamepassInfo = await gpRes.json()
+        const data = await gpRes.json()
+        if (data && data.Name) {
+          exists = true
+          gamepassInfo = {
+            name: data.Name,
+            price: data.PriceInRobux ?? null,
+            description: data.Description ?? "",
+            isForSale: data.IsForSale ?? false,
+          }
+        }
       }
     } catch {}
+
+    // Fallback: try the newer API
+    if (!exists) {
+      try {
+        const gpRes2 = await fetch(
+          `https://apis.roblox.com/game-passes/v1/game-passes/${gpId}`,
+          { headers: { "Accept": "application/json" } }
+        )
+        if (gpRes2.ok) {
+          const data2 = await gpRes2.json()
+          if (data2 && data2.name) {
+            exists = true
+            gamepassInfo = {
+              name: data2.name,
+              price: null,
+              description: data2.description ?? "",
+              isForSale: data2.isForSale ?? false,
+            }
+          }
+        }
+      } catch {}
+    }
 
     const price = gamepassInfo?.price ?? null
     const name = gamepassInfo?.name ?? null
 
     // If we have a user ID, verify ownership
     let verified = false
-    if (roblox_user_id) {
+    if (roblox_user_id && exists) {
       const userId = String(roblox_user_id).trim()
       try {
         const invResponse = await fetch(
@@ -53,7 +86,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ verified, price, name, exists: !!gamepassInfo }),
+      JSON.stringify({ verified, price, name, exists }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     )
   } catch (error) {

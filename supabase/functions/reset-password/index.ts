@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import nodemailer from "https://esm.sh/nodemailer@6.9.16";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,15 +7,10 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 465,
-  secure: true,
-  auth: {
-    user: "yobest.bytr47@gmail.com",
-    pass: "rwnjbedwmqqrysrj",
-  },
-});
+const SMTP_HOST = "smtp.gmail.com";
+const SMTP_PORT = 465;
+const SMTP_USER = "yobest.bytr47@gmail.com";
+const SMTP_PASS = "rwnjbedwmqqrysrj";
 
 function generateCode(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
@@ -41,6 +35,84 @@ function buildEmailHtml(code: string) {
 </div>
 </body>
 </html>`;
+}
+
+async function readAllLines(conn: Deno.TlsConn): Promise<string> {
+  const decoder = new TextDecoder();
+  let result = "";
+  const buf = new Uint8Array(4096);
+  let totalReads = 0;
+  while (totalReads < 10) {
+    const n = await Promise.race([
+      conn.read(buf),
+      new Promise<null>((_, reject) => setTimeout(() => reject(new Error("read timeout")), 5000)),
+    ]);
+    if (n === null) break;
+    result += decoder.decode(buf.subarray(0, n));
+    const lines = result.split("\r\n");
+    const lastLine = lines[lines.length - 2] || "";
+    if (lastLine.length >= 4 && lastLine[3] === " ") break;
+    totalReads++;
+  }
+  return result;
+}
+
+async function smtpCmd(conn: Deno.TlsConn, cmd: string): Promise<string> {
+  const encoder = new TextEncoder();
+  await conn.write(encoder.encode(cmd + "\r\n"));
+  return await readAllLines(conn);
+}
+
+async function sendSmtpEmail(to: string, subject: string, htmlBody: string): Promise<string> {
+  const conn = await Deno.connectTls({ hostname: SMTP_HOST, port: SMTP_PORT });
+
+  try {
+    let response = await readAllLines(conn);
+    console.log("Banner:", response.trim());
+
+    response = await smtpCmd(conn, "EHLO yobest.app");
+    console.log("EHLO:", response.trim());
+
+    response = await smtpCmd(conn, "AUTH LOGIN");
+    console.log("AUTH LOGIN:", response.trim());
+
+    response = await smtpCmd(conn, btoa(SMTP_USER));
+    console.log("Username:", response.trim());
+
+    response = await smtpCmd(conn, btoa(SMTP_PASS));
+    console.log("Password:", response.trim());
+
+    response = await smtpCmd(conn, `MAIL FROM:<${SMTP_USER}>`);
+    console.log("MAIL FROM:", response.trim());
+
+    response = await smtpCmd(conn, `RCPT TO:<${to}>`);
+    console.log("RCPT TO:", response.trim());
+
+    response = await smtpCmd(conn, "DATA");
+    console.log("DATA:", response.trim());
+
+    const encoder = new TextEncoder();
+    const msg =
+      `From: Yobest <${SMTP_USER}>\r\n` +
+      `To: <${to}>\r\n` +
+      `Subject: ${subject}\r\n` +
+      `MIME-Version: 1.0\r\n` +
+      `Content-Type: text/html; charset=UTF-8\r\n` +
+      `Content-Transfer-Encoding: 7bit\r\n` +
+      `\r\n` +
+      `${htmlBody}\r\n` +
+      `.\r\n`;
+    await conn.write(encoder.encode(msg));
+    response = await readAllLines(conn);
+    console.log("DATA response:", response.trim());
+
+    response = await smtpCmd(conn, "QUIT");
+    console.log("QUIT:", response.trim());
+
+    return "ok";
+  } finally {
+    conn.close();
+  }
 }
 
 serve(async (req) => {
@@ -83,13 +155,8 @@ serve(async (req) => {
       });
       if (insertError) throw insertError;
 
-      const info = await transporter.sendMail({
-        from: '"Yobest" <yobest.bytr47@gmail.com>',
-        to: normalizedEmail,
-        subject: "Your Yobest Password Reset Code",
-        html: buildEmailHtml(code),
-      });
-      console.log("Email sent:", info.messageId);
+      const smtpResult = await sendSmtpEmail(normalizedEmail, "Your Yobest Password Reset Code", buildEmailHtml(code));
+      console.log("SMTP result:", smtpResult);
 
       return new Response(JSON.stringify({ ok: true, message: "Code sent to your email." }), {
         status: 200,

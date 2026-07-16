@@ -31,10 +31,9 @@ serve(async (req) => {
     let name: string | null = null
 
     const apiUrls = [
-      `https://apis.roblox.com/marketplace-service/v1/passes/details?passIds=${gpId}`,
+      `https://apis.roblox.com/game-passes/v1/game-passes/${gpId}/product-info`,
       `https://apis.roblox.com/game-passes/v1/game-passes/${gpId}/details`,
       `https://economy.roblox.com/v1/game-passes/${gpId}`,
-      `https://api.roblox.com/marketplace/game-pass-product-info?gamePassId=${gpId}`,
     ]
 
     for (const url of apiUrls) {
@@ -55,6 +54,10 @@ serve(async (req) => {
           exists = true
           name = data.name || data.Name
           price = data.priceInRobux ?? data.PriceInRobux ?? null
+        } else if (data && data.TargetId) {
+          exists = true
+          name = data.Name || null
+          price = data.PriceInRobux ?? null
         }
       } catch {}
     }

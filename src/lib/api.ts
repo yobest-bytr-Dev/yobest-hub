@@ -946,6 +946,23 @@ export async function deleteRelease(releaseId: string) {
 // ── Gamepass Purchase Verification ──
 
 export async function fetchGamepassInfo(gamepassId: string): Promise<{ exists: boolean; price?: number; name?: string }> {
+  const gpId = gamepassId.trim().replace(/\D/g, '')
+  if (!gpId) return { exists: false }
+
+  try {
+    const res = await fetch(`https://apis.roblox.com/game-passes/v1/game-passes/${gpId}/product-info`)
+    if (res.ok) {
+      const data = await res.json()
+      if (data && (data.TargetId || data.Name)) {
+        return {
+          exists: true,
+          price: data.PriceInRobux ?? undefined,
+          name: data.Name ?? undefined,
+        }
+      }
+    }
+  } catch {}
+
   try {
     const { data: { session } } = await supabase.auth.getSession()
     const res = await fetch(`${supabaseUrl}/functions/v1/gamepass-verify`, {
@@ -955,7 +972,7 @@ export async function fetchGamepassInfo(gamepassId: string): Promise<{ exists: b
         'Authorization': `Bearer ${session?.access_token || ''}`,
         'apikey': supabaseAnonKey,
       },
-      body: JSON.stringify({ gamepass_id: gamepassId }),
+      body: JSON.stringify({ gamepass_id: gpId }),
     })
     const data = await res.json()
     return { exists: data.exists ?? false, price: data.price ?? undefined, name: data.name ?? undefined }

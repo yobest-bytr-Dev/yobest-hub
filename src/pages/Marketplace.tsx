@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ShoppingBag, Search, Download, Code, Box, Palette, X, Loader2, Plus, Upload, ExternalLink, Calendar, Tag, ShieldCheck, ShoppingCart, Lock } from 'lucide-react'
-import { getAssets, submitAsset, submitAssetReview, getUserAssetReview, getAssetReviewsStats, getReleases, verifyGamepassOwnership, isGamepassVerified } from '@/lib/api'
+import { ShoppingBag, Search, Download, Code, Box, Palette, X, Loader2, Plus, Upload, ExternalLink, Calendar, Tag, ShieldCheck, ShoppingCart, Lock, CheckCircle, AlertTriangle } from 'lucide-react'
+import { getAssets, submitAsset, submitAssetReview, getUserAssetReview, getAssetReviewsStats, getReleases, verifyGamepassOwnership, isGamepassVerified, fetchGamepassInfo } from '@/lib/api'
 import { toDirectImageUrl, uploadToGoogleDrive } from '@/lib/drive-upload'
 import { trackAssetDownload } from '@/lib/analytics'
 import ImagePicker from '@/components/ui/ImagePicker'
@@ -300,6 +300,8 @@ export default function Marketplace() {
   const [submitSuccess, setSubmitSuccess] = useState(false)
   const [uploadingFile, setUploadingFile] = useState(false)
   const [assetFileUrl, setAssetFileUrl] = useState('')
+  const [gpLoading, setGpLoading] = useState(false)
+  const [gpStatus, setGpStatus] = useState<'idle' | 'ok' | 'warn'>('idle')
   const assetFileRef = useRef<HTMLInputElement>(null)
   const currentUser = useStore((s) => s.currentUser)
   const navigate = useNavigate()
@@ -494,10 +496,59 @@ export default function Marketplace() {
                   </div>
                   <div>
                     <label className="text-xs text-text-muted font-medium mb-1.5 block">Gamepass ID (if paid)</label>
-                    <input type="text" value={submitForm.gamepassUrl} onChange={(e) => setSubmitForm({ ...submitForm, gamepassUrl: e.target.value })}
-                      placeholder="e.g. 12345678"
-                      className="w-full px-3 py-2 rounded-xl bg-bg-elevated border border-border-primary text-text-primary text-sm placeholder:text-text-dim focus:outline-none focus:border-accent-blue/50 transition-all" />
+                    <div>
+                      <input type="text" value={submitForm.gamepassUrl} onChange={(e) => {
+                        const gpUrl = e.target.value
+                        const updates = { ...submitForm, gamepassUrl: gpUrl }
+                        if (gpUrl && (!submitForm.price || submitForm.price === '0')) {
+                          updates.price = '1'
+                        } else if (!gpUrl && submitForm.price !== '0') {
+                          updates.price = '0'
+                        }
+                        setSubmitForm(updates)
+                        setGpStatus('idle')
+                      }} onBlur={async (e) => {
+                        const gpUrl = e.target.value.trim()
+                        if (!gpUrl) { setGpStatus('idle'); return }
+                        setGpLoading(true)
+                        setGpStatus('idle')
+                        try {
+                          const info = await fetchGamepassInfo(gpUrl)
+                          if (info.exists && info.price != null && info.price > 0) {
+                            setSubmitForm(prev => ({ ...prev, gamepassUrl: gpUrl, price: String(info.price) }))
+                            setGpStatus('ok')
+                          } else if (info.exists && info.name) {
+                            setSubmitForm(prev => ({ ...prev, gamepassUrl: gpUrl, price: prev.price === '0' ? '1' : prev.price }))
+                            setGpStatus('ok')
+                          } else {
+                            setSubmitForm(prev => ({ ...prev, gamepassUrl: gpUrl }))
+                            setGpStatus('warn')
+                          }
+                        } catch {
+                          setSubmitForm(prev => ({ ...prev, gamepassUrl: gpUrl }))
+                          setGpStatus('warn')
+                        }
+                        setGpLoading(false)
+                      }}
+                        placeholder="e.g. 12345678"
+                        className="w-full px-3 py-2 rounded-xl bg-bg-elevated border border-border-primary text-text-primary text-sm placeholder:text-text-dim focus:outline-none focus:border-accent-blue/50 transition-all" />
+                    </div>
                     <p className="text-[10px] text-text-dim mt-1">Numeric gamepass ID — buyers must own this</p>
+                    {gpLoading && (
+                      <div className="flex items-center gap-1.5 mt-1.5 text-[10px] text-text-muted">
+                        <Loader2 size={10} className="animate-spin text-accent-blue" /> Verifying gamepass on Roblox...
+                      </div>
+                    )}
+                    {!gpLoading && gpStatus === 'ok' && (
+                      <div className="flex items-center gap-1.5 mt-1.5 text-[10px] text-green-400">
+                        <CheckCircle size={10} /> Gamepass found! Price auto-filled.
+                      </div>
+                    )}
+                    {!gpLoading && gpStatus === 'warn' && (
+                      <div className="flex items-center gap-1.5 mt-1.5 text-[10px] text-yellow-400">
+                        <AlertTriangle size={10} /> Could not verify — ID saved as-is.
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div>

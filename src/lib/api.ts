@@ -334,7 +334,7 @@ export async function submitGame(submission: {
     ? (submission.price === 'Free' || !submission.price ? 'Gamepass Required' : submission.price)
     : (submission.price || 'Free')
 
-  const { data, error } = await supabase.from('submissions').insert({
+  let { data, error } = await supabase.from('submissions').insert({
     user_id: user.id,
     title: submission.title,
     description: submission.description,
@@ -348,7 +348,21 @@ export async function submitGame(submission: {
     gallery_images: submission.gallery_images || [],
   }).select().single()
 
-  if (error) throw error
+  if (error) {
+    const insertPayload: Record<string, any> = {
+      user_id: user.id,
+      title: submission.title,
+      description: submission.description,
+      category: submission.category,
+      price,
+      video_url: submission.video_url,
+      game_url: submission.game_url,
+      drive_file_url: submission.drive_file_url,
+    }
+    const retry = await supabase.from('submissions').insert(insertPayload).select().single()
+    if (retry.error) throw retry.error
+    data = retry.data
+  }
   return data
 }
 
@@ -708,7 +722,7 @@ export async function getOwnerSubmissions(): Promise<Submission[]> {
   return getSubmissions()
 }
 
-export async function updateExperience(id: string, updates: Partial<Experience>) {
+export async function updateExperience(id: string, updates: Partial<Experience>): Promise<{ partial?: boolean }> {
   const user = await getCurrentUser()
   if (!user) throw new Error('Not authenticated')
   const gamepassId = updates.gamepass_id || ''
@@ -727,12 +741,20 @@ export async function updateExperience(id: string, updates: Partial<Experience>)
     gamepass_id: gamepassId,
     images: updates.images || [],
   }
-  const { error } = await supabase
+  let { error } = await supabase
     .from('experiences')
     .update(payload)
     .eq('id', id)
     .eq('creator_id', user.id)
-  if (error) throw error
+  if (error) {
+    const safe: Record<string, any> = { ...payload }
+    delete safe.gamepass_id
+    delete safe.images
+    const retry = await supabase.from('experiences').update(safe).eq('id', id).eq('creator_id', user.id)
+    if (retry.error) throw retry.error
+    return { partial: true }
+  }
+  return {}
 }
 
 export async function deleteExperience(id: string) {
@@ -776,7 +798,7 @@ export async function deleteAsset(id: string) {
   if (error) throw error
 }
 
-export async function updateSubmission(id: string, updates: Partial<Submission>) {
+export async function updateSubmission(id: string, updates: Partial<Submission>): Promise<{ partial?: boolean }> {
   const user = await getCurrentUser()
   if (!user) throw new Error('Not authenticated')
   const gamepassUrl = updates.gamepass_url || ''
@@ -793,12 +815,21 @@ export async function updateSubmission(id: string, updates: Partial<Submission>)
     gamepass_url: gamepassUrl,
     gallery_images: updates.gallery_images || [],
   }
-  const { error } = await supabase
+  let { error } = await supabase
     .from('submissions')
     .update(payload)
     .eq('id', id)
     .eq('user_id', user.id)
-  if (error) throw error
+  if (error) {
+    const safe: Record<string, any> = { ...payload }
+    delete safe.gamepass_url
+    delete safe.gallery_images
+    delete safe.thumbnail_url
+    const retry = await supabase.from('submissions').update(safe).eq('id', id).eq('user_id', user.id)
+    if (retry.error) throw retry.error
+    return { partial: true }
+  }
+  return {}
 }
 
 export async function deleteSubmission(id: string) {

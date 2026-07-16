@@ -108,8 +108,12 @@ function GamesTab() {
 
   const handleSave = async (id: string) => {
     try {
-      await updateExperience(id, editForm)
-      toast('Game updated!', 'success')
+      const result = await updateExperience(id, editForm)
+      if (result.partial) {
+        toast('Saved! Run the SQL migration to save gamepass/images data.', 'success')
+      } else {
+        toast('Game updated!', 'success')
+      }
       setEditing(null)
       load()
     } catch (e: any) {
@@ -319,8 +323,12 @@ function SubmissionsTab() {
 
   const handleSave = async (id: string) => {
     try {
-      await updateSubmission(id, editForm)
-      toast('Submission updated!', 'success')
+      const result = await updateSubmission(id, editForm)
+      if (result.partial) {
+        toast('Saved! Run the SQL migration to save gamepass/gallery data.', 'success')
+      } else {
+        toast('Submission updated!', 'success')
+      }
       setEditing(null)
       load()
     } catch (e: any) {

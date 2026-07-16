@@ -326,7 +326,7 @@ export default function GameDetail() {
                     <Globe size={18} /> Play on Roblox
                   </a>
                 )}
-                {game.download_enabled && game.download_url && (
+                {game.download_enabled && game.download_url && (!game.gamepass_id || gamepassVerified) && (
                   <a href={game.download_url} target="_blank" rel="noopener noreferrer" onClick={() => id && trackExperienceDownload(id)}
                     className="flex items-center gap-2 px-5 py-3 rounded-xl bg-bg-elevated border border-border-primary text-text-primary font-semibold text-sm hover:border-border-hover transition-all">
                     <Download size={18} /> Download Source

@@ -101,11 +101,15 @@ function AssetDetailModal({ asset, onClose }: { asset: Asset; onClose: () => voi
               <span className="text-lg font-bold text-yellow-400">{asset.price_robux} Robux</span>
             )}
             <div className="flex-1" />
-            {asset.drive_file_url ? (
+            {asset.drive_file_url && (!asset.gamepass_id || gamepassVerified) ? (
               <a href={asset.drive_file_url} target="_blank" rel="noopener noreferrer" onClick={handleDownload}
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-accent-blue to-accent-purple text-white text-sm font-semibold hover:opacity-90 transition-opacity shadow-md shadow-accent-blue/20">
                 <Download size={14} /> {isFree ? 'Download' : 'Get Asset'} <ExternalLink size={11} />
               </a>
+            ) : asset.gamepass_id && !gamepassVerified ? (
+              <span className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-yellow-500/10 border border-yellow-500/25 text-yellow-400 text-sm font-medium">
+                <Lock size={14} /> Purchase required to download
+              </span>
             ) : (
               <span className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-bg-elevated border border-border-primary text-text-dim text-sm font-medium">
                 <Download size={14} /> No file available

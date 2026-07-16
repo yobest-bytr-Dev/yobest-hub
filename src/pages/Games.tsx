@@ -250,7 +250,7 @@ function GameTooltip({ game, ytStats, position }: {
               <span className="flex items-center gap-1 text-[10px] text-blue-400"><Play size={9} />Play on Roblox</span>
             )}
             {game.download_enabled && (
-              <span className="flex items-center gap-1 text-[10px] text-green-400"><Eye size={9} />Download available</span>
+              <span className={`flex items-center gap-1 text-[10px] ${game.gamepass_id ? 'text-yellow-400' : 'text-green-400'}`}><Eye size={9} />{game.gamepass_id ? 'Purchase required' : 'Download available'}</span>
             )}
           </div>
         </div>

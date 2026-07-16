@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import nodemailer from "https://esm.sh/nodemailer@6.9.16";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,10 +8,15 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const SMTP_HOST = "smtp.gmail.com";
-const SMTP_PORT = 465;
-const SMTP_USER = "yobest.bytr47@gmail.com";
-const SMTP_PASS = "rwnjbedwmqqrysrj";
+const transporter = nodemailer.createTransport({
+  host: "smtp.gmail.com",
+  port: 465,
+  secure: true,
+  auth: {
+    user: "yobest.bytr47@gmail.com",
+    pass: "rwnjbedwmqqrysrj",
+  },
+});
 
 function generateCode(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
@@ -35,66 +41,6 @@ function buildEmailHtml(code: string) {
 </div>
 </body>
 </html>`;
-}
-
-async function sendSmtpEmail(to: string, subject: string, htmlBody: string): Promise<void> {
-  const conn = await Deno.connectTls({ hostname: SMTP_HOST, port: SMTP_PORT });
-  const encoder = new TextEncoder();
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  const send = async (data: string) => {
-    await conn.write(encoder.encode(data + "\r\n"));
-  };
-
-  const readResponse = async (): Promise<string> => {
-    const buf = new Uint8Array(4096);
-    const n = await conn.read(buf);
-    if (n === null) throw new Error("SMTP connection closed");
-    return decoder.decode(buf.subarray(0, n));
-  };
-
-  try {
-    await readResponse(); // banner
-
-    await send("EHLO yobest.app");
-    await readResponse();
-
-    await send("AUTH LOGIN");
-    await readResponse();
-
-    await send(btoa(SMTP_USER));
-    await readResponse();
-
-    await send(btoa(SMTP_PASS));
-    await readResponse();
-
-    await send(`MAIL FROM:<${SMTP_USER}>`);
-    await readResponse();
-
-    await send(`RCPT TO:<${to}>`);
-    await readResponse();
-
-    await send("DATA");
-    await readResponse();
-
-    const msg =
-      `From: Yobest <${SMTP_USER}>\r\n` +
-      `To: <${to}>\r\n` +
-      `Subject: ${subject}\r\n` +
-      `MIME-Version: 1.0\r\n` +
-      `Content-Type: text/html; charset=UTF-8\r\n` +
-      `Content-Transfer-Encoding: 7bit\r\n` +
-      `\r\n` +
-      `${htmlBody}\r\n` +
-      `.`;
-    await send(msg);
-    await readResponse();
-
-    await send("QUIT");
-  } finally {
-    conn.close();
-  }
 }
 
 serve(async (req) => {
@@ -137,7 +83,13 @@ serve(async (req) => {
       });
       if (insertError) throw insertError;
 
-      await sendSmtpEmail(normalizedEmail, "Your Yobest Password Reset Code", buildEmailHtml(code));
+      const info = await transporter.sendMail({
+        from: '"Yobest" <yobest.bytr47@gmail.com>',
+        to: normalizedEmail,
+        subject: "Your Yobest Password Reset Code",
+        html: buildEmailHtml(code),
+      });
+      console.log("Email sent:", info.messageId);
 
       return new Response(JSON.stringify({ ok: true, message: "Code sent to your email." }), {
         status: 200,

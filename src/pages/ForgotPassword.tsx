@@ -27,10 +27,13 @@ export default function ForgotPassword() {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch('/api/send-reset-code', {
+      const res = await fetch(`${SB_URL}/functions/v1/reset-password`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim() }),
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SB_KEY,
+        },
+        body: JSON.stringify({ email: email.trim(), action: 'send-code' }),
       })
       const data = await res.json()
       if (!res.ok || !data.ok) throw new Error(data.error || 'Failed to send code')

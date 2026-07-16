@@ -7,6 +7,96 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+const SMTP_HOST = "smtp.gmail.com";
+const SMTP_PORT = 465;
+const SMTP_USER = "yobest.bytr47@gmail.com";
+const SMTP_PASS = "rwnjbedwmqqrysrj";
+
+function generateCode(): string {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+function buildEmailHtml(code: string) {
+  return `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"/></head>
+<body style="margin:0;padding:0;background:#07070d;font-family:Inter,sans-serif;">
+<div style="max-width:480px;margin:40px auto;background:#0d0d14;border:1px solid #1e1e2e;border-radius:16px;padding:40px 32px;text-align:center;">
+  <div style="width:56px;height:56px;border-radius:14px;background:linear-gradient(135deg,#3b82f6,#a855f7);display:inline-flex;align-items:center;justify-content:center;margin-bottom:24px;">
+    <span style="font-size:28px;">&#128274;</span>
+  </div>
+  <h1 style="color:#f1f5f9;font-size:22px;margin:0 0 8px;">Password Reset Code</h1>
+  <p style="color:#94a3b8;font-size:14px;margin:0 0 24px;">Enter this 6-digit code to reset your password</p>
+  <div style="background:#1a1a2e;border:2px solid #3b82f6;border-radius:12px;padding:20px;margin:0 0 24px;">
+    <span style="font-size:36px;font-weight:800;letter-spacing:8px;color:#f1f5f9;">${code}</span>
+  </div>
+  <p style="color:#64748b;font-size:12px;margin:0 0 8px;">This code expires in 15 minutes.</p>
+  <p style="color:#64748b;font-size:12px;margin:0;">If you didn't request this, you can safely ignore this email.</p>
+</div>
+</body>
+</html>`;
+}
+
+async function sendSmtpEmail(to: string, subject: string, htmlBody: string): Promise<void> {
+  const conn = await Deno.connectTls({ hostname: SMTP_HOST, port: SMTP_PORT });
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  const send = async (data: string) => {
+    await conn.write(encoder.encode(data + "\r\n"));
+  };
+
+  const readResponse = async (): Promise<string> => {
+    const buf = new Uint8Array(4096);
+    const n = await conn.read(buf);
+    if (n === null) throw new Error("SMTP connection closed");
+    return decoder.decode(buf.subarray(0, n));
+  };
+
+  try {
+    await readResponse(); // banner
+
+    await send("EHLO yobest.app");
+    await readResponse();
+
+    await send("AUTH LOGIN");
+    await readResponse();
+
+    await send(btoa(SMTP_USER));
+    await readResponse();
+
+    await send(btoa(SMTP_PASS));
+    await readResponse();
+
+    await send(`MAIL FROM:<${SMTP_USER}>`);
+    await readResponse();
+
+    await send(`RCPT TO:<${to}>`);
+    await readResponse();
+
+    await send("DATA");
+    await readResponse();
+
+    const msg =
+      `From: Yobest <${SMTP_USER}>\r\n` +
+      `To: <${to}>\r\n` +
+      `Subject: ${subject}\r\n` +
+      `MIME-Version: 1.0\r\n` +
+      `Content-Type: text/html; charset=UTF-8\r\n` +
+      `Content-Transfer-Encoding: 7bit\r\n` +
+      `\r\n` +
+      `${htmlBody}\r\n` +
+      `.`;
+    await send(msg);
+    await readResponse();
+
+    await send("QUIT");
+  } finally {
+    conn.close();
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -21,15 +111,46 @@ serve(async (req) => {
   const adminClient = createClient(supabaseUrl, serviceKey);
 
   const { email, code, newPassword, action } = await req.json();
-
-  if (!email || !code) {
-    return new Response(JSON.stringify({ error: "Missing fields" }), { status: 400, headers: corsHeaders });
-  }
-
-  const normalizedEmail = email.trim().toLowerCase();
-  const cleanCode = String(code).trim();
+  const normalizedEmail = (email || "").trim().toLowerCase();
 
   try {
+    if (action === "send-code") {
+      if (!normalizedEmail) {
+        return new Response(JSON.stringify({ error: "Email is required" }), { status: 400, headers: corsHeaders });
+      }
+
+      const code = generateCode();
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+
+      await adminClient
+        .from("password_reset_codes")
+        .delete()
+        .eq("email", normalizedEmail)
+        .eq("verified", false);
+
+      const { error: insertError } = await adminClient.from("password_reset_codes").insert({
+        email: normalizedEmail,
+        code,
+        verified: false,
+        attempts: 0,
+        expires_at: expiresAt,
+      });
+      if (insertError) throw insertError;
+
+      await sendSmtpEmail(normalizedEmail, "Your Yobest Password Reset Code", buildEmailHtml(code));
+
+      return new Response(JSON.stringify({ ok: true, message: "Code sent to your email." }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!email || !code) {
+      return new Response(JSON.stringify({ error: "Missing fields" }), { status: 400, headers: corsHeaders });
+    }
+
+    const cleanCode = String(code).trim();
+
     const { data: records, error: queryError } = await adminClient
       .from("password_reset_codes")
       .select("id, code, verified, attempts, expires_at")

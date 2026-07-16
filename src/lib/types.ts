@@ -13,9 +13,12 @@ export interface Experience {
   category: string
   thumbnail_url?: string
   images?: string[]
+  gallery_images?: string[]
   gamepass_id?: string
   views_count?: number
   likes_count?: number
+  rating?: number
+  rating_count?: number
   is_official: boolean
   created_at?: string
 }

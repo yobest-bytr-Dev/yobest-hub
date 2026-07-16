@@ -234,11 +234,35 @@ function SubmissionsTab() {
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<Partial<Submission>>({})
+  const [subStats, setSubStats] = useState<Record<string, { likes: number; views: number }>>({})
 
   const load = useCallback(async () => {
     setLoading(true)
     const data = await getOwnerSubmissions()
     setSubs(data)
+    // Fetch live stats for submissions
+    if (data.length > 0) {
+      try {
+        const ids = data.map(s => s.id)
+        const [likesRes, viewsRes] = await Promise.all([
+          supabase.from('game_likes').select('game_id').in('game_id', ids),
+          supabase.from('game_views').select('game_id').in('game_id', ids)
+        ])
+        const likeMap: Record<string, number> = {}
+        const viewMap: Record<string, number> = {}
+        ;(likesRes.data || []).forEach((l: any) => {
+          likeMap[l.game_id] = (likeMap[l.game_id] || 0) + 1
+        })
+        ;(viewsRes.data || []).forEach((v: any) => {
+          viewMap[v.game_id] = (viewMap[v.game_id] || 0) + 1
+        })
+        const stats: Record<string, { likes: number; views: number }> = {}
+        ids.forEach(id => {
+          stats[id] = { likes: likeMap[id] || 0, views: viewMap[id] || 0 }
+        })
+        setSubStats(stats)
+      } catch {}
+    }
     setLoading(false)
   }, [])
 
@@ -295,8 +319,21 @@ function SubmissionsTab() {
                   <input value={editForm.game_url || ''} onChange={(e) => setEditForm({ ...editForm, game_url: e.target.value })}
                     className="px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-xs focus:outline-none focus:border-accent-blue/50" placeholder="Game URL" />
                 </div>
-                <input value={(editForm as any).gamepass_url || ''} onChange={(e) => setEditForm({ ...editForm, gamepass_url: e.target.value } as any)}
-                  className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-xs focus:outline-none focus:border-accent-blue/50" placeholder="GamePass ID (if paid)" />
+                <div className="grid grid-cols-2 gap-2">
+                  <input value={(editForm as any).price || 'Free'} onChange={(e) => setEditForm({ ...editForm, price: e.target.value } as any)}
+                    className="px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-xs focus:outline-none focus:border-accent-blue/50" placeholder="Price" />
+                  <input value={(editForm as any).gamepass_url || ''} onChange={(e) => {
+                    const gpUrl = e.target.value
+                    const updates: any = { ...editForm, gamepass_url: gpUrl }
+                    if (gpUrl && (!editForm.price || editForm.price === 'Free')) {
+                      updates.price = 'Gamepass Required'
+                    } else if (!gpUrl && editForm.price === 'Gamepass Required') {
+                      updates.price = 'Free'
+                    }
+                    setEditForm(updates)
+                  }}
+                    className="px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-xs focus:outline-none focus:border-accent-blue/50" placeholder="GamePass ID (if paid)" />
+                </div>
                 <ImagePicker value={editForm.thumbnail_url || ''} onChange={(url) => setEditForm({ ...editForm, thumbnail_url: url })} folder="yobest/thumbnails" label="Thumbnail" />
                 <ImagePicker value="" onChange={() => {}} folder="yobest/thumbnails" label="Gallery Images" multiple values={(editForm as any).gallery_images || []}
                   onMultipleChange={(urls) => setEditForm({ ...editForm, gallery_images: urls } as any)} maxImages={8} />
@@ -324,7 +361,7 @@ function SubmissionsTab() {
                     )}>{sub.status}</span>
                   </div>
                   {sub.rejection_reason && <p className="text-[10px] text-red-400 mt-0.5">Reason: {sub.rejection_reason}</p>}
-                  <div className="text-[10px] text-text-muted">{sub.category} · {sub.price || 'Free'}</div>
+                  <div className="text-[10px] text-text-muted">{sub.category} · {sub.price || 'Free'} · {formatNumber(subStats[sub.id]?.views || 0)} views · {formatNumber(subStats[sub.id]?.likes || 0)} likes</div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   <button onClick={() => handleEdit(sub)} className="p-1.5 rounded-lg bg-bg-elevated text-text-muted hover:text-accent-blue transition-colors" title="Edit"><Pencil size={14} /></button>

@@ -187,6 +187,13 @@ export async function getOfficialGames(): Promise<Experience[]> {
   if (error) return []
   const games = (data || []) as Experience[]
 
+  // Fix price/gamepass inconsistency: if gamepass is set but price is "Free", correct it
+  games.forEach(g => {
+    if (g.gamepass_id && g.gamepass_id.trim() && g.price === 'Free') {
+      g.price = 'Gamepass Required'
+    }
+  })
+
   // Fetch like counts from game_likes table
   if (games.length > 0) {
     try {
@@ -239,6 +246,13 @@ export async function getApprovedCommunityGames(): Promise<Experience[]> {
     gamepass_id: s.gamepass_url || '',
     gallery_images: s.gallery_images || [],
   }))
+
+  // Fix price/gamepass inconsistency: if gamepass is set but price is "Free", correct it
+  games.forEach(g => {
+    if (g.gamepass_id && g.gamepass_id.trim() && g.price === 'Free') {
+      g.price = 'Gamepass Required'
+    }
+  })
 
   // Fetch like counts for all community games
   if (games.length > 0) {
@@ -630,7 +644,58 @@ export async function getOwnerExperiences(): Promise<Experience[]> {
     .eq('creator_id', user.id)
     .order('created_at', { ascending: false })
   if (error) return []
-  return (data || []) as Experience[]
+  const games = (data || []) as Experience[]
+
+  // Sync gamepass_id: if gamepass_id is set but price is "Free", fix it
+  games.forEach(g => {
+    if (g.gamepass_id && g.gamepass_id.trim() && g.price === 'Free') {
+      g.price = 'Gamepass Required'
+    }
+  })
+
+  // Fetch live like counts from game_likes table
+  if (games.length > 0) {
+    try {
+      const gameIds = games.map(g => g.id)
+      const { data: likesData } = await supabase
+        .from('game_likes')
+        .select('game_id')
+        .in('game_id', gameIds)
+
+      if (likesData) {
+        const likeCounts = new Map<string, number>()
+        likesData.forEach((l: any) => {
+          likeCounts.set(l.game_id, (likeCounts.get(l.game_id) || 0) + 1)
+        })
+        games.forEach(g => {
+          g.likes_count = likeCounts.get(g.id) || 0
+        })
+      }
+    } catch {}
+  }
+
+  // Fetch live view counts from game_views table
+  if (games.length > 0) {
+    try {
+      const gameIds = games.map(g => g.id)
+      const { data: viewsData } = await supabase
+        .from('game_views')
+        .select('game_id')
+        .in('game_id', gameIds)
+
+      if (viewsData) {
+        const viewCounts = new Map<string, number>()
+        viewsData.forEach((v: any) => {
+          viewCounts.set(v.game_id, (viewCounts.get(v.game_id) || 0) + 1)
+        })
+        games.forEach(g => {
+          g.views_count = viewCounts.get(g.id) || 0
+        })
+      }
+    } catch {}
+  }
+
+  return games
 }
 
 export async function getOwnerSubmissions(): Promise<Submission[]> {
@@ -651,10 +716,10 @@ export async function updateExperience(id: string, updates: Partial<Experience>)
     thumbnail_url: updates.thumbnail_url,
     download_enabled: updates.download_enabled,
     game_play: updates.game_play,
+    gamepass_id: updates.gamepass_id || '',
+    images: updates.images || [],
+    gallery_images: updates.gallery_images || [],
   }
-  if (updates.gamepass_id !== undefined) payload.gamepass_id = updates.gamepass_id
-  if (updates.images !== undefined) payload.images = updates.images
-  if (updates.gallery_images !== undefined) payload.gallery_images = updates.gallery_images
   const { error } = await supabase
     .from('experiences')
     .update(payload)
@@ -716,9 +781,9 @@ export async function updateSubmission(id: string, updates: Partial<Submission>)
     game_url: updates.game_url,
     drive_file_url: updates.drive_file_url,
     thumbnail_url: updates.thumbnail_url,
+    gamepass_url: updates.gamepass_url || '',
+    gallery_images: updates.gallery_images || [],
   }
-  if (updates.gamepass_url !== undefined) payload.gamepass_url = updates.gamepass_url
-  if (updates.gallery_images !== undefined) payload.gallery_images = updates.gallery_images
   const { error } = await supabase
     .from('submissions')
     .update(payload)

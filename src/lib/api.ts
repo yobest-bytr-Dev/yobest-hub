@@ -349,7 +349,7 @@ export async function submitGame(submission: {
   }).select().single()
 
   if (error) {
-    const insertPayload: Record<string, any> = {
+    const { data: retryData, error: retryErr } = await supabase.from('submissions').insert({
       user_id: user.id,
       title: submission.title,
       description: submission.description,
@@ -358,10 +358,10 @@ export async function submitGame(submission: {
       video_url: submission.video_url,
       game_url: submission.game_url,
       drive_file_url: submission.drive_file_url,
-    }
-    const retry = await supabase.from('submissions').insert(insertPayload).select().single()
-    if (retry.error) throw retry.error
-    data = retry.data
+      gamepass_url: gamepassUrl,
+    }).select().single()
+    if (retryErr) throw retryErr
+    data = retryData
   }
   return data
 }
@@ -748,8 +748,8 @@ export async function updateExperience(id: string, updates: Partial<Experience>)
     .eq('creator_id', user.id)
   if (error) {
     const safe: Record<string, any> = { ...payload }
-    delete safe.gamepass_id
     delete safe.images
+    delete safe.gamepass_id
     const retry = await supabase.from('experiences').update(safe).eq('id', id).eq('creator_id', user.id)
     if (retry.error) throw retry.error
     return { partial: true }
@@ -822,9 +822,7 @@ export async function updateSubmission(id: string, updates: Partial<Submission>)
     .eq('user_id', user.id)
   if (error) {
     const safe: Record<string, any> = { ...payload }
-    delete safe.gamepass_url
     delete safe.gallery_images
-    delete safe.thumbnail_url
     const retry = await supabase.from('submissions').update(safe).eq('id', id).eq('user_id', user.id)
     if (retry.error) throw retry.error
     return { partial: true }

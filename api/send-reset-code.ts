@@ -1,23 +1,23 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { createClient } from '@supabase/supabase-js'
-import nodemailer from 'nodemailer'
-
 const SB_URL = 'https://pohslivolczprxacroje.supabase.co'
 const SB_KEY = 'sb_publishable_zg1KBuWhnqVm8GM8q4siIA_M1BC1vyG'
-const supabase = createClient(SB_URL, SB_KEY)
-
-const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 465,
-  secure: true,
-  auth: {
-    user: 'yobest.bytr47@gmail.com',
-    pass: 'rwnjbedwmqqrysrj',
-  },
-})
 
 function generateCode(): string {
   return String(Math.floor(100000 + Math.random() * 900000))
+}
+
+async function sbQuery(table: string, method: string, body?: any) {
+  const url = `${SB_URL}/rest/v1/${table}`
+  const opts: RequestInit = {
+    method,
+    headers: {
+      'apikey': SB_KEY,
+      'Authorization': `Bearer ${SB_KEY}`,
+      'Content-Type': 'application/json',
+      'Prefer': method === 'POST' ? 'return=minimal' : undefined,
+    } as any,
+  }
+  if (body) opts.body = JSON.stringify(body)
+  return fetch(url, opts)
 }
 
 function buildEmailHtml(code: string) {
@@ -41,7 +41,21 @@ function buildEmailHtml(code: string) {
 </html>`
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+async function sendGmail(to: string, subject: string, html: string) {
+  const resp = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      service_id: 'default_transactional',
+      template_id: '',
+      user_id: '',
+      template_params: { to, subject, html },
+    }),
+  })
+  return resp
+}
+
+export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
@@ -54,19 +68,47 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const normalizedEmail = email.trim().toLowerCase()
 
   try {
-    await supabase.from('password_reset_codes').delete().eq('email', normalizedEmail).eq('verified', false)
-
     const code = generateCode()
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString()
 
-    const { error: insertError } = await supabase.from('password_reset_codes').insert({
-      email: normalizedEmail,
-      code,
-      verified: false,
-      attempts: 0,
-      expires_at: expiresAt,
+    const delResp = await fetch(
+      `${SB_URL}/rest/v1/password_reset_codes?email=eq.${encodeURIComponent(normalizedEmail)}&verified=eq.false`,
+      {
+        method: 'DELETE',
+        headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` },
+      }
+    )
+    if (!delResp.ok) console.warn('delete old codes failed:', delResp.status)
+
+    const insResp = await fetch(`${SB_URL}/rest/v1/password_reset_codes`, {
+      method: 'POST',
+      headers: {
+        'apikey': SB_KEY,
+        'Authorization': `Bearer ${SB_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify({
+        email: normalizedEmail,
+        code,
+        verified: false,
+        attempts: 0,
+        expires_at: expiresAt,
+      }),
     })
-    if (insertError) throw insertError
+    if (!insResp.ok) {
+      const errText = await insResp.text()
+      console.error('insert code failed:', insResp.status, errText)
+      throw new Error('Failed to store reset code')
+    }
+
+    const nodemailer = await import('nodemailer')
+    const transporter = (nodemailer.default || nodemailer).createTransport({
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
+      auth: { user: 'yobest.bytr47@gmail.com', pass: 'rwnjbedwmqqrysrj' },
+    })
 
     await transporter.sendMail({
       from: '"Yobest" <yobest.bytr47@gmail.com>',

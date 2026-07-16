@@ -1,5 +1,16 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { SmtpClient } from "https://deno.land/x/smtp@v0.7.0/mod.ts";
+
+if (typeof Deno.writeAll !== "function") {
+  // @ts-ignore
+  Deno.writeAll = async function (w: Deno.Writer, arr: Uint8Array) {
+    let nwritten = 0;
+    while (nwritten < arr.length) {
+      nwritten += await w.write(arr.subarray(nwritten));
+    }
+  };
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,8 +20,8 @@ const corsHeaders = {
 
 const SMTP_HOST = "smtp.gmail.com";
 const SMTP_PORT = 465;
-const SMTP_USER = "yobest.bytr47@gmail.com";
-const SMTP_PASS = "rwnjbedwmqqrysrj";
+const SMTP_USER = Deno.env.get("SMTP_USER") || "yobest.bytr47@gmail.com";
+const SMTP_PASS = Deno.env.get("SMTP_PASS") || "nkthpnaudpauupmh";
 
 function generateCode(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
@@ -35,84 +46,6 @@ function buildEmailHtml(code: string) {
 </div>
 </body>
 </html>`;
-}
-
-async function readAllLines(conn: Deno.TlsConn): Promise<string> {
-  const decoder = new TextDecoder();
-  let result = "";
-  const buf = new Uint8Array(4096);
-  let totalReads = 0;
-  while (totalReads < 10) {
-    const n = await Promise.race([
-      conn.read(buf),
-      new Promise<null>((_, reject) => setTimeout(() => reject(new Error("read timeout")), 5000)),
-    ]);
-    if (n === null) break;
-    result += decoder.decode(buf.subarray(0, n));
-    const lines = result.split("\r\n");
-    const lastLine = lines[lines.length - 2] || "";
-    if (lastLine.length >= 4 && lastLine[3] === " ") break;
-    totalReads++;
-  }
-  return result;
-}
-
-async function smtpCmd(conn: Deno.TlsConn, cmd: string): Promise<string> {
-  const encoder = new TextEncoder();
-  await conn.write(encoder.encode(cmd + "\r\n"));
-  return await readAllLines(conn);
-}
-
-async function sendSmtpEmail(to: string, subject: string, htmlBody: string): Promise<string> {
-  const conn = await Deno.connectTls({ hostname: SMTP_HOST, port: SMTP_PORT });
-
-  try {
-    let response = await readAllLines(conn);
-    console.log("Banner:", response.trim());
-
-    response = await smtpCmd(conn, "EHLO yobest.app");
-    console.log("EHLO:", response.trim());
-
-    response = await smtpCmd(conn, "AUTH LOGIN");
-    console.log("AUTH LOGIN:", response.trim());
-
-    response = await smtpCmd(conn, btoa(SMTP_USER));
-    console.log("Username:", response.trim());
-
-    response = await smtpCmd(conn, btoa(SMTP_PASS));
-    console.log("Password:", response.trim());
-
-    response = await smtpCmd(conn, `MAIL FROM:<${SMTP_USER}>`);
-    console.log("MAIL FROM:", response.trim());
-
-    response = await smtpCmd(conn, `RCPT TO:<${to}>`);
-    console.log("RCPT TO:", response.trim());
-
-    response = await smtpCmd(conn, "DATA");
-    console.log("DATA:", response.trim());
-
-    const encoder = new TextEncoder();
-    const msg =
-      `From: Yobest <${SMTP_USER}>\r\n` +
-      `To: <${to}>\r\n` +
-      `Subject: ${subject}\r\n` +
-      `MIME-Version: 1.0\r\n` +
-      `Content-Type: text/html; charset=UTF-8\r\n` +
-      `Content-Transfer-Encoding: 7bit\r\n` +
-      `\r\n` +
-      `${htmlBody}\r\n` +
-      `.\r\n`;
-    await conn.write(encoder.encode(msg));
-    response = await readAllLines(conn);
-    console.log("DATA response:", response.trim());
-
-    response = await smtpCmd(conn, "QUIT");
-    console.log("QUIT:", response.trim());
-
-    return "ok";
-  } finally {
-    conn.close();
-  }
 }
 
 serve(async (req) => {
@@ -155,8 +88,23 @@ serve(async (req) => {
       });
       if (insertError) throw insertError;
 
-      const smtpResult = await sendSmtpEmail(normalizedEmail, "Your Yobest Password Reset Code", buildEmailHtml(code));
-      console.log("SMTP result:", smtpResult);
+      const client = new SmtpClient();
+      await client.connectTLS({
+        hostname: SMTP_HOST,
+        port: SMTP_PORT,
+        username: SMTP_USER,
+        password: SMTP_PASS,
+      });
+
+      await client.send({
+        from: SMTP_USER,
+        to: normalizedEmail,
+        subject: "Your Yobest Password Reset Code",
+        content: `Your password reset code is: ${code}`,
+        html: buildEmailHtml(code),
+      });
+
+      await client.close();
 
       return new Response(JSON.stringify({ ok: true, message: "Code sent to your email." }), {
         status: 200,
@@ -235,10 +183,10 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err: any) {
-    console.error("reset-password error:", err);
-    return new Response(JSON.stringify({ error: "Failed to reset password. Please try again." }), {
+    console.error("reset-password error:", err?.message || err);
+    return new Response(JSON.stringify({ error: err?.message || "Failed to reset password. Please try again." }), {
       status: 500,
-      headers: corsHeaders,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });

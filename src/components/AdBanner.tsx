@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useMemo } from 'react'
 
 interface AdBannerProps {
   type: 'leaderboard' | 'rectangle' | 'skyscraper' | 'fluid'
@@ -28,64 +28,67 @@ const adConfigs = {
   },
 }
 
-export default function AdBanner({ type, className = '' }: AdBannerProps) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const config = adConfigs[type]
-
-  useEffect(() => {
-    if (!containerRef.current) return
-    const container = containerRef.current
-
-    // Clean previous content
-    container.innerHTML = ''
-
+function AdIframe({ config, type }: { config: { key: string; width: number | string; height: number | string }; type: string }) {
+  const srcDoc = useMemo(() => {
     if (type === 'fluid') {
-      // Fluid ad needs a container div
-      const adDiv = document.createElement('div')
-      adDiv.id = `container-${config.key}`
-      container.appendChild(adDiv)
-
-      const script1 = document.createElement('script')
-      script1.async = true
-      script1.setAttribute('data-cfasync', 'false')
-      script1.src = `https://pl28924845.effectivecpmnetwork.com/${config.key}/invoke.js`
-      container.appendChild(script1)
-    } else {
-      // iframe-based ads
-      const scriptContent = `atOptions = { 'key': '${config.key}', 'format': 'iframe', 'height': ${config.height}, 'width': ${typeof config.width === 'number' ? config.width : 300}, 'params': {} };`
-      const script1 = document.createElement('script')
-      script1.textContent = scriptContent
-      container.appendChild(script1)
-
-      const script2 = document.createElement('script')
-      script2.src = `https://www.highperformanceformat.com/${config.key}/invoke.js`
-      container.appendChild(script2)
+      return `<!DOCTYPE html><html><head><style>body{margin:0;padding:0;overflow:visible;background:transparent}</style></head><body>
+<div id="container-${config.key}"></div>
+<script>var atOptions={};(function(){var s=document.createElement('script');s.async=true;s.setAttribute('data-cfasync','false');s.src='https://pl28924845.effectivecpmnetwork.com/${config.key}/invoke.js';document.body.appendChild(s);})();</script>
+</body></html>`
     }
+    const w = typeof config.width === 'number' ? config.width : 300
+    const h = typeof config.height === 'number' ? config.height : 250
+    return `<!DOCTYPE html><html><head><style>body{margin:0;padding:0;overflow:hidden;background:transparent}iframe{border:none}</style></head><body>
+<script>var atOptions={key:'${config.key}',format:'iframe',height:${h},width:${w},params:{}};</script>
+<script src="https://www.highperformanceformat.com/${config.key}/invoke.js"></script>
+</body></html>`
+  }, [config.key, config.width, config.height, type])
 
-    return () => {
-      container.innerHTML = ''
-    }
-  }, [type, config.key])
+  const h = typeof config.height === 'number' ? config.height : 300
+  const w = typeof config.width === 'number' ? config.width : 300
+
+  return (
+    <iframe
+      srcDoc={srcDoc}
+      sandbox="allow-scripts"
+      style={{ width: typeof config.width === 'number' ? config.width : '100%', height: h, border: 'none', overflow: 'hidden' }}
+      scrolling="no"
+      loading="lazy"
+      title="Advertisement"
+    />
+  )
+}
+
+export default function AdBanner({ type, className = '' }: AdBannerProps) {
+  const config = adConfigs[type]
 
   if (type === 'skyscraper') {
     return (
-      <div ref={containerRef} className={`flex justify-center ${className}`} style={{ width: 160, minHeight: 300 }} />
+      <div className={`flex justify-center ${className}`} style={{ width: 160, minHeight: 300 }}>
+        <AdIframe config={config} type={type} />
+      </div>
     )
   }
 
   if (type === 'leaderboard') {
     return (
-      <div ref={containerRef} className={`flex justify-center overflow-hidden max-w-full ${className}`} style={{ width: 728, minHeight: 90 }} />
+      <div className={`flex justify-center overflow-hidden max-w-full ${className}`} style={{ width: 728, minHeight: 90 }}>
+        <AdIframe config={config} type={type} />
+      </div>
     )
   }
 
   if (type === 'rectangle') {
     return (
-      <div ref={containerRef} className={`flex justify-center overflow-hidden max-w-full ${className}`} style={{ width: 300, minHeight: 250 }} />
+      <div className={`flex justify-center overflow-hidden max-w-full ${className}`} style={{ width: 300, minHeight: 250 }}>
+        <AdIframe config={config} type={type} />
+      </div>
     )
   }
 
   return (
-    <div ref={containerRef} className={className} style={{ minHeight: 100 }} />
+    <div className={className} style={{ minHeight: 100 }}>
+      <AdIframe config={config} type={type} />
+    </div>
   )
 }

@@ -39,13 +39,18 @@ serve(async (req) => {
 
   const adminClient = createClient(supabaseUrl, serviceKey);
 
+  // Check if user is admin
+  const { data: profile } = await adminClient
+    .from("profiles").select("is_admin").eq("id", user.id).maybeSingle();
+  const isAdmin = profile?.is_admin === true;
+
   if (table === "submissions") {
     const { data: sub, error: fetchErr } = await adminClient
       .from("submissions").select("user_id").eq("id", id).single();
     if (fetchErr || !sub) {
       return new Response(JSON.stringify({ error: "Record not found" }), { status: 404, headers: corsHeaders });
     }
-    if (sub.user_id !== user.id) {
+    if (!isAdmin && sub.user_id !== user.id) {
       return new Response(JSON.stringify({ error: "Not authorized" }), { status: 403, headers: corsHeaders });
     }
   } else if (table === "experiences") {
@@ -54,7 +59,7 @@ serve(async (req) => {
     if (fetchErr || !exp) {
       return new Response(JSON.stringify({ error: "Record not found" }), { status: 404, headers: corsHeaders });
     }
-    if (exp.creator_id !== user.id) {
+    if (!isAdmin && exp.creator_id !== user.id) {
       return new Response(JSON.stringify({ error: "Not authorized" }), { status: 403, headers: corsHeaders });
     }
   } else {

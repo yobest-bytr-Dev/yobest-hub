@@ -13,43 +13,53 @@ serve(async (req) => {
   try {
     const { gamepass_id, roblox_user_id } = await req.json()
 
-    if (!gamepass_id || !roblox_user_id) {
-      throw new Error("gamepass_id and roblox_user_id are required")
+    if (!gamepass_id) {
+      throw new Error("gamepass_id is required")
     }
 
     const gpId = String(gamepass_id).trim()
-    const userId = String(roblox_user_id).trim()
 
-    // Check Roblox inventory for gamepass ownership
-    const invResponse = await fetch(
-      `https://inventory.roblox.com/v1/users/${userId}/items/GamePass/${gpId}`,
-      { headers: { "Accept": "application/json" } }
-    )
-
-    if (invResponse.ok) {
-      const invData = await invResponse.json()
-      if (invData.data && invData.data.length > 0) {
-        return new Response(
-          JSON.stringify({ verified: true }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        )
+    // Fetch gamepass info from Roblox API to get name and price
+    let gamepassInfo: any = null
+    try {
+      const gpRes = await fetch(
+        `https://apis.roblox.com/game-passes/v1/game-passes/${gpId}`,
+        { headers: { "Accept": "application/json" } }
+      )
+      if (gpRes.ok) {
+        gamepassInfo = await gpRes.json()
       }
+    } catch {}
+
+    const price = gamepassInfo?.price ?? null
+    const name = gamepassInfo?.name ?? null
+
+    // If we have a user ID, verify ownership
+    let verified = false
+    if (roblox_user_id) {
+      const userId = String(roblox_user_id).trim()
+      try {
+        const invResponse = await fetch(
+          `https://inventory.roblox.com/v1/users/${userId}/items/GamePass/${gpId}`,
+          { headers: { "Accept": "application/json" } }
+        )
+        if (invResponse.ok) {
+          const invData = await invResponse.json()
+          if (invData.data && invData.data.length > 0) {
+            verified = true
+          }
+        }
+      } catch {}
     }
 
-    // Fallback: check via gamepass info API to verify the gamepass exists
-    const gpResponse = await fetch(
-      `https://games.roblox.com/v1/games/multiget-place-details?placeIds=${gpId}`,
-      { headers: { "Accept": "application/json" } }
-    ).catch(() => null)
-
     return new Response(
-      JSON.stringify({ verified: false, error: "Gamepass not found in inventory" }),
+      JSON.stringify({ verified, price, name, exists: !!gamepassInfo }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     )
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error"
     return new Response(
-      JSON.stringify({ verified: false, error: message }),
+      JSON.stringify({ verified: false, price: null, name: null, exists: false, error: message }),
       {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

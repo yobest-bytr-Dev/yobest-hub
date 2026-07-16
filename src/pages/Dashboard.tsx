@@ -10,7 +10,8 @@ import { useStore } from '@/store/useStore'
 import {
   getOwnerExperiences, getOwnerSubmissions, getAssets,
   updateExperience, deleteExperience, updateAsset, deleteAsset,
-  updateSubmission, deleteSubmission, getReleases, addRelease, deleteRelease
+  updateSubmission, deleteSubmission, getReleases, addRelease, deleteRelease,
+  fetchGamepassInfo
 } from '@/lib/api'
 import { supabase } from '@/config/supabase'
 import { formatNumber, cn } from '@/lib/utils'
@@ -88,6 +89,7 @@ function GamesTab() {
   const [editing, setEditing] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<Partial<Experience>>({})
   const [search, setSearch] = useState('')
+  const [gpLoading, setGpLoading] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -171,15 +173,29 @@ function GamesTab() {
                 <input value={(editForm as any).gamepass_id || ''} onChange={(e) => {
                   const gpId = e.target.value
                   const updates: any = { ...editForm, gamepass_id: gpId }
-                  // Auto-set price when gamepass is added
                   if (gpId && (!editForm.price || editForm.price === 'Free')) {
                     updates.price = 'Gamepass Required'
                   } else if (!gpId && editForm.price === 'Gamepass Required') {
                     updates.price = 'Free'
                   }
                   setEditForm(updates)
+                }} onBlur={async (e) => {
+                  const gpId = (e.target as HTMLInputElement).value.trim()
+                  if (!gpId) return
+                  setGpLoading(true)
+                  try {
+                    const info = await fetchGamepassInfo(gpId)
+                    if (info.exists && info.price != null && info.price > 0) {
+                      setEditForm(prev => ({ ...prev, gamepass_id: gpId, price: `${info.price} Robux` }))
+                    } else if (info.exists) {
+                      setEditForm(prev => ({ ...prev, gamepass_id: gpId, price: 'Gamepass Required' }))
+                    } else {
+                      toast('Gamepass not found on Roblox. Check the ID.', 'error')
+                    }
+                  } catch {}
+                  setGpLoading(false)
                 }}
-                  className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-xs focus:outline-none focus:border-accent-blue/50" placeholder="GamePass ID (e.g. 12345678 or URL)" />
+                  className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-xs focus:outline-none focus:border-accent-blue/50" placeholder={gpLoading ? "Verifying gamepass..." : "GamePass ID (e.g. 12345678 or URL)"} disabled={gpLoading} />
                 <ImagePicker value="" onChange={() => {}} folder="yobest/thumbnails" label="Gallery Images" multiple values={(editForm as any).images || []}
                   onMultipleChange={(urls) => setEditForm({ ...editForm, images: urls } as any)} maxImages={12} />
                 <div className="flex gap-2">
@@ -235,6 +251,7 @@ function SubmissionsTab() {
   const [editing, setEditing] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<Partial<Submission>>({})
   const [subStats, setSubStats] = useState<Record<string, { likes: number; views: number }>>({})
+  const [gpLoading, setGpLoading] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -331,8 +348,23 @@ function SubmissionsTab() {
                       updates.price = 'Free'
                     }
                     setEditForm(updates)
+                  }} onBlur={async (e) => {
+                    const gpUrl = (e.target as HTMLInputElement).value.trim()
+                    if (!gpUrl) return
+                    setGpLoading(true)
+                    try {
+                      const info = await fetchGamepassInfo(gpUrl)
+                      if (info.exists && info.price != null && info.price > 0) {
+                        setEditForm(prev => ({ ...prev, gamepass_url: gpUrl, price: `${info.price} Robux` }))
+                      } else if (info.exists) {
+                        setEditForm(prev => ({ ...prev, gamepass_url: gpUrl, price: 'Gamepass Required' }))
+                      } else {
+                        toast('Gamepass not found on Roblox. Check the ID.', 'error')
+                      }
+                    } catch {}
+                    setGpLoading(false)
                   }}
-                    className="px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-xs focus:outline-none focus:border-accent-blue/50" placeholder="GamePass ID (if paid)" />
+                    className="px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-xs focus:outline-none focus:border-accent-blue/50" placeholder={gpLoading ? "Verifying..." : "GamePass ID (if paid)"} disabled={gpLoading} />
                 </div>
                 <ImagePicker value={editForm.thumbnail_url || ''} onChange={(url) => setEditForm({ ...editForm, thumbnail_url: url })} folder="yobest/thumbnails" label="Thumbnail" />
                 <ImagePicker value="" onChange={() => {}} folder="yobest/thumbnails" label="Gallery Images" multiple values={(editForm as any).gallery_images || []}

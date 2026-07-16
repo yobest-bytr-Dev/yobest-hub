@@ -945,6 +945,25 @@ export async function deleteRelease(releaseId: string) {
 
 // ── Gamepass Purchase Verification ──
 
+export async function fetchGamepassInfo(gamepassId: string): Promise<{ exists: boolean; price?: number; name?: string }> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch(`${supabaseUrl}/functions/v1/gamepass-verify`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session?.access_token || ''}`,
+        'apikey': supabaseAnonKey,
+      },
+      body: JSON.stringify({ gamepass_id: gamepassId }),
+    })
+    const data = await res.json()
+    return { exists: data.exists ?? false, price: data.price ?? undefined, name: data.name ?? undefined }
+  } catch {
+    return { exists: false }
+  }
+}
+
 export async function verifyGamepassOwnership(gamepassId: string): Promise<{ verified: boolean; error?: string }> {
   const user = await getCurrentUser()
   if (!user) return { verified: false, error: 'Not signed in' }

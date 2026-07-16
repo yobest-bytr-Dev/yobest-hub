@@ -5,7 +5,8 @@ import {
   UserCheck, UserX, Search, Eye, Heart, MessageSquare, Download, CheckCircle,
   XCircle, ExternalLink, ArrowLeft, Crown, Mail, Calendar, TrendingUp, RefreshCw,
   Wrench, Plus, Clock, Sparkles, Save, Upload, Ban, ShieldOff, ImagePlus, Tag, X,
-  ShoppingCart, AlertTriangle
+  ShoppingCart, AlertTriangle, Bot, Send, Radio, Hash, Volume2, Zap, Power,
+  CircleDot, ToggleLeft, ToggleRight, ChevronDown, ChevronRight
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '@/store/useStore'
@@ -28,7 +29,7 @@ interface AdminUser {
   profile?: any
 }
 
-type Tab = 'dashboard' | 'users' | 'submissions' | 'games' | 'tools' | 'settings'
+type Tab = 'dashboard' | 'users' | 'submissions' | 'games' | 'tools' | 'settings' | 'bot'
 
 export default function Admin() {
   const navigate = useNavigate()
@@ -82,6 +83,7 @@ export default function Admin() {
     { id: 'submissions', label: 'Submissions', icon: FileText },
     { id: 'games', label: 'Games', icon: Gamepad2 },
     { id: 'tools', label: 'Tools', icon: Wrench },
+    { id: 'bot', label: 'Bot', icon: Bot },
     { id: 'settings', label: 'Settings', icon: Settings },
   ]
 
@@ -116,6 +118,7 @@ export default function Admin() {
         {tab === 'submissions' && <SubmissionsTab />}
         {tab === 'games' && <GamesTab />}
         {tab === 'tools' && <ToolsTab />}
+        {tab === 'bot' && <BotTab />}
         {tab === 'settings' && <SettingsTab />}
       </motion.div>
     </div>
@@ -1335,6 +1338,336 @@ function ToolsTab() {
           <div className="text-center py-12">
             <Wrench size={36} className="mx-auto text-text-dim mb-3" />
             <p className="text-sm text-text-muted">No tools yet. Click "Add Tool" to create one.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function botApiCall(action: string, data: Record<string, any> = {}) {
+  return supabase.auth.getSession().then(({ data: { session } }) => {
+    return fetch(`${supabaseUrl}/functions/v1/bot-api`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session?.access_token || ''}`,
+        apikey: supabaseAnonKey,
+      },
+      body: JSON.stringify({ action, ...data }),
+    }).then((r) => r.json())
+  })
+}
+
+function BotTab() {
+  const { toast } = useToast()
+  const [loading, setLoading] = useState(true)
+  const [isOnline, setIsOnline] = useState(false)
+  const [lastHb, setLastHb] = useState<string | null>(null)
+  const [config, setConfig] = useState<Record<string, string>>({})
+  const [stats, setStats] = useState({ pending_commands: 0, executed_commands: 0, failed_commands: 0, guild_count: 0 })
+  const [guilds, setGuilds] = useState<any[]>([])
+  const [selectedGuild, setSelectedGuild] = useState<string>('')
+  const [cmdHistory, setCmdHistory] = useState<any[]>([])
+  const [newsTitle, setNewsTitle] = useState('')
+  const [newsDesc, setNewsDesc] = useState('')
+  const [newsUrl, setNewsUrl] = useState('')
+  const [newsImage, setNewsImage] = useState('')
+  const [sending, setSending] = useState(false)
+  const [expandedConfig, setExpandedConfig] = useState(false)
+  const [expandedHistory, setExpandedHistory] = useState(false)
+  const [configEdits, setConfigEdits] = useState<Record<string, string>>({})
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const data = await botApiCall('get_bot_status')
+      if (!data.error) {
+        setIsOnline(data.is_online)
+        setLastHb(data.last_heartbeat)
+        setStats(data.stats || {})
+        setGuilds(data.guilds || [])
+        const cfg: Record<string, string> = {}
+        ;(data.config || []).forEach((c: any) => { cfg[c.key] = c.value })
+        setConfig(cfg)
+        setConfigEdits(cfg)
+        if (data.guilds?.length && !selectedGuild) {
+          setSelectedGuild(data.guilds[0].guild_id)
+        }
+      }
+    } catch (e: any) {
+      toast('Failed to load bot status: ' + (e.message || ''), 'error')
+    }
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const loadHistory = useCallback(async () => {
+    try {
+      const data = await botApiCall('get_command_history')
+      if (!data.error) setCmdHistory(data.commands || [])
+    } catch {}
+  }, [])
+
+  useEffect(() => {
+    if (expandedHistory) loadHistory()
+  }, [expandedHistory, loadHistory])
+
+  const toggleConfig = async (key: string, value: string) => {
+    const newVal = value === 'true' ? 'false' : 'true'
+    try {
+      const data = await botApiCall('update_config', { key, value: newVal })
+      if (data.error) throw new Error(data.error)
+      setConfig(prev => ({ ...prev, [key]: newVal }))
+      setConfigEdits(prev => ({ ...prev, [key]: newVal }))
+      toast(`${key} ${newVal === 'true' ? 'enabled' : 'disabled'}`, 'success')
+    } catch (e: any) {
+      toast(e.message || 'Failed', 'error')
+    }
+  }
+
+  const saveConfig = async (key: string) => {
+    try {
+      const data = await botApiCall('update_config', { key, value: configEdits[key] || '' })
+      if (data.error) throw new Error(data.error)
+      setConfig(prev => ({ ...prev, [key]: configEdits[key] }))
+      toast('Saved', 'success')
+    } catch (e: any) {
+      toast(e.message || 'Failed', 'error')
+    }
+  }
+
+  const sendNews = async () => {
+    if (!newsTitle.trim()) { toast('Title required', 'error'); return }
+    if (!selectedGuild) { toast('Select a server first', 'error'); return }
+    setSending(true)
+    try {
+      const payload: any = { title: newsTitle, description: newsDesc }
+      if (newsUrl) payload.game_url = newsUrl
+      if (newsImage) payload.image_url = newsImage
+      const data = await botApiCall('post_news', { guild_id: selectedGuild, payload })
+      if (data.error) throw new Error(data.error)
+      toast('News posted to Discord!', 'success')
+      setNewsTitle('')
+      setNewsDesc('')
+      setNewsUrl('')
+      setNewsImage('')
+      if (expandedHistory) loadHistory()
+    } catch (e: any) {
+      toast(e.message || 'Failed to send', 'error')
+    }
+    setSending(false)
+  }
+
+  const sendCommand = async (command: string, payload: any = {}) => {
+    if (!selectedGuild) { toast('Select a server first', 'error'); return }
+    try {
+      const data = await botApiCall('send_command', { guild_id: selectedGuild, command, payload })
+      if (data.error) throw new Error(data.error)
+      toast(`Command "${command}" sent`, 'success')
+      if (expandedHistory) loadHistory()
+    } catch (e: any) {
+      toast(e.message || 'Failed', 'error')
+    }
+  }
+
+  if (loading) return <div className="flex items-center justify-center py-20"><Loader2 size={24} className="animate-spin text-accent-blue" /></div>
+
+  const toggleConfigItems = [
+    { key: 'ai_enabled', label: 'AI Chat', desc: 'AI-powered chatbot responses', icon: Sparkles },
+    { key: 'xp_enabled', label: 'XP System', desc: 'Leveling and experience points', icon: TrendingUp },
+    { key: 'automod_enabled', label: 'Auto Mod', desc: 'Automatic moderation filters', icon: Shield },
+    { key: 'welcome_enabled', label: 'Welcome Messages', desc: 'Greet new members', icon: MessageSquare },
+  ]
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <h2 className="text-lg font-semibold text-text-primary">Discord Bot</h2>
+          <div className={cn('flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold',
+            isOnline ? 'bg-green-500/15 text-green-400 border border-green-500/25' : 'bg-red-500/15 text-red-400 border border-red-500/25')}>
+            <CircleDot size={10} className={isOnline ? 'animate-pulse' : ''} />
+            {isOnline ? 'Online' : 'Offline'}
+          </div>
+          {lastHb && <span className="text-[10px] text-text-dim">Last seen: {new Date(lastHb).toLocaleString()}</span>}
+        </div>
+        <button onClick={load} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-elevated border border-border-primary text-xs text-text-secondary hover:text-text-primary transition-colors">
+          <RefreshCw size={12} /> Refresh
+        </button>
+      </div>
+
+      {guilds.length > 0 && (
+        <div className="rounded-xl bg-bg-secondary border border-border-primary p-4">
+          <label className="text-[10px] text-text-dim font-semibold uppercase tracking-wider block mb-2">Select Server</label>
+          <div className="flex flex-wrap gap-2">
+            {guilds.map((g) => (
+              <button key={g.guild_id} onClick={() => setSelectedGuild(g.guild_id)}
+                className={cn('flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium transition-all',
+                  selectedGuild === g.guild_id
+                    ? 'bg-accent-blue/15 text-accent-blue border-accent-blue/25'
+                    : 'bg-bg-elevated text-text-secondary border-border-primary hover:border-accent-blue/30')}>
+                {g.icon_url ? <img src={g.icon_url} alt="" className="w-5 h-5 rounded-full" /> : <Hash size={14} />}
+                <span className="truncate max-w-[150px]">{g.name || g.guild_id}</span>
+                <span className="text-[9px] text-text-dim">{formatNumber(g.member_count)} members</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: 'Guilds', value: stats.guild_count, icon: Hash, color: 'text-accent-blue' },
+          { label: 'Pending Cmds', value: stats.pending_commands, icon: Clock, color: 'text-yellow-400' },
+          { label: 'Executed', value: stats.executed_commands, icon: CheckCircle, color: 'text-green-400' },
+          { label: 'Failed', value: stats.failed_commands, icon: XCircle, color: 'text-red-400' },
+        ].map((s) => {
+          const Icon = s.icon
+          return (
+            <div key={s.label} className="p-4 rounded-xl bg-bg-secondary border border-border-primary">
+              <Icon size={18} className={cn(s.color, 'mb-2')} />
+              <div className="text-2xl font-bold text-text-primary">{s.value}</div>
+              <div className="text-xs text-text-muted">{s.label}</div>
+            </div>
+          )
+        })}
+      </div>
+
+      {selectedGuild && (
+        <div className="rounded-xl bg-bg-secondary border border-border-primary p-5">
+          <h3 className="text-sm font-semibold text-text-primary mb-3">Quick Actions</h3>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => sendCommand('sync_commands')} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-xs text-text-secondary hover:text-accent-blue hover:border-accent-blue/30 transition-all">
+              <Zap size={12} /> Sync Commands
+            </button>
+            <button onClick={() => sendCommand('snapshot_stats')} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-xs text-text-secondary hover:text-accent-green hover:border-accent-green/30 transition-all">
+              <BarChart3 size={12} /> Snapshot Stats
+            </button>
+          </div>
+        </div>
+      )}
+
+      {selectedGuild && (
+        <div className="rounded-xl bg-bg-secondary border border-border-primary p-5 space-y-4">
+          <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+            <Send size={14} className="text-accent-blue" /> Post News to Discord
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="sm:col-span-2">
+              <label className="text-[10px] text-text-dim font-semibold uppercase tracking-wider block mb-1.5">Title *</label>
+              <input value={newsTitle} onChange={(e) => setNewsTitle(e.target.value)} placeholder="News title..."
+                className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50" />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="text-[10px] text-text-dim font-semibold uppercase tracking-wider block mb-1.5">Description</label>
+              <textarea value={newsDesc} onChange={(e) => setNewsDesc(e.target.value)} rows={3} placeholder="News content..."
+                className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50 resize-none" />
+            </div>
+            <div>
+              <label className="text-[10px] text-text-dim font-semibold uppercase tracking-wider block mb-1.5">Game URL (optional)</label>
+              <input value={newsUrl} onChange={(e) => setNewsUrl(e.target.value)} placeholder="https://roblox.com/games/..."
+                className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50" />
+            </div>
+            <div>
+              <label className="text-[10px] text-text-dim font-semibold uppercase tracking-wider block mb-1.5">Image URL (optional)</label>
+              <input value={newsImage} onChange={(e) => setNewsImage(e.target.value)} placeholder="https://...png"
+                className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50" />
+            </div>
+          </div>
+          <button onClick={sendNews} disabled={sending || !newsTitle.trim()} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent-blue text-white text-xs font-semibold hover:opacity-90 disabled:opacity-50 transition-all">
+            {sending ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+            Send to Discord
+          </button>
+        </div>
+      )}
+
+      <div className="rounded-xl bg-bg-secondary border border-border-primary p-5">
+        <button onClick={() => setExpandedConfig(!expandedConfig)} className="flex items-center gap-2 w-full text-left">
+          {expandedConfig ? <ChevronDown size={14} className="text-text-muted" /> : <ChevronRight size={14} className="text-text-muted" />}
+          <h3 className="text-sm font-semibold text-text-primary">Bot Configuration</h3>
+          <span className="text-[9px] text-text-dim ml-auto">{Object.keys(config).length} settings</span>
+        </button>
+        {expandedConfig && (
+          <div className="mt-4 space-y-3">
+            {toggleConfigItems.map((item) => {
+              const Icon = item.icon
+              const enabled = config[item.key] === 'true'
+              return (
+                <div key={item.key} className="flex items-center justify-between p-3 rounded-lg bg-bg-elevated border border-border-primary">
+                  <div className="flex items-center gap-3">
+                    <Icon size={16} className={cn(enabled ? 'text-accent-blue' : 'text-text-dim')} />
+                    <div>
+                      <div className="text-xs font-medium text-text-primary">{item.label}</div>
+                      <div className="text-[10px] text-text-dim">{item.desc}</div>
+                    </div>
+                  </div>
+                  <button onClick={() => toggleConfig(item.key, config[item.key])}
+                    className={cn('p-1 rounded-lg transition-colors', enabled ? 'text-green-400 hover:bg-green-500/10' : 'text-text-dim hover:bg-bg-secondary')}>
+                    {enabled ? <ToggleRight size={24} /> : <ToggleLeft size={24} />}
+                  </button>
+                </div>
+              )
+            })}
+            <div className="flex items-center justify-between p-3 rounded-lg bg-bg-elevated border border-border-primary">
+              <div className="flex items-center gap-3">
+                <Bot size={16} className="text-accent-purple" />
+                <div>
+                  <div className="text-xs font-medium text-text-primary">AI Model</div>
+                  <div className="text-[10px] text-text-dim">OpenRouter model for chat</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <input value={configEdits.ai_model || ''} onChange={(e) => setConfigEdits(prev => ({ ...prev, ai_model: e.target.value }))}
+                  className="w-48 px-2 py-1 rounded bg-bg-secondary border border-border-primary text-xs text-text-primary focus:outline-none focus:border-accent-blue/50" />
+                {configEdits.ai_model !== config.ai_model && (
+                  <button onClick={() => saveConfig('ai_model')} className="p-1 text-green-400 hover:bg-green-500/10 rounded"><Save size={14} /></button>
+                )}
+              </div>
+            </div>
+            <div className="p-3 rounded-lg bg-bg-elevated border border-border-primary space-y-2">
+              <div className="flex items-center gap-3">
+                <Volume2 size={16} className="text-accent-orange" />
+                <div>
+                  <div className="text-xs font-medium text-text-primary">AI System Prompt</div>
+                  <div className="text-[10px] text-text-dim">Personality and instructions for the bot</div>
+                </div>
+              </div>
+              <textarea value={configEdits.ai_system_prompt || ''} onChange={(e) => setConfigEdits(prev => ({ ...prev, ai_system_prompt: e.target.value }))} rows={3}
+                className="w-full px-3 py-2 rounded-lg bg-bg-secondary border border-border-primary text-xs text-text-primary focus:outline-none focus:border-accent-blue/50 resize-none font-mono" />
+              {configEdits.ai_system_prompt !== config.ai_system_prompt && (
+                <button onClick={() => saveConfig('ai_system_prompt')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500/15 text-green-400 text-xs font-medium hover:bg-green-500/25 transition-colors">
+                  <Save size={12} /> Save Prompt
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-xl bg-bg-secondary border border-border-primary p-5">
+        <button onClick={() => { setExpandedHistory(!expandedHistory); if (!expandedHistory) loadHistory() }}
+          className="flex items-center gap-2 w-full text-left">
+          {expandedHistory ? <ChevronDown size={14} className="text-text-muted" /> : <ChevronRight size={14} className="text-text-muted" />}
+          <h3 className="text-sm font-semibold text-text-primary">Command History</h3>
+          <span className="text-[9px] text-text-dim ml-auto">{cmdHistory.length} commands</span>
+        </button>
+        {expandedHistory && (
+          <div className="mt-4 space-y-1 max-h-80 overflow-y-auto">
+            {cmdHistory.length === 0 && <p className="text-xs text-text-muted text-center py-4">No commands yet</p>}
+            {cmdHistory.map((cmd) => (
+              <div key={cmd.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-bg-elevated border border-border-primary text-xs">
+                <span className={cn('px-1.5 py-0.5 rounded text-[9px] font-bold',
+                  cmd.status === 'pending' && 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/20',
+                  cmd.status === 'executed' && 'bg-green-500/15 text-green-400 border border-green-500/20',
+                  cmd.status === 'failed' && 'bg-red-500/15 text-red-400 border border-red-500/20'
+                )}>{cmd.status}</span>
+                <span className="font-mono text-text-primary">{cmd.command}</span>
+                <span className="text-text-dim truncate flex-1">{cmd.guild_id?.slice(0, 8)}</span>
+                <span className="text-text-dim shrink-0">{new Date(cmd.created_at).toLocaleString()}</span>
+              </div>
+            ))}
           </div>
         )}
       </div>

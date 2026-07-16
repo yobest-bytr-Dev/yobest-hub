@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 import {
   User, Mail, Calendar, ShieldCheck, Gamepad2, Settings,
   Loader2, ExternalLink, Copy, Check, LogOut, ChevronRight,
-  BarChart3, Heart, MessageSquare, Bookmark, Users, Sparkles
+  BarChart3, Heart, MessageSquare, Bookmark, Users, Sparkles, Gamepad
 } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { signOut, getSubmissions, getAiChats, getCurrentProfile } from '@/lib/api'
@@ -41,9 +41,33 @@ export default function Profile() {
     }
     getSubmissions().then(setSubmissions)
     getAiChats().then(setAiChats)
-    // Re-fetch profile to get fresh follower/following counts
     getCurrentProfile().then((profile) => {
       if (profile) setCurrentUser(profile)
+    })
+
+    // Capture Discord OAuth data after redirect
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user?.app_metadata?.provider === 'discord' && !currentUser.discord_user_id) {
+        const identities = user.identities || []
+        const discordIdentity = identities.find((i: any) => i.provider === 'discord')
+        if (discordIdentity) {
+          const discordData = discordIdentity.identity_data || {}
+          const discordUserId = discordData.sub || discordData.id
+          const discordUsername = discordData.full_name || discordData.preferred_username || discordData.name
+          const discordAvatar = discordData.avatar_url
+          if (discordUserId) {
+            import('@/config/supabase').then(({ supabase: sb }) => {
+              sb.from('profiles').update({
+                discord_user_id: String(discordUserId),
+                discord_username: discordUsername || null,
+                discord_avatar: discordAvatar || null,
+              }).eq('id', currentUser.id).then(() => {
+                setCurrentUser({ ...currentUser, discord_user_id: String(discordUserId), discord_username: discordUsername, discord_avatar: discordAvatar })
+              })
+            })
+          }
+        }
+      }
     })
   }, [currentUser, navigate])
 
@@ -424,6 +448,32 @@ export default function Profile() {
                   )
                 })}
               </div>
+            </div>
+
+            <div className="p-5 rounded-xl bg-bg-secondary border border-border-primary">
+              <div className="flex items-center gap-2 mb-4">
+                <Gamepad size={16} className="text-[#5865F2]" />
+                <h3 className="text-sm font-semibold text-text-primary">Discord Account</h3>
+              </div>
+              {currentUser.discord_user_id ? (
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-bg-elevated border border-border-primary">
+                  {currentUser.discord_avatar && (
+                    <img src={currentUser.discord_avatar} alt="" className="w-10 h-10 rounded-full" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-text-primary">{currentUser.discord_username || 'Linked'}</p>
+                    <p className="text-[10px] text-green-400 font-medium">Discord account linked</p>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <p className="text-text-muted text-xs mb-3">Link your Discord account to control the bot from this site.</p>
+                  <a href={`${import.meta.env.VITE_SUPABASE_URL}/auth/v1/authorize?provider=discord&redirect_to=${encodeURIComponent(window.location.origin + '/profile')}`}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#5865F2] text-white text-xs font-semibold hover:bg-[#4752C4] transition-colors">
+                    <Gamepad size={14} /> Link Discord
+                  </a>
+                </div>
+              )}
             </div>
 
             <div className="p-5 rounded-xl bg-red-500/5 border border-red-500/15">

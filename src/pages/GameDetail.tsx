@@ -564,12 +564,16 @@ export default function GameDetail() {
                             </div>
                             <h4 className="text-xs font-semibold text-text-primary mb-0.5">{r.title}</h4>
                             {r.body && <p className="text-[11px] text-text-secondary leading-relaxed whitespace-pre-wrap">{r.body}</p>}
-                            {r.file_url && (
+                            {r.file_url && (!game.gamepass_id || gamepassVerified) ? (
                               <a href={r.file_url} target="_blank" rel="noopener noreferrer"
                                 className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 rounded-lg bg-bg-elevated border border-border-primary text-[11px] font-medium text-accent-blue hover:border-accent-blue/30 transition-all">
                                 <Download size={11} /> {r.file_name || 'Download'} {r.file_size && <span className="text-text-muted">({r.file_size})</span>}
                               </a>
-                            )}
+                            ) : r.file_url && game.gamepass_id && !gamepassVerified ? (
+                              <span className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 rounded-lg bg-bg-elevated border border-border-primary text-[11px] font-medium text-text-dim">
+                                <Lock size={11} /> Purchase required
+                              </span>
+                            ) : null}
                             <div className="flex items-center gap-2 mt-1.5 text-[10px] text-text-dim">
                               {r.author_username && <span>by {r.author_username}</span>}
                               <span>{timeAgo(r.created_at)}</span>

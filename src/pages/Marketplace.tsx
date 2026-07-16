@@ -168,12 +168,16 @@ function AssetDetailModal({ asset, onClose }: { asset: Asset; onClose: () => voi
                         </div>
                         <p className="text-[11px] font-semibold text-text-primary">{r.title}</p>
                         {r.body && <p className="text-[10px] text-text-secondary leading-relaxed mt-0.5 whitespace-pre-wrap">{r.body}</p>}
-                        {r.file_url && (
+                        {r.file_url && (!asset.gamepass_id || gamepassVerified) ? (
                           <a href={r.file_url} target="_blank" rel="noopener noreferrer"
                             className="inline-flex items-center gap-1 mt-1 px-2 py-1 rounded bg-bg-elevated border border-border-primary text-[9px] font-medium text-accent-blue hover:border-accent-blue/30 transition-all">
                             <Download size={9} /> {r.file_name || 'Download'} {r.file_size && <span className="text-text-dim">({r.file_size})</span>}
                           </a>
-                        )}
+                        ) : r.file_url && asset.gamepass_id && !gamepassVerified ? (
+                          <span className="inline-flex items-center gap-1 mt-1 px-2 py-1 rounded bg-bg-elevated border border-border-primary text-[9px] font-medium text-text-dim">
+                            <Lock size={9} /> Purchase required
+                          </span>
+                        ) : null}
                         <div className="flex items-center gap-1.5 mt-0.5 text-[9px] text-text-dim">
                           {r.author_username && <span>by {r.author_username}</span>}
                           <span>{new Date(r.created_at).toLocaleDateString()}</span>

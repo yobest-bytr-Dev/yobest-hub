@@ -5,10 +5,9 @@ const BASE = 'https://yobest-bytr.vercel.app'
 const DEFAULT_IMG = `${BASE}/YobestLogo.png`
 const DEFAULT_DESC = 'Build games with AI assistance, share with the community, and monetize your creations.'
 
-const supabase = createClient(
-  process.env.SUPABASE_URL || 'https://pohslivolczprxacroje.supabase.co',
-  process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-)
+const SB_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://pohslivolczprxacroje.supabase.co'
+const SB_KEY = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || ''
+const supabase = createClient(SB_URL, SB_KEY)
 
 function esc(s: string) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
@@ -48,13 +47,22 @@ export default async function handler(req: any, res: any) {
   const pageUrl = `${BASE}/games/${id}`
 
   let game: any = null
+
   if (id) {
-    const { data } = await supabase.from('experiences').select('title, description, thumbnail_url, video_url').eq('id', id).maybeSingle()
-    if (data) {
-      game = data
-    } else {
-      const { data: sub } = await supabase.from('submissions').select('title, description, thumbnail_url, video_url').eq('id', id).maybeSingle()
-      if (sub) game = sub
+    try {
+      const { data, error } = await supabase.from('experiences').select('title, description, thumbnail_url, video_url').eq('id', id).limit(1)
+      if (!error && data && data.length > 0) {
+        game = data[0]
+      }
+    } catch {}
+
+    if (!game) {
+      try {
+        const { data, error } = await supabase.from('submissions').select('title, description, thumbnail_url, video_url').eq('id', id).limit(1)
+        if (!error && data && data.length > 0) {
+          game = data[0]
+        }
+      } catch {}
     }
   }
 

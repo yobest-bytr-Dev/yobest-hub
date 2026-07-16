@@ -1,23 +1,14 @@
+import tls from 'tls'
+
 const SB_URL = 'https://pohslivolczprxacroje.supabase.co'
 const SB_KEY = 'sb_publishable_zg1KBuWhnqVm8GM8q4siIA_M1BC1vyG'
+const SMTP_HOST = 'smtp.gmail.com'
+const SMTP_PORT = 465
+const SMTP_USER = 'yobest.bytr47@gmail.com'
+const SMTP_PASS = 'rwnjbedwmqqrysrj'
 
 function generateCode(): string {
   return String(Math.floor(100000 + Math.random() * 900000))
-}
-
-async function sbQuery(table: string, method: string, body?: any) {
-  const url = `${SB_URL}/rest/v1/${table}`
-  const opts: RequestInit = {
-    method,
-    headers: {
-      'apikey': SB_KEY,
-      'Authorization': `Bearer ${SB_KEY}`,
-      'Content-Type': 'application/json',
-      'Prefer': method === 'POST' ? 'return=minimal' : undefined,
-    } as any,
-  }
-  if (body) opts.body = JSON.stringify(body)
-  return fetch(url, opts)
 }
 
 function buildEmailHtml(code: string) {
@@ -41,18 +32,55 @@ function buildEmailHtml(code: string) {
 </html>`
 }
 
-async function sendGmail(to: string, subject: string, html: string) {
-  const resp = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      service_id: 'default_transactional',
-      template_id: '',
-      user_id: '',
-      template_params: { to, subject, html },
-    }),
+function sendSmtpEmail(to: string, subject: string, htmlBody: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const sock = tls.connect({ host: SMTP_HOST, port: SMTP_PORT, rejectUnauthorized: true })
+    let step = 0
+    let buffer = ''
+
+    const send = (data: string) => sock.write(data + '\r\n')
+
+    const next = () => {
+      switch (step++) {
+        case 0: send(`EHLO yobest.app`); break
+        case 1: send(`AUTH LOGIN`); break
+        case 2: send(Buffer.from(SMTP_USER).toString('base64')); break
+        case 3: send(Buffer.from(SMTP_PASS).toString('base64')); break
+        case 4: send(`MAIL FROM:<${SMTP_USER}>`); break
+        case 5: send(`RCPT TO:<${to}>`); break
+        case 6: send(`DATA`); break
+        case 7:
+          send(
+            `From: Yobest <${SMTP_USER}>\r\n` +
+            `To: <${to}>\r\n` +
+            `Subject: ${subject}\r\n` +
+            `MIME-Version: 1.0\r\n` +
+            `Content-Type: text/html; charset=UTF-8\r\n` +
+            `Content-Transfer-Encoding: 7bit\r\n` +
+            `\r\n` +
+            `${htmlBody}\r\n` +
+            `.`
+          )
+          break
+        case 8:
+          send(`QUIT`)
+          sock.destroy()
+          resolve()
+          break
+      }
+    }
+
+    sock.on('data', (data: Buffer) => {
+      buffer += data.toString()
+      if (buffer.includes('\n')) { buffer = ''; next() }
+    })
+
+    sock.on('error', (err: Error) => reject(err))
+    sock.on('timeout', () => { sock.destroy(); reject(new Error('SMTP timeout')) })
+    sock.setTimeout(15000)
+
+    sock.on('secureConnect', () => next())
   })
-  return resp
 }
 
 export default async function handler(req: any, res: any) {
@@ -71,22 +99,18 @@ export default async function handler(req: any, res: any) {
     const code = generateCode()
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString()
 
-    const delResp = await fetch(
+    await fetch(
       `${SB_URL}/rest/v1/password_reset_codes?email=eq.${encodeURIComponent(normalizedEmail)}&verified=eq.false`,
-      {
-        method: 'DELETE',
-        headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` },
-      }
+      { method: 'DELETE', headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
     )
-    if (!delResp.ok) console.warn('delete old codes failed:', delResp.status)
 
     const insResp = await fetch(`${SB_URL}/rest/v1/password_reset_codes`, {
       method: 'POST',
       headers: {
-        'apikey': SB_KEY,
-        'Authorization': `Bearer ${SB_KEY}`,
+        apikey: SB_KEY,
+        Authorization: `Bearer ${SB_KEY}`,
         'Content-Type': 'application/json',
-        'Prefer': 'return=minimal',
+        Prefer: 'return=minimal',
       },
       body: JSON.stringify({
         email: normalizedEmail,
@@ -102,20 +126,7 @@ export default async function handler(req: any, res: any) {
       throw new Error('Failed to store reset code')
     }
 
-    const nodemailer = await import('nodemailer')
-    const transporter = (nodemailer.default || nodemailer).createTransport({
-      host: 'smtp.gmail.com',
-      port: 465,
-      secure: true,
-      auth: { user: 'yobest.bytr47@gmail.com', pass: 'rwnjbedwmqqrysrj' },
-    })
-
-    await transporter.sendMail({
-      from: '"Yobest" <yobest.bytr47@gmail.com>',
-      to: normalizedEmail,
-      subject: 'Your Yobest Password Reset Code',
-      html: buildEmailHtml(code),
-    })
+    await sendSmtpEmail(normalizedEmail, 'Your Yobest Password Reset Code', buildEmailHtml(code))
 
     return res.status(200).json({ ok: true, message: 'Code sent to your email.' })
   } catch (err: any) {

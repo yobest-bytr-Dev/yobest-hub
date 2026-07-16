@@ -4,11 +4,12 @@ import {
   Shield, Users, Gamepad2, FileText, BarChart3, Settings, Loader2, Trash2,
   UserCheck, UserX, Search, Eye, Heart, MessageSquare, Download, CheckCircle,
   XCircle, ExternalLink, ArrowLeft, Crown, Mail, Calendar, TrendingUp, RefreshCw,
-  Wrench, Plus, Clock, Sparkles, Save, Upload, Ban, ShieldOff, ImagePlus, Tag, X
+  Wrench, Plus, Clock, Sparkles, Save, Upload, Ban, ShieldOff, ImagePlus, Tag, X,
+  ShoppingCart, AlertTriangle
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '@/store/useStore'
-import { supabase } from '@/config/supabase'
+import { supabase, supabaseUrl, supabaseAnonKey } from '@/config/supabase'
 import { formatNumber, cn } from '@/lib/utils'
 import { useToast } from '@/components/ui/Toast'
 import RobloxAvatar from '@/components/ui/RobloxAvatar'
@@ -544,6 +545,8 @@ function GamesTab() {
   const [releaseUploading, setReleaseUploading] = useState(false)
   const releaseFileRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
+  const [gpLoading, setGpLoading] = useState(false)
+  const [gpStatus, setGpStatus] = useState<'idle' | 'ok' | 'warn'>('idle')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -560,25 +563,65 @@ function GamesTab() {
     if (!form.title.trim()) { toast('Title is required', 'error'); return }
     setSaving(true)
     try {
-      const payload = {
-        title: form.title, description: form.description, category: form.category,
-        video_url: form.video_url, game_url: form.game_url, download_url: form.download_url,
-        thumbnail_url: form.thumbnail_url, images: form.images || [], gamepass_id: form.gamepass_id,
-        price: form.price, is_official: form.is_official, game_play: form.game_play,
-        download_enabled: form.download_enabled,
-      }
+      const gamepassId = form.gamepass_id.trim()
+      const price = gamepassId
+        ? (form.price === 'Free' || !form.price ? 'Gamepass Required' : form.price)
+        : (form.price === 'Gamepass Required' ? 'Free' : form.price || 'Free')
+
       if (editing) {
-        const { error } = await supabase.from('experiences').update(payload).eq('id', editing)
-        if (error) throw error
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) throw new Error('Not authenticated')
+        const res = await fetch(`${supabaseUrl}/functions/v1/update-record`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey': supabaseAnonKey,
+          },
+          body: JSON.stringify({
+            table: 'experiences',
+            id: editing,
+            fields: {
+              title: form.title, description: form.description, category: form.category,
+              video_url: form.video_url, game_url: form.game_url, download_url: form.download_url,
+              thumbnail_url: form.thumbnail_url, gamepass_id: gamepassId, price,
+              is_official: form.is_official, game_play: form.game_play, download_enabled: form.download_enabled,
+            },
+          }),
+        })
+        const result = await res.json()
+        if (!res.ok || result.error) throw new Error(result.error || 'Update failed')
+
+        // Sync matching submission
+        try {
+          const { data: sub } = await supabase.from('submissions').select('id').eq('title', form.title).limit(1).maybeSingle()
+          if (sub) {
+            await fetch(`${supabaseUrl}/functions/v1/update-record`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}`, 'apikey': supabaseAnonKey },
+              body: JSON.stringify({
+                table: 'submissions', id: sub.id,
+                fields: { title: form.title, description: form.description, category: form.category, price, gamepass_url: gamepassId, video_url: form.video_url, game_url: form.game_url, drive_file_url: form.download_url, thumbnail_url: form.thumbnail_url },
+              }),
+            })
+          }
+        } catch {}
         toast('Game updated!', 'success')
       } else {
-        const { error } = await supabase.from('experiences').insert({ ...payload, views_count: 0, likes_count: 0 })
+        const { error } = await supabase.from('experiences').insert({
+          title: form.title, description: form.description, category: form.category,
+          video_url: form.video_url, game_url: form.game_url, download_url: form.download_url,
+          thumbnail_url: form.thumbnail_url, images: form.images || [], gamepass_id: gamepassId,
+          price, is_official: form.is_official, game_play: form.game_play,
+          download_enabled: form.download_enabled, views_count: 0, likes_count: 0,
+        })
         if (error) throw error
         toast('Game created!', 'success')
       }
       setShowForm(false)
       setEditing(null)
       setForm(emptyGame)
+      setGpStatus('idle')
       load()
     } catch (e: any) {
       toast(e.message || 'Failed to save game', 'error')
@@ -596,6 +639,7 @@ function GamesTab() {
     })
     setEditing(game.id)
     setShowForm(true)
+    setGpStatus(game.gamepass_id ? 'ok' : 'idle')
   }
 
   const handleDelete = async (id: string) => {
@@ -743,9 +787,42 @@ function GamesTab() {
             </div>
             <div>
               <label className="text-[10px] text-text-dim font-semibold uppercase tracking-wider block mb-1.5">GamePass ID</label>
-              <input value={form.gamepass_id} onChange={e => setForm(f => ({ ...f, gamepass_id: e.target.value }))} placeholder="e.g. 12345678"
-                className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50" />
-              <p className="text-[9px] text-text-dim mt-1">Users must own this GamePass to download</p>
+              <div className="relative">
+                <input value={form.gamepass_id} onChange={e => {
+                  const gpId = e.target.value
+                  setGpStatus('idle')
+                  setForm(f => {
+                    const updates: GameForm = { ...f, gamepass_id: gpId }
+                    if (gpId && (!f.price || f.price === 'Free')) updates.price = 'Gamepass Required'
+                    else if (!gpId && f.price === 'Gamepass Required') updates.price = 'Free'
+                    return updates
+                  })
+                }} onBlur={async (e) => {
+                  const gpUrl = e.target.value.trim()
+                  if (!gpUrl) { setGpStatus('idle'); return }
+                  setGpLoading(true); setGpStatus('idle')
+                  try {
+                    const info = await fetch(`${supabaseUrl}/functions/v1/gamepass-verify`, {
+                      method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': supabaseAnonKey },
+                      body: JSON.stringify({ gamepass_id: gpUrl, action: 'info' }),
+                    }).then(r => r.json())
+                    if (info.exists) { setGpStatus('ok'); setForm(f => ({ ...f, gamepass_id: gpUrl, price: info.price != null && info.price > 0 ? `${info.price} Robux` : f.price })) }
+                    else { setGpStatus('warn') }
+                  } catch { setGpStatus('warn') }
+                  setGpLoading(false)
+                }} placeholder="e.g. 12345678"
+                  className="w-full px-3 py-2 pr-8 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50" />
+                <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                  {gpLoading ? <Loader2 size={14} className="animate-spin text-text-muted" /> :
+                    gpStatus === 'ok' ? <CheckCircle size={14} className="text-green-400" /> :
+                    gpStatus === 'warn' ? <AlertTriangle size={14} className="text-yellow-400" /> : null}
+                </div>
+              </div>
+              <p className="text-[9px] text-text-dim mt-1">
+                {gpStatus === 'ok' ? <span className="text-green-400">Verified - price auto-filled</span> :
+                 gpStatus === 'warn' ? <span className="text-yellow-400">GamePass not found on Roblox</span> :
+                 'Users must own this GamePass to download'}
+              </p>
             </div>
             <div>
               <ImagePicker value={form.thumbnail_url} onChange={(url) => setForm(f => ({ ...f, thumbnail_url: url }))} folder="yobest/thumbnails" label="Thumbnail Image" />

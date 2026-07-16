@@ -275,11 +275,16 @@ function AssetCard({ asset, onClick }: { asset: Asset; onClick: () => void }) {
           ) : (
             <span className="text-sm font-bold text-yellow-400">{asset.price_robux} Robux</span>
           )}
-          {asset.drive_file_url ? (
+          {asset.drive_file_url && isFree ? (
             <a href={asset.drive_file_url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
               className="px-3 py-1.5 rounded-lg bg-accent-blue/15 text-accent-blue text-xs font-semibold hover:bg-accent-blue/25 transition-colors flex items-center gap-1">
-              <Download size={12} /> {isFree ? 'Download' : 'Get'}
+              <Download size={12} /> Download
             </a>
+          ) : asset.drive_file_url && !isFree ? (
+            <button onClick={e => { e.stopPropagation(); onClick() }}
+              className="px-3 py-1.5 rounded-lg bg-yellow-500/15 text-yellow-400 text-xs font-semibold hover:bg-yellow-500/25 transition-colors flex items-center gap-1">
+              <ShoppingCart size={12} /> Buy to Download
+            </button>
           ) : (
             <button onClick={e => { e.stopPropagation(); onClick() }}
               className="px-3 py-1.5 rounded-lg bg-accent-blue/15 text-accent-blue text-xs font-semibold hover:bg-accent-blue/25 transition-colors">

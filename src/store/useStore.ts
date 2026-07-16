@@ -203,34 +203,26 @@ export const useStore = create<AppState>((set, get) => ({
       if (isNowFollowing) {
         // Insert into follows table
         await supabase.from('follows').insert({ follower_id: myId, following_id: userId })
-        // Increment counts
-        const { data: target } = await supabase.from('profiles').select('followers_count').eq('id', userId).single()
-        const { data: me } = await supabase.from('profiles').select('following_count').eq('id', myId).single()
-        const newFollowers = (target?.followers_count || 0) + 1
-        const newFollowing = (me?.following_count || 0) + 1
+        // Use RPCs to update counts (bypasses RLS)
         await Promise.all([
-          supabase.from('profiles').update({ followers_count: newFollowers }).eq('id', userId),
-          supabase.from('profiles').update({ following_count: newFollowing }).eq('id', myId),
+          supabase.rpc('increment_followers', { p_user_id: userId }),
+          supabase.rpc('increment_following', { p_user_id: myId }),
         ])
-        // Refresh currentUser if we just updated our own count
+        // Update currentUser following_count in store
         if (currentUser) {
-          set({ currentUser: { ...currentUser, following_count: newFollowing } })
+          set({ currentUser: { ...currentUser, following_count: (currentUser.following_count || 0) + 1 } })
         }
       } else {
         // Delete from follows table
         await supabase.from('follows').delete().eq('follower_id', myId).eq('following_id', userId)
-        // Decrement counts
-        const { data: target } = await supabase.from('profiles').select('followers_count').eq('id', userId).single()
-        const { data: me } = await supabase.from('profiles').select('following_count').eq('id', myId).single()
-        const newFollowers = Math.max(0, (target?.followers_count || 0) - 1)
-        const newFollowing = Math.max(0, (me?.following_count || 0) - 1)
+        // Use RPCs to update counts (bypasses RLS)
         await Promise.all([
-          supabase.from('profiles').update({ followers_count: newFollowers }).eq('id', userId),
-          supabase.from('profiles').update({ following_count: newFollowing }).eq('id', myId),
+          supabase.rpc('decrement_followers', { p_user_id: userId }),
+          supabase.rpc('decrement_following', { p_user_id: myId }),
         ])
-        // Refresh currentUser if we just updated our own count
+        // Update currentUser following_count in store
         if (currentUser) {
-          set({ currentUser: { ...currentUser, following_count: newFollowing } })
+          set({ currentUser: { ...currentUser, following_count: Math.max(0, (currentUser.following_count || 0) - 1) } })
         }
       }
     } catch (e) {

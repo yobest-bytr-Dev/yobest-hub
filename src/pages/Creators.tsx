@@ -205,6 +205,15 @@ export default function Creators() {
   const wasFollowing = isFollowing(profile.id)
   await toggleFollow(profile.id)
   toast(wasFollowing ? `Unfollowed ${profile.username}` : `Following ${profile.username}`, 'success')
+  // Re-fetch profiles to show updated counts
+  const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false }).limit(100)
+  if (data) {
+    const updated = data as UserProfile[]
+    if (currentUser && !updated.some(p => p.id === currentUser.id)) {
+      updated.unshift(currentUser)
+    }
+    setProfiles(updated)
+  }
 }}
                           className={cn(
                             'flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all',

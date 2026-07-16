@@ -62,18 +62,24 @@ export default function GameDetail() {
 
   useEffect(() => {
     setLoading(true)
-    const found = experiences.find((e) => e.id === id)
-    if (found) {
-      setGame(found)
+    // Always query DB for latest data (hardcoded data may be stale after Dashboard edits)
+    Promise.all([getOfficialGames(), getApprovedCommunityGames()]).then(([official, community]) => {
+      const all = [...official, ...community]
+      const foundDb = all.find((e) => e.id === id)
+      if (foundDb) {
+        setGame(foundDb)
+      } else {
+        // Fallback to hardcoded data (for games not in DB)
+        const found = experiences.find((e) => e.id === id)
+        if (found) setGame(found)
+      }
       setLoading(false)
-    } else {
-      Promise.all([getOfficialGames(), getApprovedCommunityGames()]).then(([official, community]) => {
-        const all = [...official, ...community]
-        const foundDb = all.find((e) => e.id === id)
-        if (foundDb) setGame(foundDb)
-        setLoading(false)
-      })
-    }
+    }).catch(() => {
+      // If DB query fails, fall back to hardcoded
+      const found = experiences.find((e) => e.id === id)
+      if (found) setGame(found)
+      setLoading(false)
+    })
   }, [id])
 
   useEffect(() => {

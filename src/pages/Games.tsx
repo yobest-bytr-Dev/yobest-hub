@@ -326,7 +326,7 @@ export default function Games() {
 
   // Fetch YouTube stats for all visible games
   useEffect(() => {
-    const games = activeTab === 'official' ? experiences : communityData
+    const games = activeTab === 'official' ? (officialData.length > 0 ? officialData : experiences) : communityData
     const videoIds = games
       .map(g => extractYoutubeId(g.video_url))
       .filter((id): id is string => !!id)
@@ -341,7 +341,7 @@ export default function Games() {
         return next
       })
     })
-  }, [activeTab, communityData])
+  }, [activeTab, communityData, officialData])
 
   const allGames = activeTab === 'official' ? (officialData.length > 0 ? officialData : experiences) : communityData
 

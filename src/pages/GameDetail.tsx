@@ -419,7 +419,7 @@ export default function GameDetail() {
                   if (!reviewRating || !id) return
                   setReviewSubmitting(true)
                   try {
-                    await submitReview(id, reviewRating, reviewComment)
+                    await submitReview(id, reviewRating, reviewComment, game?.is_official ?? true)
                     setMyReview({ rating: reviewRating, comment: reviewComment })
                     getReviewsStats(id).then(setReviewStats)
                     setShowReviewForm(false)

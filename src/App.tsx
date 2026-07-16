@@ -20,6 +20,8 @@ import Contact from '@/pages/legal/Contact'
 import Admin from '@/pages/Admin'
 import Dashboard from '@/pages/Dashboard'
 import Tools from '@/pages/Tools'
+import ForgotPassword from '@/pages/ForgotPassword'
+import ResetPassword from '@/pages/ResetPassword'
 import NotFound from '@/pages/NotFound'
 
 const Router = import.meta.env.PROD ? BrowserRouter : HashRouter
@@ -38,6 +40,8 @@ export default function App() {
             <Route path="/community" element={<Community />} />
             <Route path="/marketplace" element={<Marketplace />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/profile/:userId" element={<PublicProfile />} />
             <Route path="/creators" element={<Creators />} />

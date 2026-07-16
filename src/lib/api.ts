@@ -185,7 +185,30 @@ export async function getOfficialGames(): Promise<Experience[]> {
     .order('created_at', { ascending: false })
 
   if (error) return []
-  return (data || []) as Experience[]
+  const games = (data || []) as Experience[]
+
+  // Fetch like counts from game_likes table
+  if (games.length > 0) {
+    try {
+      const gameIds = games.map(g => g.id)
+      const { data: likesData } = await supabase
+        .from('game_likes')
+        .select('game_id')
+        .in('game_id', gameIds)
+
+      if (likesData) {
+        const likeCounts = new Map<string, number>()
+        likesData.forEach((l: any) => {
+          likeCounts.set(l.game_id, (likeCounts.get(l.game_id) || 0) + 1)
+        })
+        games.forEach(g => {
+          g.likes_count = likeCounts.get(g.id) || 0
+        })
+      }
+    } catch {}
+  }
+
+  return games
 }
 
 export async function getApprovedCommunityGames(): Promise<Experience[]> {
@@ -197,7 +220,7 @@ export async function getApprovedCommunityGames(): Promise<Experience[]> {
 
   if (error) return []
 
-  return (data || []).map((s: Submission): Experience => ({
+  const games = (data || []).map((s: Submission): Experience => ({
     id: s.id,
     creator: '',
     creator_id: s.user_id,
@@ -214,6 +237,29 @@ export async function getApprovedCommunityGames(): Promise<Experience[]> {
     thumbnail_url: s.thumbnail_url || '',
     created_at: s.created_at,
   }))
+
+  // Fetch like counts for all community games
+  if (games.length > 0) {
+    try {
+      const gameIds = games.map(g => g.id)
+      const { data: likesData } = await supabase
+        .from('game_likes')
+        .select('game_id')
+        .in('game_id', gameIds)
+
+      if (likesData) {
+        const likeCounts = new Map<string, number>()
+        likesData.forEach((l: any) => {
+          likeCounts.set(l.game_id, (likeCounts.get(l.game_id) || 0) + 1)
+        })
+        games.forEach(g => {
+          g.likes_count = likeCounts.get(g.id) || 0
+        })
+      }
+    } catch {}
+  }
+
+  return games
 }
 
 export async function getAssets(options?: { type?: string }): Promise<Asset[]> {
@@ -679,14 +725,16 @@ export async function deleteSubmission(id: string) {
   if (error) throw error
 }
 
-export async function submitReview(experienceId: string, rating: number, comment: string = '') {
+export async function submitReview(experienceId: string, rating: number, comment: string = '', isOfficial: boolean = true) {
   const user = await getCurrentUser()
   if (!user) throw new Error('Not authenticated')
   const { error } = await supabase
     .from('reviews')
     .upsert({ user_id: user.id, experience_id: experienceId, rating, comment }, { onConflict: 'user_id,experience_id' })
   if (error) throw error
-  try { await supabase.rpc('update_experience_rating', { p_exp_id: experienceId }) } catch {}
+  if (isOfficial) {
+    try { await supabase.rpc('update_experience_rating', { p_exp_id: experienceId }) } catch {}
+  }
 }
 
 export async function getReviews(experienceId: string) {

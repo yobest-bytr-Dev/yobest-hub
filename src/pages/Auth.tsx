@@ -7,6 +7,7 @@ import { useStore } from '@/store/useStore'
 import { verifyRobloxUsername, type RobloxUser } from '@/lib/roblox'
 import { saveAccount } from '@/lib/accounts'
 import { cn } from '@/lib/utils'
+import { Link } from 'react-router-dom'
 
 type AuthMode = 'signin' | 'signup'
 
@@ -307,6 +308,14 @@ export default function Auth() {
                 </p>
               )}
             </div>
+
+            {mode === 'signin' && (
+              <div className="text-right">
+                <Link to="/forgot-password" className="text-accent-blue text-xs font-medium hover:underline">
+                  Forgot Password?
+                </Link>
+              </div>
+            )}
 
             <AnimatePresence>
               {error && (

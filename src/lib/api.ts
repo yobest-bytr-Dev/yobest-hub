@@ -630,6 +630,7 @@ export async function submitAsset(submission: {
   drive_file_url?: string
   thumbnail_url?: string
   gamepass_id?: string
+  gallery_images?: string[]
 }) {
   const user = await getCurrentUser()
   if (!user) throw new Error('Not authenticated')
@@ -778,6 +779,7 @@ export async function updateExperience(id: string, updates: Partial<Experience>)
         download_enabled: updates.download_enabled ?? true,
         game_play: updates.game_play ?? false,
         gamepass_id: gamepassId,
+        gallery_images: updates.gallery_images || updates.images || [],
       },
     }),
   })
@@ -814,6 +816,7 @@ export async function updateExperience(id: string, updates: Partial<Experience>)
             drive_file_url: updates.download_url || '',
             thumbnail_url: updates.thumbnail_url || '',
             gamepass_url: gamepassId,
+            gallery_images: updates.gallery_images || updates.images || [],
           },
         }),
       })
@@ -847,6 +850,7 @@ export async function updateAsset(id: string, updates: Partial<Asset>) {
       drive_file_url: updates.drive_file_url,
       thumbnail_url: updates.thumbnail_url,
       gamepass_id: updates.gamepass_id,
+      gallery_images: updates.gallery_images || [],
     })
     .eq('id', id)
     .eq('creator_id', user.id)
@@ -893,6 +897,7 @@ export async function updateSubmission(id: string, updates: Partial<Submission>)
         drive_file_url: updates.drive_file_url || '',
         thumbnail_url: updates.thumbnail_url || '',
         gamepass_url: gamepassUrl,
+        gallery_images: updates.gallery_images || [],
       },
     }),
   })
@@ -929,6 +934,7 @@ export async function updateSubmission(id: string, updates: Partial<Submission>)
             download_url: updates.drive_file_url || '',
             thumbnail_url: updates.thumbnail_url || '',
             gamepass_id: gamepassUrl,
+            gallery_images: updates.gallery_images || [],
           },
         }),
       })

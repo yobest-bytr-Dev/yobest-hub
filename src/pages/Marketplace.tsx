@@ -88,6 +88,23 @@ function AssetDetailModal({ asset, onClose }: { asset: Asset; onClose: () => voi
         <div className="p-5 space-y-4 overflow-y-auto flex-1">
           <p className="text-sm text-text-secondary leading-relaxed">{asset.description || 'No description provided.'}</p>
 
+          {(() => {
+            const gallery = asset.gallery_images || []
+            return gallery.length > 0 ? (
+              <div>
+                <h4 className="text-[11px] font-semibold text-text-muted mb-2 uppercase tracking-wide">Gallery</h4>
+                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
+                  {gallery.map((img, i) => (
+                    <a key={i} href={toDirectImageUrl(img)} target="_blank" rel="noopener noreferrer"
+                      className="shrink-0 w-32 h-24 rounded-lg overflow-hidden bg-bg-tertiary border border-border-primary hover:border-accent-blue/30 transition-all group">
+                      <img src={toDirectImageUrl(img)} alt={`Gallery ${i + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform" loading="lazy" />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ) : null
+          })()}
+
           <div className="flex items-center gap-4 text-xs text-text-muted">
             <StarRating rating={reviewStats.avg} count={reviewStats.count} size={12} />
             <span className="flex items-center gap-1"><Download size={12} /> {localDownloads} downloads</span>
@@ -308,7 +325,7 @@ export default function Marketplace() {
   const [assets, setAssets] = useState<Asset[]>([])
   const [loading, setLoading] = useState(true)
   const [showSubmit, setShowSubmit] = useState(false)
-  const [submitForm, setSubmitForm] = useState({ title: '', description: '', type: 'script' as 'script' | 'model' | 'uikit', price: '0', imageUrl: '', gamepassUrl: '' })
+  const [submitForm, setSubmitForm] = useState({ title: '', description: '', type: 'script' as 'script' | 'model' | 'uikit', price: '0', imageUrl: '', gamepassUrl: '', galleryImages: [] as string[] })
   const [submitting, setSubmitting] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
   const [uploadingFile, setUploadingFile] = useState(false)
@@ -363,12 +380,13 @@ export default function Marketplace() {
         thumbnail_url: submitForm.imageUrl || undefined,
         gamepass_id: submitForm.gamepassUrl || undefined,
         drive_file_url: assetFileUrl || undefined,
+        gallery_images: submitForm.galleryImages.length > 0 ? submitForm.galleryImages : undefined,
       })
       setSubmitSuccess(true)
       setTimeout(() => {
         setShowSubmit(false)
         setSubmitSuccess(false)
-        setSubmitForm({ title: '', description: '', type: 'script', price: '0', imageUrl: '', gamepassUrl: '' })
+        setSubmitForm({ title: '', description: '', type: 'script', price: '0', imageUrl: '', gamepassUrl: '', galleryImages: [] })
         setAssetFileUrl('')
         getAssets().then(setAssets)
       }, 2000)
@@ -571,6 +589,10 @@ export default function Marketplace() {
                     folder="yobest/assets"
                     label="Thumbnail Image"
                   />
+                </div>
+                <div>
+                  <ImagePicker value="" onChange={() => {}} folder="yobest/assets" label="Gallery Images (optional)" multiple values={submitForm.galleryImages}
+                    onMultipleChange={(urls) => setSubmitForm({ ...submitForm, galleryImages: urls })} maxImages={8} />
                 </div>
                 <div>
                   <label className="text-xs text-text-muted font-medium mb-1.5 block">Asset File (optional)</label>

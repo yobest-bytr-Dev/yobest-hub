@@ -586,6 +586,7 @@ function GamesTab() {
               video_url: form.video_url, game_url: form.game_url, download_url: form.download_url,
               thumbnail_url: form.thumbnail_url, gamepass_id: gamepassId, price,
               is_official: form.is_official, game_play: form.game_play, download_enabled: form.download_enabled,
+              gallery_images: form.images || [],
             },
           }),
         })
@@ -601,7 +602,7 @@ function GamesTab() {
               headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}`, 'apikey': supabaseAnonKey },
               body: JSON.stringify({
                 table: 'submissions', id: sub.id,
-                fields: { title: form.title, description: form.description, category: form.category, price, gamepass_url: gamepassId, video_url: form.video_url, game_url: form.game_url, drive_file_url: form.download_url, thumbnail_url: form.thumbnail_url },
+                fields: { title: form.title, description: form.description, category: form.category, price, gamepass_url: gamepassId, video_url: form.video_url, game_url: form.game_url, drive_file_url: form.download_url, thumbnail_url: form.thumbnail_url, gallery_images: form.images || [] },
               }),
             })
           }
@@ -611,7 +612,7 @@ function GamesTab() {
         const { error } = await supabase.from('experiences').insert({
           title: form.title, description: form.description, category: form.category,
           video_url: form.video_url, game_url: form.game_url, download_url: form.download_url,
-          thumbnail_url: form.thumbnail_url, images: form.images || [], gamepass_id: gamepassId,
+          thumbnail_url: form.thumbnail_url, images: form.images || [], gallery_images: form.images || [], gamepass_id: gamepassId,
           price, is_official: form.is_official, game_play: form.game_play,
           download_enabled: form.download_enabled, views_count: 0, likes_count: 0,
         })
@@ -633,7 +634,7 @@ function GamesTab() {
     setForm({
       title: game.title, description: game.description || '', category: game.category || 'Uncopylocked',
       video_url: game.video_url || '', game_url: game.game_url || '', download_url: game.download_url || '',
-      thumbnail_url: game.thumbnail_url || '', images: game.images || [], gamepass_id: game.gamepass_id || '',
+      thumbnail_url: game.thumbnail_url || '', images: game.gallery_images || game.images || [], gamepass_id: game.gamepass_id || '',
       price: game.price || 'Free', is_official: game.is_official ?? true,
       game_play: game.game_play ?? false, download_enabled: game.download_enabled ?? true,
     })

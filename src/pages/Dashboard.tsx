@@ -226,8 +226,8 @@ function GamesTab() {
                     </div>
                   )}
                 </div>
-                <ImagePicker value="" onChange={() => {}} folder="yobest/thumbnails" label="Gallery Images" multiple values={(editForm as any).images || []}
-                  onMultipleChange={(urls) => setEditForm({ ...editForm, images: urls } as any)} maxImages={12} />
+                <ImagePicker value="" onChange={() => {}} folder="yobest/thumbnails" label="Gallery Images" multiple values={(editForm as any).gallery_images || (editForm as any).images || []}
+                  onMultipleChange={(urls) => setEditForm({ ...editForm, gallery_images: urls } as any)} maxImages={12} />
                 <div className="flex gap-2">
                   <label className="flex items-center gap-1.5 text-xs text-text-muted">
                     <input type="checkbox" checked={!!editForm.game_play} onChange={(e) => setEditForm({ ...editForm, game_play: e.target.checked })} className="rounded" /> Playable

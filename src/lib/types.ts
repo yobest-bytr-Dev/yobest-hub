@@ -68,6 +68,7 @@ export interface Asset {
   drive_file_url: string
   thumbnail_url: string
   gamepass_id?: string
+  gallery_images?: string[]
   downloads_count: number
   rating: number
   rating_count: number

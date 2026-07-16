@@ -281,6 +281,23 @@ export default function GameDetail() {
               )}
             </div>
 
+            {(() => {
+              const gallery = game.gallery_images || game.images || []
+              return gallery.length > 0 ? (
+                <div className="rounded-2xl bg-bg-secondary border border-border-primary p-4">
+                  <h3 className="text-sm font-semibold text-text-primary mb-3">Gallery</h3>
+                  <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin">
+                    {gallery.map((img, i) => (
+                      <a key={i} href={toDirectImageUrl(img)} target="_blank" rel="noopener noreferrer"
+                        className="shrink-0 w-48 h-32 rounded-xl overflow-hidden bg-bg-tertiary border border-border-primary hover:border-accent-blue/30 transition-all group">
+                        <img src={toDirectImageUrl(img)} alt={`Gallery ${i + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform" loading="lazy" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              ) : null
+            })()}
+
             <div>
               <div className="flex flex-wrap items-center gap-2 mb-3">
                 <span className={cn('inline-flex items-center px-3 py-1 rounded-lg border text-xs font-medium', getCategoryColor(game.category))}>

@@ -186,7 +186,7 @@ export const useStore = create<AppState>((set, get) => ({
     } catch {}
   },
   toggleFollow: async (userId) => {
-    const { following } = get()
+    const { following, currentUser } = get()
     const isNowFollowing = !following.includes(userId)
     const user = await supabase.auth.getUser()
     if (!user.data.user) return
@@ -206,20 +206,32 @@ export const useStore = create<AppState>((set, get) => ({
         // Increment counts
         const { data: target } = await supabase.from('profiles').select('followers_count').eq('id', userId).single()
         const { data: me } = await supabase.from('profiles').select('following_count').eq('id', myId).single()
+        const newFollowers = (target?.followers_count || 0) + 1
+        const newFollowing = (me?.following_count || 0) + 1
         await Promise.all([
-          supabase.from('profiles').update({ followers_count: (target?.followers_count || 0) + 1 }).eq('id', userId),
-          supabase.from('profiles').update({ following_count: (me?.following_count || 0) + 1 }).eq('id', myId),
+          supabase.from('profiles').update({ followers_count: newFollowers }).eq('id', userId),
+          supabase.from('profiles').update({ following_count: newFollowing }).eq('id', myId),
         ])
+        // Refresh currentUser if we just updated our own count
+        if (currentUser) {
+          set({ currentUser: { ...currentUser, following_count: newFollowing } })
+        }
       } else {
         // Delete from follows table
         await supabase.from('follows').delete().eq('follower_id', myId).eq('following_id', userId)
         // Decrement counts
         const { data: target } = await supabase.from('profiles').select('followers_count').eq('id', userId).single()
         const { data: me } = await supabase.from('profiles').select('following_count').eq('id', myId).single()
+        const newFollowers = Math.max(0, (target?.followers_count || 0) - 1)
+        const newFollowing = Math.max(0, (me?.following_count || 0) - 1)
         await Promise.all([
-          supabase.from('profiles').update({ followers_count: Math.max(0, (target?.followers_count || 0) - 1) }).eq('id', userId),
-          supabase.from('profiles').update({ following_count: Math.max(0, (me?.following_count || 0) - 1) }).eq('id', myId),
+          supabase.from('profiles').update({ followers_count: newFollowers }).eq('id', userId),
+          supabase.from('profiles').update({ following_count: newFollowing }).eq('id', myId),
         ])
+        // Refresh currentUser if we just updated our own count
+        if (currentUser) {
+          set({ currentUser: { ...currentUser, following_count: newFollowing } })
+        }
       }
     } catch (e) {
       console.warn('Failed to update follow:', e)

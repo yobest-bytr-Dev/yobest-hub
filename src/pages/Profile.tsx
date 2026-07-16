@@ -7,7 +7,7 @@ import {
   BarChart3, Heart, MessageSquare, Bookmark, Users, Sparkles
 } from 'lucide-react'
 import { useStore } from '@/store/useStore'
-import { signOut, getSubmissions, getAiChats } from '@/lib/api'
+import { signOut, getSubmissions, getAiChats, getCurrentProfile } from '@/lib/api'
 import { getSiteAnalytics } from '@/lib/analytics'
 import { experiences } from '@/data/official-games'
 import { cn, formatNumber } from '@/lib/utils'
@@ -41,6 +41,10 @@ export default function Profile() {
     }
     getSubmissions().then(setSubmissions)
     getAiChats().then(setAiChats)
+    // Re-fetch profile to get fresh follower/following counts
+    getCurrentProfile().then((profile) => {
+      if (profile) setCurrentUser(profile)
+    })
   }, [currentUser, navigate])
 
   if (!currentUser) return null

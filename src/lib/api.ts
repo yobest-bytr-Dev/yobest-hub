@@ -329,16 +329,21 @@ export async function submitGame(submission: {
   const user = await getCurrentUser()
   if (!user) throw new Error('Not authenticated')
 
+  const gamepassUrl = submission.gamepass_url || ''
+  const price = gamepassUrl.trim()
+    ? (submission.price === 'Free' || !submission.price ? 'Gamepass Required' : submission.price)
+    : (submission.price || 'Free')
+
   const { data, error } = await supabase.from('submissions').insert({
     user_id: user.id,
     title: submission.title,
     description: submission.description,
     category: submission.category,
-    price: submission.price,
+    price,
     video_url: submission.video_url,
     game_url: submission.game_url,
     drive_file_url: submission.drive_file_url,
-    gamepass_url: submission.gamepass_url,
+    gamepass_url: gamepassUrl,
     thumbnail_url: submission.thumbnail_url,
     gallery_images: submission.gallery_images || [],
   }).select().single()
@@ -706,18 +711,20 @@ export async function getOwnerSubmissions(): Promise<Submission[]> {
 export async function updateExperience(id: string, updates: Partial<Experience>) {
   const user = await getCurrentUser()
   if (!user) throw new Error('Not authenticated')
+  const gamepassId = updates.gamepass_id || ''
+  const price = gamepassId.trim() ? (updates.price === 'Free' || !updates.price ? 'Gamepass Required' : updates.price) : (updates.price === 'Gamepass Required' ? 'Free' : updates.price || 'Free')
   const payload: Record<string, any> = {
     title: updates.title,
     description: updates.description,
     category: updates.category,
-    price: updates.price,
+    price,
     video_url: updates.video_url,
     game_url: updates.game_url,
     download_url: updates.download_url,
     thumbnail_url: updates.thumbnail_url,
     download_enabled: updates.download_enabled,
     game_play: updates.game_play,
-    gamepass_id: updates.gamepass_id || '',
+    gamepass_id: gamepassId,
     images: updates.images || [],
   }
   const { error } = await supabase
@@ -772,16 +779,18 @@ export async function deleteAsset(id: string) {
 export async function updateSubmission(id: string, updates: Partial<Submission>) {
   const user = await getCurrentUser()
   if (!user) throw new Error('Not authenticated')
+  const gamepassUrl = updates.gamepass_url || ''
+  const price = gamepassUrl.trim() ? (updates.price === 'Free' || !updates.price ? 'Gamepass Required' : updates.price) : (updates.price === 'Gamepass Required' ? 'Free' : updates.price || 'Free')
   const payload: Record<string, any> = {
     title: updates.title,
     description: updates.description,
     category: updates.category,
-    price: updates.price,
+    price,
     video_url: updates.video_url,
     game_url: updates.game_url,
     drive_file_url: updates.drive_file_url,
     thumbnail_url: updates.thumbnail_url,
-    gamepass_url: updates.gamepass_url || '',
+    gamepass_url: gamepassUrl,
     gallery_images: updates.gallery_images || [],
   }
   const { error } = await supabase

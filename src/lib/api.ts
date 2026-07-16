@@ -741,19 +741,21 @@ export async function updateExperience(id: string, updates: Partial<Experience>)
     gamepass_id: gamepassId,
     images: updates.images || [],
   }
-  let { error } = await supabase
+  let { data, error } = await supabase
     .from('experiences')
     .update(payload)
     .eq('id', id)
     .eq('creator_id', user.id)
+    .select('id')
   if (error) {
     const safe: Record<string, any> = { ...payload }
     delete safe.images
     delete safe.gamepass_id
-    const retry = await supabase.from('experiences').update(safe).eq('id', id).eq('creator_id', user.id)
+    let retry = await supabase.from('experiences').update(safe).eq('id', id).eq('creator_id', user.id).select('id')
     if (retry.error) throw retry.error
-    return { partial: true }
+    data = retry.data
   }
+  if (data && data.length === 0) throw new Error('Update blocked — please run the SQL migration in Supabase Dashboard SQL Editor')
   return {}
 }
 
@@ -815,18 +817,28 @@ export async function updateSubmission(id: string, updates: Partial<Submission>)
     gamepass_url: gamepassUrl,
     gallery_images: updates.gallery_images || [],
   }
-  let { error } = await supabase
+  let { data, error } = await supabase
     .from('submissions')
     .update(payload)
     .eq('id', id)
     .eq('user_id', user.id)
+    .select('id')
   if (error) {
     const safe: Record<string, any> = { ...payload }
     delete safe.gallery_images
-    const retry = await supabase.from('submissions').update(safe).eq('id', id).eq('user_id', user.id)
-    if (retry.error) throw retry.error
-    return { partial: true }
+    let retry = await supabase.from('submissions').update(safe).eq('id', id).eq('user_id', user.id).select('id')
+    if (retry.error) {
+      delete safe.gamepass_url
+      retry = await supabase.from('submissions').update(safe).eq('id', id).eq('user_id', user.id).select('id')
+      if (retry.error) {
+        delete safe.thumbnail_url
+        retry = await supabase.from('submissions').update(safe).eq('id', id).eq('user_id', user.id).select('id')
+        if (retry.error) throw retry.error
+      }
+    }
+    data = retry.data
   }
+  if (data && data.length === 0) throw new Error('Update blocked — please run the SQL migration in Supabase Dashboard SQL Editor')
   return {}
 }
 

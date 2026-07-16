@@ -79,7 +79,7 @@ export default function GameDetail() {
   useEffect(() => {
     if (!id) return
     trackGameView(id)
-    setSiteViews(getGameViewCount(id))
+    getGameViewCount(id).then(setSiteViews)
     getGameLikeCount(id).then(setLikes)
     hasUserLikedGame(id).then(setLiked)
   }, [id])

@@ -1,7 +1,6 @@
 import { supabase } from '@/config/supabase'
 
 const LAST_VISIT_KEY = 'yobest_last_visit'
-const GAME_VIEWS_KEY = 'yobest_game_views'
 
 export async function trackVisit(): Promise<void> {
   const now = Date.now()
@@ -48,21 +47,31 @@ export async function trackAiSession(): Promise<void> {
   } catch {}
 }
 
-export function trackGameView(gameId: string): void {
+export async function trackGameView(gameId: string): Promise<void> {
   try {
-    const views = JSON.parse(localStorage.getItem(GAME_VIEWS_KEY) || '{}')
-    if (!views[gameId]) views[gameId] = 0
-    views[gameId]++
-    localStorage.setItem(GAME_VIEWS_KEY, JSON.stringify(views))
+    await supabase.rpc('track_game_view', { p_game_id: gameId })
   } catch {}
 }
 
-export function getGameViewCount(gameId: string): number {
+export async function getGameViewCount(gameId: string): Promise<number> {
   try {
-    const views = JSON.parse(localStorage.getItem(GAME_VIEWS_KEY) || '{}')
-    return views[gameId] || 0
+    const { data } = await supabase.rpc('get_game_view_count', { p_game_id: gameId })
+    return Number(data) || 0
   } catch {
     return 0
+  }
+}
+
+export async function getGameViewCounts(gameIds: string[]): Promise<Map<string, number>> {
+  try {
+    const { data } = await supabase.rpc('get_game_view_counts', { p_game_ids: gameIds })
+    const map = new Map<string, number>()
+    if (data) {
+      data.forEach((row: any) => map.set(row.game_id, Number(row.view_count) || 0))
+    }
+    return map
+  } catch {
+    return new Map()
   }
 }
 

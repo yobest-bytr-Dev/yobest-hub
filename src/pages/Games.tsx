@@ -19,16 +19,17 @@ const categories: GameCategory[] = [
   'Tower Defense', 'Script Kit', 'UI Kit', 'Core API', 'Template',
 ]
 
-function GameCard({ game, ytStats, onMouseEnter, onMouseLeave }: {
+function GameCard({ game, ytStats, serverViews, onMouseEnter, onMouseLeave }: {
   game: Experience
   ytStats?: YouTubeStats | null
+  serverViews?: number
   onMouseEnter: (e: React.MouseEvent, game: Experience, ytStats?: YouTubeStats | null) => void
   onMouseLeave: () => void
 }) {
   const navigate = useNavigate()
   const thumbId = extractYoutubeId(game.video_url)
   const isFree = game.price === 'Free'
-  const views = ytStats?.viewCount ?? game.views_count ?? 0
+  const views = serverViews ?? ytStats?.viewCount ?? game.views_count ?? 0
   const likes = ytStats?.likeCount ?? game.likes_count ?? 0
 
   return (
@@ -276,6 +277,7 @@ export default function Games() {
 
   // YouTube stats for all games
   const [ytStatsMap, setYtStatsMap] = useState<Map<string, YouTubeStats>>(new Map())
+  const [viewCounts, setViewCounts] = useState<Map<string, number>>(new Map())
 
   // Hover tooltip state
   const [tooltipGame, setTooltipGame] = useState<Experience | null>(null)
@@ -340,6 +342,17 @@ export default function Games() {
         stats.forEach((v, k) => next.set(k, v))
         return next
       })
+    })
+  }, [activeTab, communityData, officialData])
+
+  // Fetch server-side view counts for all visible games
+  useEffect(() => {
+    const games = activeTab === 'official' ? (officialData.length > 0 ? officialData : experiences) : communityData
+    if (games.length === 0) return
+
+    import('@/lib/analytics').then(({ getGameViewCounts }) => {
+      const gameIds = games.map(g => g.id)
+      getGameViewCounts(gameIds).then(setViewCounts)
     })
   }, [activeTab, communityData, officialData])
 
@@ -506,6 +519,7 @@ export default function Games() {
                   key={game.id}
                   game={game}
                   ytStats={ytStats}
+                  serverViews={viewCounts.get(game.id)}
                   onMouseEnter={handleCardMouseEnter}
                   onMouseLeave={handleCardMouseLeave}
                 />

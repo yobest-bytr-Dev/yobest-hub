@@ -19,57 +19,55 @@ serve(async (req) => {
 
     const gpId = String(gamepass_id).trim()
 
-    // Fetch gamepass info using the Roblox marketplace API
-    let gamepassInfo: any = null
-    let exists = false
-
-    try {
-      const gpRes = await fetch(
-        `https://api.roblox.com/marketplace/game-pass-product-info?gamePassId=${gpId}`,
-        { headers: { "Accept": "application/json" } }
+    if (!/^\d+$/.test(gpId)) {
+      return new Response(
+        JSON.stringify({ verified: false, exists: false, price: null, name: null, error: "Gamepass ID must be a number" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       )
-      if (gpRes.ok) {
-        const data = await gpRes.json()
-        if (data && data.Name) {
-          exists = true
-          gamepassInfo = {
-            name: data.Name,
-            price: data.PriceInRobux ?? null,
-            description: data.Description ?? "",
-            isForSale: data.IsForSale ?? false,
-          }
-        }
-      }
-    } catch {}
+    }
 
-    // Fallback: try the newer API
-    if (!exists) {
+    let exists = false
+    let price: number | null = null
+    let name: string | null = null
+
+    const apiUrls = [
+      `https://apis.roblox.com/marketplace-service/v1/passes/details?passIds=${gpId}`,
+      `https://apis.roblox.com/game-passes/v1/game-passes/${gpId}/details`,
+      `https://economy.roblox.com/v1/game-passes/${gpId}`,
+      `https://api.roblox.com/marketplace/game-pass-product-info?gamePassId=${gpId}`,
+    ]
+
+    for (const url of apiUrls) {
+      if (exists) break
       try {
-        const gpRes2 = await fetch(
-          `https://apis.roblox.com/game-passes/v1/game-passes/${gpId}`,
-          { headers: { "Accept": "application/json" } }
-        )
-        if (gpRes2.ok) {
-          const data2 = await gpRes2.json()
-          if (data2 && data2.name) {
+        const res = await fetch(url, { headers: { "Accept": "application/json" } })
+        if (!res.ok) continue
+        const data = await res.json()
+
+        if (Array.isArray(data) && data.length > 0) {
+          const item = data[0]
+          if (item.name || item.Name) {
             exists = true
-            gamepassInfo = {
-              name: data2.name,
-              price: null,
-              description: data2.description ?? "",
-              isForSale: data2.isForSale ?? false,
-            }
+            name = item.name || item.Name
+            price = item.priceInRobux ?? item.PriceInRobux ?? null
           }
+        } else if (data && (data.name || data.Name)) {
+          exists = true
+          name = data.name || data.Name
+          price = data.priceInRobux ?? data.PriceInRobux ?? null
         }
       } catch {}
     }
 
-    const price = gamepassInfo?.price ?? null
-    const name = gamepassInfo?.name ?? null
+    if (!exists) {
+      return new Response(
+        JSON.stringify({ verified: false, exists: false, price: null, name: null, error: "Could not verify gamepass" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      )
+    }
 
-    // If we have a user ID, verify ownership
     let verified = false
-    if (roblox_user_id && exists) {
+    if (roblox_user_id) {
       const userId = String(roblox_user_id).trim()
       try {
         const invResponse = await fetch(
@@ -93,10 +91,7 @@ serve(async (req) => {
     const message = error instanceof Error ? error.message : "Unknown error"
     return new Response(
       JSON.stringify({ verified: false, price: null, name: null, exists: false, error: message }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     )
   }
 })

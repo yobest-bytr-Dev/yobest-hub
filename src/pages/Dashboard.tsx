@@ -187,12 +187,14 @@ function GamesTab() {
                     const info = await fetchGamepassInfo(gpId)
                     if (info.exists && info.price != null && info.price > 0) {
                       setEditForm(prev => ({ ...prev, gamepass_id: gpId, price: `${info.price} Robux` }))
-                    } else if (info.exists) {
+                    } else if (info.exists && info.name) {
                       setEditForm(prev => ({ ...prev, gamepass_id: gpId, price: 'Gamepass Required' }))
                     } else {
-                      toast('Gamepass not found on Roblox. Check the ID.', 'error')
+                      setEditForm(prev => ({ ...prev, gamepass_id: gpId, price: prev.price === 'Free' ? 'Gamepass Required' : prev.price || 'Gamepass Required' }))
                     }
-                  } catch {}
+                  } catch {
+                    setEditForm(prev => ({ ...prev, gamepass_id: gpId, price: prev.price === 'Free' ? 'Gamepass Required' : prev.price || 'Gamepass Required' }))
+                  }
                   setGpLoading(false)
                 }}
                   className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-xs focus:outline-none focus:border-accent-blue/50" placeholder={gpLoading ? "Verifying gamepass..." : "GamePass ID (e.g. 12345678 or URL)"} disabled={gpLoading} />
@@ -356,12 +358,14 @@ function SubmissionsTab() {
                       const info = await fetchGamepassInfo(gpUrl)
                       if (info.exists && info.price != null && info.price > 0) {
                         setEditForm(prev => ({ ...prev, gamepass_url: gpUrl, price: `${info.price} Robux` }))
-                      } else if (info.exists) {
+                      } else if (info.exists && info.name) {
                         setEditForm(prev => ({ ...prev, gamepass_url: gpUrl, price: 'Gamepass Required' }))
                       } else {
-                        toast('Gamepass not found on Roblox. Check the ID.', 'error')
+                        setEditForm(prev => ({ ...prev, gamepass_url: gpUrl, price: prev.price === 'Free' ? 'Gamepass Required' : prev.price || 'Gamepass Required' }))
                       }
-                    } catch {}
+                    } catch {
+                      setEditForm(prev => ({ ...prev, gamepass_url: gpUrl, price: prev.price === 'Free' ? 'Gamepass Required' : prev.price || 'Gamepass Required' }))
+                    }
                     setGpLoading(false)
                   }}
                     className="px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-xs focus:outline-none focus:border-accent-blue/50" placeholder={gpLoading ? "Verifying..." : "GamePass ID (if paid)"} disabled={gpLoading} />

@@ -1,77 +1,74 @@
-const GAMES: Record<string, { title: string; desc: string; img: string }> = {
-  'a1000000-0000-0000-0000-000000000001': { title: 'Roblox Studio SharkBite UNCOPYLOCKED by BYTR', desc: 'Free Roblox SharkBite uncopylocked game with all scripts by Yobest.', img: 'https://img.youtube.com/vi/bRzzhZcNHr0/hqdefault.jpg' },
-  'a1000000-0000-0000-0000-000000000002': { title: 'Yobest Blade Ball uncopylocked all Scripts', desc: 'Free Blade Ball uncopylocked with all scripts included.', img: 'https://img.youtube.com/vi/gHeW6FvXmkk/hqdefault.jpg' },
-  'a1000000-0000-0000-0000-000000000003': { title: 'Yobest Tower Defense Anime uncopylocked Up 3', desc: 'Free Anime Tower Defense uncopylocked game by Yobest.', img: 'https://img.youtube.com/vi/XiGrxZNzpZM/hqdefault.jpg' },
-  'a1000000-0000-0000-0000-000000000004': { title: 'Yobest Anime Vanguard uncopylocked (all Scripts)', desc: 'Anime Vanguard uncopylocked with all scripts. Premium Roblox game.', img: 'https://img.youtube.com/vi/o3VxS9r2OwY/hqdefault.jpg' },
-  'a1000000-0000-0000-0000-000000000005': { title: 'Toilet Tower Defense uncopylocked UP4 By BYTR', desc: 'Free Toilet Tower Defense uncopylocked with all features.', img: 'https://img.youtube.com/vi/6mDovQ4d87M/hqdefault.jpg' },
-  'a1000000-0000-0000-0000-000000000006': { title: 'Pet Trade System Up 1 By BYTR', desc: 'Pet trading system template for Roblox Studio.', img: 'https://img.youtube.com/vi/pMrRFF7dHYM/hqdefault.jpg' },
-  'a1000000-0000-0000-0000-000000000007': { title: 'Tower Defense Anime Update 2 BYTR uncopylocked', desc: 'Free Anime Tower Defense Update 2 uncopylocked.', img: 'https://img.youtube.com/vi/97f1sqtWy6o/hqdefault.jpg' },
-  'a1000000-0000-0000-0000-000000000008': { title: 'Robot Simulator BYTR uncopylocked', desc: 'Free Robot Simulator uncopylocked game by Yobest.', img: 'https://img.youtube.com/vi/dsDqBZBLpfg/hqdefault.jpg' },
-  'a1000000-0000-0000-0000-000000000009': { title: 'Real Pls Donate Game BYTR uncopylocked', desc: 'Pls Donate game uncopylocked with full script system.', img: 'https://img.youtube.com/vi/w9OLn8YValE/hqdefault.jpg' },
-  'a1000000-0000-0000-0000-000000000010': { title: 'Pet Trade System and Trade Chat BYTR', desc: 'Pet trading system with trade chat for Roblox.', img: 'https://img.youtube.com/vi/kXMamYt5Zd8/hqdefault.jpg' },
-  'a1000000-0000-0000-0000-000000000011': { title: 'Real Donation Game uncopylocked BYTR', desc: 'Donation game uncopylocked with working donate system.', img: 'https://img.youtube.com/vi/5BYv9x_E2Iw/hqdefault.jpg' },
-  'a1000000-0000-0000-0000-000000000012': { title: 'Race Clicker BYTR uncopylocked', desc: 'Race clicker game uncopylocked by Yobest.', img: 'https://img.youtube.com/vi/bW3ILQnV6Rw/hqdefault.jpg' },
-  'a1000000-0000-0000-0000-000000000013': { title: 'Pet Companions BYTR uncopylocked', desc: 'Pet companions system UI kit for Roblox.', img: 'https://img.youtube.com/vi/KATJLumZSOs/hqdefault.jpg' },
-  'bRzzhZcNHr0': { title: 'Roblox Studio SharkBite UNCOPYLOCKED by BYTR', desc: 'Free Roblox SharkBite uncopylocked game with all scripts by Yobest.', img: 'https://img.youtube.com/vi/bRzzhZcNHr0/hqdefault.jpg' },
-  'gHeW6FvXmkk': { title: 'Yobest Blade Ball uncopylocked all Scripts', desc: 'Free Blade Ball uncopylocked with all scripts included.', img: 'https://img.youtube.com/vi/gHeW6FvXmkk/hqdefault.jpg' },
-  'XiGrxZNzpZM': { title: 'Yobest Tower Defense Anime uncopylocked Up 3', desc: 'Free Anime Tower Defense uncopylocked game by Yobest.', img: 'https://img.youtube.com/vi/XiGrxZNzpZM/hqdefault.jpg' },
-  'o3VxS9r2OwY': { title: 'Yobest Anime Vanguard uncopylocked (all Scripts)', desc: 'Anime Vanguard uncopylocked with all scripts.', img: 'https://img.youtube.com/vi/o3VxS9r2OwY/hqdefault.jpg' },
-  '6mDovQ4d87M': { title: 'Toilet Tower Defense uncopylocked UP4 By BYTR', desc: 'Free Toilet Tower Defense uncopylocked.', img: 'https://img.youtube.com/vi/6mDovQ4d87M/hqdefault.jpg' },
-  'pMrRFF7dHYM': { title: 'Pet Trade System Up 1 By BYTR', desc: 'Pet trading system template for Roblox Studio.', img: 'https://img.youtube.com/vi/pMrRFF7dHYM/hqdefault.jpg' },
-  '97f1sqtWy6o': { title: 'Tower Defense Anime Update 2 BYTR uncopylocked', desc: 'Free Anime Tower Defense Update 2.', img: 'https://img.youtube.com/vi/97f1sqtWy6o/hqdefault.jpg' },
-  'dsDqBZBLpfg': { title: 'Robot Simulator BYTR uncopylocked', desc: 'Free Robot Simulator uncopylocked.', img: 'https://img.youtube.com/vi/dsDqBZBLpfg/hqdefault.jpg' },
-  'w9OLn8YValE': { title: 'Real Pls Donate Game BYTR uncopylocked', desc: 'Pls Donate game uncopylocked.', img: 'https://img.youtube.com/vi/w9OLn8YValE/hqdefault.jpg' },
-  'kXMamYt5Zd8': { title: 'Pet Trade System and Trade Chat BYTR', desc: 'Pet trading system with trade chat.', img: 'https://img.youtube.com/vi/kXMamYt5Zd8/hqdefault.jpg' },
-  '5BYv9x_E2Iw': { title: 'Real Donation Game uncopylocked BYTR', desc: 'Donation game uncopylocked.', img: 'https://img.youtube.com/vi/5BYv9x_E2Iw/hqdefault.jpg' },
-  'bW3ILQnV6Rw': { title: 'Race Clicker BYTR uncopylocked', desc: 'Race clicker game uncopylocked.', img: 'https://img.youtube.com/vi/bW3ILQnV6Rw/hqdefault.jpg' },
-  'KATJLumZSOs': { title: 'Pet Companions BYTR uncopylocked', desc: 'Pet companions system UI kit.', img: 'https://img.youtube.com/vi/KATJLumZSOs/hqdefault.jpg' },
-}
+import { createClient } from '@supabase/supabase-js'
+
+const SITE = 'Yobest'
+const BASE = 'https://yobest-bytr.vercel.app'
+const DEFAULT_IMG = `${BASE}/YobestLogo.png`
+const DEFAULT_DESC = 'Build games with AI assistance, share with the community, and monetize your creations.'
+
+const supabase = createClient(
+  process.env.SUPABASE_URL || 'https://pohslivolczprxacroje.supabase.co',
+  process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+)
 
 function esc(s: string) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
-export default function handler(req: any, res: any) {
-  const gameId = (req.query.id as string) || ''
-  const game = GAMES[gameId]
-  const base = 'https://yobestbytr.vercel.app'
+function ytThumb(url?: string): string | null {
+  if (!url?.includes('youtube.com')) return null
+  const m = url.match(/v=([^&]+)/)
+  return m ? `https://img.youtube.com/vi/${m[1]}/hqdefault.jpg` : null
+}
+
+function buildPage(title: string, desc: string, img: string, url: string) {
+  return `<!DOCTYPE html><html><head>
+<meta charset="UTF-8"/>
+<meta property="og:type" content="website"/>
+<meta property="og:title" content="${esc(title)}"/>
+<meta property="og:description" content="${esc(desc)}"/>
+<meta property="og:image" content="${img}"/>
+<meta property="og:image:width" content="1280"/>
+<meta property="og:image:height" content="720"/>
+<meta property="og:url" content="${url}"/>
+<meta property="og:site_name" content="${SITE}"/>
+<meta name="twitter:card" content="summary_large_image"/>
+<meta name="twitter:title" content="${esc(title)}"/>
+<meta name="twitter:description" content="${esc(desc)}"/>
+<meta name="twitter:image" content="${img}"/>
+<meta http-equiv="refresh" content="0;url=${url}"/>
+<title>${esc(title)}</title>
+</head><body>
+<script>window.location.replace("${url}")</script>
+<p>Redirecting to <a href="${url}">${esc(title)}</a>...</p>
+</body></html>`
+}
+
+export default async function handler(req: any, res: any) {
+  const id = (req.query.id as string) || ''
+  const pageUrl = `${BASE}/games/${id}`
+
+  let game: any = null
+  if (id) {
+    const { data } = await supabase.from('experiences').select('title, description, thumbnail_url, video_url').eq('id', id).maybeSingle()
+    if (data) {
+      game = data
+    } else {
+      const { data: sub } = await supabase.from('submissions').select('title, description, thumbnail_url, video_url').eq('id', id).maybeSingle()
+      if (sub) game = sub
+    }
+  }
 
   if (game) {
-    const html = `<!DOCTYPE html><html><head>
-<meta charset="UTF-8" />
-<meta property="og:type" content="website" />
-<meta property="og:title" content="${esc(game.title)} — Yobest" />
-<meta property="og:description" content="${esc(game.desc)}" />
-<meta property="og:image" content="${game.img}" />
-<meta property="og:image:width" content="1280" />
-<meta property="og:image:height" content="720" />
-<meta property="og:url" content="${base}/games/${gameId}" />
-<meta property="og:site_name" content="Yobest" />
-<meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:title" content="${esc(game.title)} — Yobest" />
-<meta name="twitter:description" content="${esc(game.desc)}" />
-<meta name="twitter:image" content="${game.img}" />
-<meta http-equiv="refresh" content="0;url=${base}/games/${gameId}" />
-<title>${esc(game.title)} — Yobest</title>
-</head><body>
-<script>window.location.replace("${base}/games/${gameId}")</script>
-<p>Redirecting to <a href="${base}/games/${gameId}">${esc(game.title)}</a>...</p>
-</body></html>`
-    res.setHeader('Content-Type', 'text/html')
-    res.setHeader('Cache-Control', 's-maxage=86400, maxage=0')
+    const img = game.thumbnail_url || ytThumb(game.video_url) || DEFAULT_IMG
+    const desc = game.description || `${game.title} — Free Roblox game on ${SITE}`
+    const title = `${game.title} — ${SITE}`
+    const html = buildPage(title, desc, img, pageUrl)
+    res.setHeader('Content-Type', 'text/html; charset=utf-8')
+    res.setHeader('Cache-Control', 's-maxage=3600, maxage=0')
     return res.send(html)
   }
 
-  const html = `<!DOCTYPE html><html><head>
-<meta charset="UTF-8" />
-<meta property="og:title" content="Yobest — The Roblox Creator Platform" />
-<meta property="og:description" content="Build games with AI assistance, share with the community, and monetize your creations." />
-<meta property="og:image" content="${base}/YobestLogo.png" />
-<meta http-equiv="refresh" content="0;url=${base}/" />
-</head><body>
-<script>window.location.replace("${base}/")</script>
-<p>Redirecting to <a href="${base}/">Yobest</a>...</p>
-</body></html>`
-  res.setHeader('Content-Type', 'text/html')
+  const html = buildPage(`${SITE} — The Roblox Creator Platform`, DEFAULT_DESC, DEFAULT_IMG, `${BASE}/`)
+  res.setHeader('Content-Type', 'text/html; charset=utf-8')
   return res.send(html)
 }

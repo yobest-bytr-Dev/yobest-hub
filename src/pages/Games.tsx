@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, SlidersHorizontal, Play, Eye, X, ChevronDown, Plus, Loader2, Heart, MessageSquare, ExternalLink, Upload, Check, Clock } from 'lucide-react'
+import { Search, SlidersHorizontal, Play, Eye, X, ChevronDown, Plus, Loader2, Heart, MessageSquare, ExternalLink, Upload, Check, Clock, Shield, Users } from 'lucide-react'
 import { experiences } from '@/data/official-games'
 import { getApprovedCommunityGames, getOfficialGames, submitGame, getSubmissions } from '@/lib/api'
 import { toDirectImageUrl, uploadToGoogleDrive } from '@/lib/drive-upload'
@@ -417,12 +417,12 @@ export default function Games() {
           <div className="flex items-center justify-between">
             <Tabs
               tabs={[
-                { id: 'official', label: 'Official Games', count: officialData.length || experiences.length },
-                { id: 'community', label: 'Community Games', count: communityData.length },
+                { id: 'official', label: 'Official Games', count: officialData.length || experiences.length, icon: <Shield size={15} /> },
+                { id: 'community', label: 'Community Games', count: communityData.length, icon: <Users size={15} /> },
               ]}
               activeTab={activeTab}
               onChange={setActiveTab}
-              className="flex-1 max-w-md"
+              className="flex-1 max-w-lg"
             />
             {activeTab === 'community' && (
               <button onClick={() => { if (!currentUser) { navigate('/auth'); return } setShowSubmit(true) }}

@@ -187,16 +187,14 @@ export const useStore = create<AppState>((set, get) => ({
       if (isNowFollowing) {
         const user = await supabase.auth.getUser()
         if (user.data.user) {
-          await supabase.rpc('increment_field' as any, { table_name: 'profiles', field_name: 'followers_count', row_id: userId }).catch(() => {
-            supabase.from('profiles').select('followers_count').eq('id', userId).single().then(({ data }) => {
-              if (data) supabase.from('profiles').update({ followers_count: (data.followers_count || 0) + 1 }).eq('id', userId)
-            })
-          })
-          await supabase.rpc('increment_field' as any, { table_name: 'profiles', field_name: 'following_count', row_id: user.data.user.id }).catch(() => {
-            supabase.from('profiles').select('following_count').eq('id', user.data.user!.id).single().then(({ data }) => {
-              if (data) supabase.from('profiles').update({ following_count: (data.following_count || 0) + 1 }).eq('id', user.data.user!.id)
-            })
-          })
+          try { await supabase.rpc('increment_field' as any, { table_name: 'profiles', field_name: 'followers_count', row_id: userId }) } catch {
+            const { data } = await supabase.from('profiles').select('followers_count').eq('id', userId).single()
+            if (data) await supabase.from('profiles').update({ followers_count: (data.followers_count || 0) + 1 }).eq('id', userId)
+          }
+          try { await supabase.rpc('increment_field' as any, { table_name: 'profiles', field_name: 'following_count', row_id: user.data.user.id }) } catch {
+            const { data } = await supabase.from('profiles').select('following_count').eq('id', user.data.user!.id).single()
+            if (data) await supabase.from('profiles').update({ following_count: (data.following_count || 0) + 1 }).eq('id', user.data.user!.id)
+          }
         }
       } else {
         const user = await supabase.auth.getUser()

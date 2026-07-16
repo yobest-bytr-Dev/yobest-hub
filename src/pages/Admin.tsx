@@ -4,7 +4,7 @@ import {
   Shield, Users, Gamepad2, FileText, BarChart3, Settings, Loader2, Trash2,
   UserCheck, UserX, Search, Eye, Heart, MessageSquare, Download, CheckCircle,
   XCircle, ExternalLink, ArrowLeft, Crown, Mail, Calendar, TrendingUp, RefreshCw,
-  Wrench, Plus, Clock, Sparkles, Save, Upload, Ban, ShieldOff, ImagePlus, Tag
+  Wrench, Plus, Clock, Sparkles, Save, Upload, Ban, ShieldOff, ImagePlus, Tag, X
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '@/store/useStore'
@@ -639,7 +639,7 @@ function GamesTab() {
     if (!releaseForm.version.trim() || !releaseForm.title.trim()) { toast('Version and title required', 'error'); return }
     setReleaseLoading(true)
     try {
-      const user = currentUser
+      const { data: { user } } = await supabase.auth.getUser()
       const { error } = await supabase.from('releases').insert({
         target_type: 'game', target_id: releaseGame.id,
         version: releaseForm.version, title: releaseForm.title, body: releaseForm.body,

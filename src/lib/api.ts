@@ -248,6 +248,31 @@ export async function getApprovedCommunityGames(): Promise<Experience[]> {
     gallery_images: s.gallery_images || [],
   }))
 
+  // Merge data from experiences table: if a matching non-official experience exists, prefer its price/gamepass
+  try {
+    const { data: exps } = await supabase
+      .from('experiences')
+      .select('*')
+      .eq('is_official', false)
+      .not('creator_id', 'is', null)
+    if (exps && exps.length > 0) {
+      const expMap = new Map<string, any>()
+      exps.forEach((e: any) => expMap.set(`${e.creator_id}|${e.title}`, e))
+      games.forEach(g => {
+        const exp = expMap.get(`${g.creator_id}|${g.title}`)
+        if (exp) {
+          g.id = exp.id
+          if (exp.gamepass_id) g.gamepass_id = exp.gamepass_id
+          if (exp.price && exp.price !== 'Free') g.price = exp.price
+          if (exp.thumbnail_url) g.thumbnail_url = exp.thumbnail_url
+          if (exp.video_url) g.video_url = exp.video_url
+          if (exp.game_url) g.game_url = exp.game_url
+          if (exp.download_url) g.download_url = exp.download_url
+        }
+      })
+    }
+  } catch {}
+
   // Fix price/gamepass inconsistency: if gamepass is set but price is "Free", correct it
   games.forEach(g => {
     if (g.gamepass_id && g.gamepass_id.trim() && g.price === 'Free') {
@@ -758,6 +783,43 @@ export async function updateExperience(id: string, updates: Partial<Experience>)
   })
   const result = await res.json()
   if (!res.ok || result.error) throw new Error(result.error || 'Update failed')
+
+  // Also sync matching submission so Games page shows updated data
+  try {
+    const { data: sub } = await supabase
+      .from('submissions')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('title', updates.title || '')
+      .limit(1)
+      .maybeSingle()
+    if (sub) {
+      await fetch(`${supabaseUrl}/functions/v1/update-record`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': supabaseAnonKey,
+        },
+        body: JSON.stringify({
+          table: 'submissions',
+          id: sub.id,
+          fields: {
+            title: updates.title || '',
+            description: updates.description || '',
+            category: updates.category || '',
+            price,
+            video_url: updates.video_url || '',
+            game_url: updates.game_url || '',
+            drive_file_url: updates.download_url || '',
+            thumbnail_url: updates.thumbnail_url || '',
+            gamepass_url: gamepassId,
+          },
+        }),
+      })
+    }
+  } catch {}
+
   return {}
 }
 
@@ -836,6 +898,43 @@ export async function updateSubmission(id: string, updates: Partial<Submission>)
   })
   const result = await res.json()
   if (!res.ok || result.error) throw new Error(result.error || 'Update failed')
+
+  // Also sync matching experience so Dashboard shows updated data
+  try {
+    const { data: exp } = await supabase
+      .from('experiences')
+      .select('id')
+      .eq('creator_id', user.id)
+      .eq('title', updates.title || '')
+      .limit(1)
+      .maybeSingle()
+    if (exp) {
+      await fetch(`${supabaseUrl}/functions/v1/update-record`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': supabaseAnonKey,
+        },
+        body: JSON.stringify({
+          table: 'experiences',
+          id: exp.id,
+          fields: {
+            title: updates.title || '',
+            description: updates.description || '',
+            category: updates.category || '',
+            price,
+            video_url: updates.video_url || '',
+            game_url: updates.game_url || '',
+            download_url: updates.drive_file_url || '',
+            thumbnail_url: updates.thumbnail_url || '',
+            gamepass_id: gamepassUrl,
+          },
+        }),
+      })
+    }
+  } catch {}
+
   return {}
 }
 

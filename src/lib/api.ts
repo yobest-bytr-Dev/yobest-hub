@@ -1,4 +1,4 @@
-import { supabase } from '@/config/supabase'
+import { supabase, supabaseUrl, supabaseAnonKey } from '@/config/supabase'
 import type { Experience, Asset, UserProfile, Challenge, Submission, Release } from './types'
 
 export async function signUp(
@@ -244,6 +244,7 @@ export async function getApprovedCommunityGames(): Promise<Experience[]> {
     thumbnail_url: s.thumbnail_url || '',
     created_at: s.created_at,
     gamepass_id: s.gamepass_url || '',
+    images: s.gallery_images || [],
     gallery_images: s.gallery_images || [],
   }))
 
@@ -718,7 +719,6 @@ export async function updateExperience(id: string, updates: Partial<Experience>)
     game_play: updates.game_play,
     gamepass_id: updates.gamepass_id || '',
     images: updates.images || [],
-    gallery_images: updates.gallery_images || [],
   }
   const { error } = await supabase
     .from('experiences')
@@ -945,12 +945,12 @@ export async function verifyGamepassOwnership(gamepassId: string): Promise<{ ver
 
   try {
     const { data: { session } } = await supabase.auth.getSession()
-    const res = await fetch(`${supabase.supabaseUrl}/functions/v1/gamepass-verify`, {
+    const res = await fetch(`${supabaseUrl}/functions/v1/gamepass-verify`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${session?.access_token || ''}`,
-        'apikey': supabase.supabaseKey,
+        'apikey': supabaseAnonKey,
       },
       body: JSON.stringify({ gamepass_id: gamepassId, roblox_user_id: profile.roblox_id }),
     })

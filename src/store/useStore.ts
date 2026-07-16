@@ -170,45 +170,62 @@ export const useStore = create<AppState>((set, get) => ({
   setSiteAnalytics: (analytics) => set({ siteAnalytics: analytics }),
 
   following: loadFromStorage<string[]>(FOLLOWING_KEY, []),
-  loadFollowing: () => {
-    set({ following: loadFromStorage<string[]>(FOLLOWING_KEY, []) })
+  loadFollowing: async () => {
+    const user = await supabase.auth.getUser()
+    if (!user.data.user) return
+    try {
+      const { data } = await supabase
+        .from('follows')
+        .select('following_id')
+        .eq('follower_id', user.data.user.id)
+      if (data) {
+        const ids = data.map((f: any) => f.following_id)
+        saveToStorage(FOLLOWING_KEY, ids)
+        set({ following: ids })
+      }
+    } catch {}
   },
   toggleFollow: async (userId) => {
     const { following } = get()
     const isNowFollowing = !following.includes(userId)
+    const user = await supabase.auth.getUser()
+    if (!user.data.user) return
+    const myId = user.data.user.id
+
+    // Optimistic update
     const next = isNowFollowing
       ? [...following, userId]
       : following.filter((id) => id !== userId)
     saveToStorage(FOLLOWING_KEY, next)
     set({ following: next })
-    
-    // Update followers_count in DB
+
     try {
       if (isNowFollowing) {
-        const user = await supabase.auth.getUser()
-        if (user.data.user) {
-          try { await supabase.rpc('increment_field' as any, { table_name: 'profiles', field_name: 'followers_count', row_id: userId }) } catch {
-            const { data } = await supabase.from('profiles').select('followers_count').eq('id', userId).single()
-            if (data) await supabase.from('profiles').update({ followers_count: (data.followers_count || 0) + 1 }).eq('id', userId)
-          }
-          try { await supabase.rpc('increment_field' as any, { table_name: 'profiles', field_name: 'following_count', row_id: user.data.user.id }) } catch {
-            const { data } = await supabase.from('profiles').select('following_count').eq('id', user.data.user!.id).single()
-            if (data) await supabase.from('profiles').update({ following_count: (data.following_count || 0) + 1 }).eq('id', user.data.user!.id)
-          }
-        }
+        // Insert into follows table
+        await supabase.from('follows').insert({ follower_id: myId, following_id: userId })
+        // Increment counts
+        const { data: target } = await supabase.from('profiles').select('followers_count').eq('id', userId).single()
+        const { data: me } = await supabase.from('profiles').select('following_count').eq('id', myId).single()
+        await Promise.all([
+          supabase.from('profiles').update({ followers_count: (target?.followers_count || 0) + 1 }).eq('id', userId),
+          supabase.from('profiles').update({ following_count: (me?.following_count || 0) + 1 }).eq('id', myId),
+        ])
       } else {
-        const user = await supabase.auth.getUser()
-        if (user.data.user) {
-          supabase.from('profiles').select('followers_count').eq('id', userId).single().then(({ data }) => {
-            if (data) supabase.from('profiles').update({ followers_count: Math.max(0, (data.followers_count || 0) - 1) }).eq('id', userId)
-          })
-          supabase.from('profiles').select('following_count').eq('id', user.data.user!.id).single().then(({ data }) => {
-            if (data) supabase.from('profiles').update({ following_count: Math.max(0, (data.following_count || 0) - 1) }).eq('id', user.data.user!.id)
-          })
-        }
+        // Delete from follows table
+        await supabase.from('follows').delete().eq('follower_id', myId).eq('following_id', userId)
+        // Decrement counts
+        const { data: target } = await supabase.from('profiles').select('followers_count').eq('id', userId).single()
+        const { data: me } = await supabase.from('profiles').select('following_count').eq('id', myId).single()
+        await Promise.all([
+          supabase.from('profiles').update({ followers_count: Math.max(0, (target?.followers_count || 0) - 1) }).eq('id', userId),
+          supabase.from('profiles').update({ following_count: Math.max(0, (me?.following_count || 0) - 1) }).eq('id', myId),
+        ])
       }
     } catch (e) {
-      console.warn('Failed to update follow counts:', e)
+      console.warn('Failed to update follow:', e)
+      // Revert optimistic update
+      saveToStorage(FOLLOWING_KEY, following)
+      set({ following })
     }
   },
   isFollowing: (userId) => get().following.includes(userId),

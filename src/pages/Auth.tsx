@@ -8,6 +8,7 @@ import { verifyRobloxUsername, type RobloxUser } from '@/lib/roblox'
 import { saveAccount } from '@/lib/accounts'
 import { cn } from '@/lib/utils'
 import { Link } from 'react-router-dom'
+import { supabase } from '@/config/supabase'
 
 type AuthMode = 'signin' | 'signup'
 
@@ -89,6 +90,7 @@ export default function Auth() {
       } else {
         await signIn(email, password)
         const profile = await getCurrentProfile()
+        const { data: { session } } = await supabase.auth.getSession()
         if (profile) {
           setCurrentUser(profile)
           saveAccount({
@@ -97,6 +99,7 @@ export default function Auth() {
             username: profile.username,
             avatar_url: profile.avatar_url,
             roblox_id: profile.roblox_id,
+            refresh_token: session?.refresh_token || '',
           })
         }
         navigate('/')

@@ -168,8 +168,18 @@ function GamesTab() {
                     className="px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-xs focus:outline-none focus:border-accent-blue/50" placeholder="Price" />
                 </div>
                 <ImagePicker value={editForm.thumbnail_url || ''} onChange={(url) => setEditForm({ ...editForm, thumbnail_url: url })} folder="yobest/thumbnails" label="Thumbnail" />
-                <input value={(editForm as any).gamepass_id || ''} onChange={(e) => setEditForm({ ...editForm, gamepass_id: e.target.value } as any)}
-                  className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-xs focus:outline-none focus:border-accent-blue/50" placeholder="GamePass ID (if paid)" />
+                <input value={(editForm as any).gamepass_id || ''} onChange={(e) => {
+                  const gpId = e.target.value
+                  const updates: any = { ...editForm, gamepass_id: gpId }
+                  // Auto-set price when gamepass is added
+                  if (gpId && (!editForm.price || editForm.price === 'Free')) {
+                    updates.price = 'Gamepass Required'
+                  } else if (!gpId && editForm.price === 'Gamepass Required') {
+                    updates.price = 'Free'
+                  }
+                  setEditForm(updates)
+                }}
+                  className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-xs focus:outline-none focus:border-accent-blue/50" placeholder="GamePass ID (e.g. 12345678 or URL)" />
                 <ImagePicker value="" onChange={() => {}} folder="yobest/thumbnails" label="Gallery Images" multiple values={(editForm as any).images || []}
                   onMultipleChange={(urls) => setEditForm({ ...editForm, images: urls } as any)} maxImages={12} />
                 <div className="flex gap-2">

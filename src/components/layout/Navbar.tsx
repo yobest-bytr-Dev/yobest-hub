@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { getSavedAccounts, setActiveAccount } from '@/lib/accounts'
 import RobloxAvatar from '@/components/ui/RobloxAvatar'
 import NotificationBell from '@/components/ui/NotificationBell'
+import { supabase } from '@/config/supabase'
 
 const navLinks = [
   { to: '/games', label: 'Games', icon: Gamepad2 },
@@ -25,6 +26,7 @@ export default function Navbar() {
   const currentUser = useStore((s) => s.currentUser)
   const setCurrentUser = useStore((s) => s.setCurrentUser)
   const conversations = useStore((s) => s.conversations)
+  const loadFollowing = useStore((s) => s.loadFollowing)
 
   const totalUnread = conversations.reduce((sum, c) => sum + c.unread, 0)
   const savedAccounts = getSavedAccounts()
@@ -35,9 +37,10 @@ export default function Navbar() {
         const savedDeco = localStorage.getItem('yobest_avatar_decoration')
         if (savedDeco) profile.avatar_decoration = savedDeco
         setCurrentUser(profile)
+        loadFollowing()
       }
     }).catch(() => {})
-  }, [setCurrentUser])
+  }, [setCurrentUser, loadFollowing])
 
   useEffect(() => {
     setMobileOpen(false)
@@ -153,10 +156,26 @@ export default function Navbar() {
                         {savedAccounts.map(acc => (
                           <div key={acc.id} className={cn('flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm cursor-pointer transition-colors',
                             currentUser?.id === acc.id ? 'bg-accent-blue/15 text-accent-blue' : 'text-text-secondary hover:bg-bg-elevated hover:text-text-primary'
-                          )} onClick={() => {
+                          )} onClick={async () => {
                             if (currentUser?.id !== acc.id) {
-                              setActiveAccount(acc.id)
-                              window.location.reload()
+                              if (acc.refresh_token) {
+                                try {
+                                  await supabase.auth.signOut()
+                                  const { error } = await supabase.auth.setSession({
+                                    access_token: '',
+                                    refresh_token: acc.refresh_token,
+                                  })
+                                  if (error) throw error
+                                  setActiveAccount(acc.id)
+                                  window.location.reload()
+                                } catch {
+                                  setActiveAccount(acc.id)
+                                  navigate('/auth')
+                                }
+                              } else {
+                                setActiveAccount(acc.id)
+                                navigate('/auth')
+                              }
                             }
                             setShowAccounts(false)
                           }}>
@@ -303,10 +322,26 @@ export default function Navbar() {
                       {savedAccounts.map(acc => (
                         <div key={acc.id} className={cn('flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm cursor-pointer transition-colors',
                           currentUser?.id === acc.id ? 'bg-accent-blue/15 text-accent-blue' : 'text-text-secondary hover:bg-bg-elevated hover:text-text-primary'
-                        )} onClick={() => {
+                        )} onClick={async () => {
                           if (currentUser?.id !== acc.id) {
-                            setActiveAccount(acc.id)
-                            window.location.reload()
+                            if (acc.refresh_token) {
+                              try {
+                                await supabase.auth.signOut()
+                                const { error } = await supabase.auth.setSession({
+                                  access_token: '',
+                                  refresh_token: acc.refresh_token,
+                                })
+                                if (error) throw error
+                                setActiveAccount(acc.id)
+                                window.location.reload()
+                              } catch {
+                                setActiveAccount(acc.id)
+                                navigate('/auth')
+                              }
+                            } else {
+                              setActiveAccount(acc.id)
+                              navigate('/auth')
+                            }
                           }
                           setMobileOpen(false)
                         }}>

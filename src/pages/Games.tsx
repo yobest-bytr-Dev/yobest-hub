@@ -82,8 +82,12 @@ function GameCard({ game, ytStats, serverViews, onMouseEnter, onMouseLeave }: {
               Official
             </div>
           )}
-          {isFree ? (
+          {isFree && !game.gamepass_id ? (
             <div className="px-2 py-0.5 rounded-md bg-green-500/90 text-white text-xs font-bold">FREE</div>
+          ) : game.gamepass_id ? (
+            <div className="px-2 py-0.5 rounded-md bg-purple-500/90 text-white text-xs font-bold">
+              {game.price === 'Gamepass Required' ? 'Gamepass' : game.price}
+            </div>
           ) : (
             <div className="px-2 py-0.5 rounded-md bg-yellow-500/90 text-black text-xs font-bold">{game.price}</div>
           )}

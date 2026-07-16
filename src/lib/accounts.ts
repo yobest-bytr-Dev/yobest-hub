@@ -4,6 +4,7 @@ export interface SavedAccount {
   username: string
   avatar_url: string
   roblox_id?: string
+  refresh_token?: string
 }
 
 const STORAGE_KEY = 'yobest_saved_accounts'
@@ -17,7 +18,7 @@ export function getSavedAccounts(): SavedAccount[] {
 export function saveAccount(account: SavedAccount) {
   const accounts = getSavedAccounts()
   const existing = accounts.findIndex(a => a.id === account.id)
-  if (existing >= 0) accounts[existing] = account
+  if (existing >= 0) accounts[existing] = { ...accounts[existing], ...account }
   else accounts.push(account)
   localStorage.setItem(STORAGE_KEY, JSON.stringify(accounts))
 }
@@ -33,4 +34,13 @@ export function setActiveAccount(id: string) {
 
 export function getActiveAccountId(): string | null {
   return localStorage.getItem(ACTIVE_KEY)
+}
+
+export function updateAccountToken(id: string, refresh_token: string) {
+  const accounts = getSavedAccounts()
+  const idx = accounts.findIndex(a => a.id === id)
+  if (idx >= 0) {
+    accounts[idx].refresh_token = refresh_token
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(accounts))
+  }
 }

@@ -147,14 +147,17 @@ export default function PublicProfile() {
                 {!isYou && (
                   <>
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         if (!currentUser) { navigate('/auth'); return }
-                        toggleFollow(profile.id)
-                        const nowFollowing = !isFollowing(profile.id)
-                        toast(nowFollowing ? `Following ${profile.username}` : `Unfollowed ${profile.username}`, 'success')
-                        if (nowFollowing) {
+                        const wasFollowing = isFollowing(profile.id)
+                        await toggleFollow(profile.id)
+                        toast(wasFollowing ? `Unfollowed ${profile.username}` : `Following ${profile.username}`, 'success')
+                        if (!wasFollowing) {
                           addNotification({ type: 'follow', title: 'New follower', body: `You are now following ${profile.username}`, link: `/profile/${profile.id}` })
                         }
+                        // Re-fetch profile to update counts
+                        const { data } = await supabase.from('profiles').select('*').eq('id', profile.id).single()
+                        if (data) setProfile(data)
                       }}
                       className={cn(
                         'flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all',

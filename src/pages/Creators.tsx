@@ -200,10 +200,11 @@ export default function Creators() {
                           <UserCheck size={13} /> View Profile
                         </button>
                         <button
-                          onClick={() => {
+                          onClick={async () => {
   if (!currentUser) { navigate('/auth'); return }
-  toggleFollow(profile.id)
-  toast(!isFollowing(profile.id) ? `Following ${profile.username}` : `Unfollowed ${profile.username}`, 'success')
+  const wasFollowing = isFollowing(profile.id)
+  await toggleFollow(profile.id)
+  toast(wasFollowing ? `Unfollowed ${profile.username}` : `Following ${profile.username}`, 'success')
 }}
                           className={cn(
                             'flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all',

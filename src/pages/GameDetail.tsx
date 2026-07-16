@@ -346,7 +346,7 @@ export default function GameDetail() {
                 </button>
               </div>
 
-              {game.price !== 'Free' && game.gamepass_id && (
+              {game.gamepass_id && (
                 <div className="mt-4 p-4 rounded-xl bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20">
                   <div className="flex items-center gap-2 mb-3">
                     <ShoppingCart size={16} className="text-yellow-400" />

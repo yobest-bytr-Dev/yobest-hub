@@ -236,6 +236,8 @@ export async function getApprovedCommunityGames(): Promise<Experience[]> {
     is_official: false,
     thumbnail_url: s.thumbnail_url || '',
     created_at: s.created_at,
+    gamepass_id: s.gamepass_url || '',
+    gallery_images: s.gallery_images || [],
   }))
 
   // Fetch like counts for all community games
@@ -609,6 +611,10 @@ export async function recordGamepassPurchase(gamepassId: string, gameId?: string
 }
 
 export function extractGamepassId(url: string): string | null {
+  if (!url) return null
+  // Handle raw numeric IDs
+  if (/^\d+$/.test(url.trim())) return url.trim()
+  // Handle URLs like https://www.roblox.com/game-pass/123456/name
   const match = url.match(/game-pass[\/?]([0-9]+)/)
   return match ? match[1] : null
 }
@@ -634,20 +640,24 @@ export async function getOwnerSubmissions(): Promise<Submission[]> {
 export async function updateExperience(id: string, updates: Partial<Experience>) {
   const user = await getCurrentUser()
   if (!user) throw new Error('Not authenticated')
+  const payload: Record<string, any> = {
+    title: updates.title,
+    description: updates.description,
+    category: updates.category,
+    price: updates.price,
+    video_url: updates.video_url,
+    game_url: updates.game_url,
+    download_url: updates.download_url,
+    thumbnail_url: updates.thumbnail_url,
+    download_enabled: updates.download_enabled,
+    game_play: updates.game_play,
+  }
+  if (updates.gamepass_id !== undefined) payload.gamepass_id = updates.gamepass_id
+  if (updates.images !== undefined) payload.images = updates.images
+  if (updates.gallery_images !== undefined) payload.gallery_images = updates.gallery_images
   const { error } = await supabase
     .from('experiences')
-    .update({
-      title: updates.title,
-      description: updates.description,
-      category: updates.category,
-      price: updates.price,
-      video_url: updates.video_url,
-      game_url: updates.game_url,
-      download_url: updates.download_url,
-      thumbnail_url: updates.thumbnail_url,
-      download_enabled: updates.download_enabled,
-      game_play: updates.game_play,
-    })
+    .update(payload)
     .eq('id', id)
     .eq('creator_id', user.id)
   if (error) throw error
@@ -697,18 +707,21 @@ export async function deleteAsset(id: string) {
 export async function updateSubmission(id: string, updates: Partial<Submission>) {
   const user = await getCurrentUser()
   if (!user) throw new Error('Not authenticated')
+  const payload: Record<string, any> = {
+    title: updates.title,
+    description: updates.description,
+    category: updates.category,
+    price: updates.price,
+    video_url: updates.video_url,
+    game_url: updates.game_url,
+    drive_file_url: updates.drive_file_url,
+    thumbnail_url: updates.thumbnail_url,
+  }
+  if (updates.gamepass_url !== undefined) payload.gamepass_url = updates.gamepass_url
+  if (updates.gallery_images !== undefined) payload.gallery_images = updates.gallery_images
   const { error } = await supabase
     .from('submissions')
-    .update({
-      title: updates.title,
-      description: updates.description,
-      category: updates.category,
-      price: updates.price,
-      video_url: updates.video_url,
-      game_url: updates.game_url,
-      drive_file_url: updates.drive_file_url,
-      thumbnail_url: updates.thumbnail_url,
-    })
+    .update(payload)
     .eq('id', id)
     .eq('user_id', user.id)
   if (error) throw error
@@ -866,17 +879,25 @@ export async function verifyGamepassOwnership(gamepassId: string): Promise<{ ver
   if (!profile?.roblox_id) return { verified: false, error: 'Link your Roblox account first' }
 
   try {
-    const res = await fetch(`https://inventory.roblox.com/v1/users/${profile.roblox_id}/items/GamePass/${gamepassId}`)
-    if (res.ok) {
-      const data = await res.json()
-      if (data.data && data.data.length > 0) {
-        await recordGamepassPurchase(gamepassId)
-        return { verified: true }
-      }
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch(`${supabase.supabaseUrl}/functions/v1/gamepass-verify`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session?.access_token || ''}`,
+        'apikey': supabase.supabaseKey,
+      },
+      body: JSON.stringify({ gamepass_id: gamepassId, roblox_user_id: profile.roblox_id }),
+    })
+    const data = await res.json()
+    if (data.verified) {
+      await recordGamepassPurchase(gamepassId)
+      return { verified: true }
     }
-  } catch {}
-
-  return { verified: false, error: 'Could not verify ownership. Make sure you own the gamepass.' }
+    return { verified: false, error: data.error || 'Gamepass not found in your inventory' }
+  } catch (e) {
+    return { verified: false, error: 'Could not verify ownership. Make sure you own the gamepass.' }
+  }
 }
 
 export async function isGamepassVerified(gamepassId: string): Promise<boolean> {

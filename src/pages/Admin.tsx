@@ -6,7 +6,7 @@ import {
   XCircle, ExternalLink, ArrowLeft, Crown, Mail, Calendar, TrendingUp, RefreshCw,
   Wrench, Plus, Clock, Sparkles, Save, Upload, Ban, ShieldOff, ImagePlus, Tag, X,
   ShoppingCart, AlertTriangle, Bot, Send, Radio, Hash, Volume2, Zap, Power,
-  CircleDot, ToggleLeft, ToggleRight, ChevronDown, ChevronRight
+  CircleDot, ToggleLeft, ToggleRight, ChevronDown, ChevronRight, Terminal
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '@/store/useStore'
@@ -1381,6 +1381,11 @@ function BotTab() {
   const [configEdits, setConfigEdits] = useState<Record<string, string>>({})
   const [guildSettings, setGuildSettings] = useState<any>(null)
   const [newsChannel, setNewsChannel] = useState('')
+  const [commands, setCommands] = useState<any[]>([])
+  const [commandCategories, setCommandCategories] = useState<string[]>([])
+  const [expandedCommands, setExpandedCommands] = useState(false)
+  const [cmdFilter, setCmdFilter] = useState('')
+  const [catFilter, setCatFilter] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -1487,6 +1492,63 @@ function BotTab() {
       toast(e.message || 'Failed', 'error')
     }
   }
+
+  const loadCommands = useCallback(async () => {
+    if (!selectedGuild) return
+    try {
+      const data = await botApiCall('list_commands', { guild_id: selectedGuild })
+      if (!data.error) {
+        setCommands(data.commands || [])
+        setCommandCategories(data.categories || [])
+      }
+    } catch {}
+  }, [selectedGuild])
+
+  useEffect(() => {
+    if (expandedCommands && selectedGuild) loadCommands()
+  }, [expandedCommands, selectedGuild, loadCommands])
+
+  const toggleCommand = async (cmd: string) => {
+    if (!selectedGuild) return
+    try {
+      const data = await botApiCall('toggle_command', { guild_id: selectedGuild, command: cmd })
+      if (data.error) throw new Error(data.error)
+      setCommands(prev => prev.map(c => c.name === cmd ? { ...c, disabled: !c.disabled } : c))
+      toast(`Command "${cmd}" ${commands.find(c => c.name === cmd)?.disabled ? 'enabled' : 'disabled'}`, 'success')
+    } catch (e: any) {
+      toast(e.message || 'Failed', 'error')
+    }
+  }
+
+  const setCommandChannel = async (cmd: string, channelId: string) => {
+    if (!selectedGuild) return
+    try {
+      const data = await botApiCall('set_command_channel', { guild_id: selectedGuild, command: cmd, channel_id: channelId || null })
+      if (data.error) throw new Error(data.error)
+      setCommands(prev => prev.map(c => c.name === cmd ? { ...c, channel_restricted: channelId || null } : c))
+      toast(`Command "${cmd}" channel updated`, 'success')
+    } catch (e: any) {
+      toast(e.message || 'Failed', 'error')
+    }
+  }
+
+  const setCommandPerm = async (cmd: string, level: string) => {
+    if (!selectedGuild) return
+    try {
+      const data = await botApiCall('update_command_permission', { guild_id: selectedGuild, command: cmd, min_level: level || undefined })
+      if (data.error) throw new Error(data.error)
+      setCommands(prev => prev.map(c => c.name === cmd ? { ...c, custom_level: level || null, effective_level: level || c.defaultLevel } : c))
+      toast(`Command "${cmd}" permission updated`, 'success')
+    } catch (e: any) {
+      toast(e.message || 'Failed', 'error')
+    }
+  }
+
+  const filteredCmds = commands.filter(c => {
+    if (cmdFilter && !c.name.includes(cmdFilter.toLowerCase()) && !c.description.toLowerCase().includes(cmdFilter.toLowerCase())) return false
+    if (catFilter && c.category !== catFilter) return false
+    return true
+  })
 
   if (loading) return <div className="flex items-center justify-center py-20"><Loader2 size={24} className="animate-spin text-accent-blue" /></div>
 
@@ -1690,6 +1752,79 @@ function BotTab() {
             <button onClick={() => sendCommand('test_welcome')} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-xs text-text-secondary hover:text-accent-purple hover:border-accent-purple/30 transition-all">
               <MessageSquare size={12} /> Test Welcome
             </button>
+          </div>
+        </div>
+      )}
+
+      {selectedGuild && (
+        <div className="rounded-xl bg-bg-secondary border border-border-primary p-5">
+          <button onClick={() => { setExpandedCommands(!expandedCommands); if (!expandedCommands) loadCommands() }} className="flex items-center gap-2 w-full text-left">
+            {expandedCommands ? <ChevronDown size={14} className="text-text-muted" /> : <ChevronRight size={14} className="text-text-muted" />}
+            <Terminal size={14} className="text-accent-purple" />
+            <h3 className="text-sm font-semibold text-text-primary">Slash Commands</h3>
+            <span className="text-[9px] text-text-dim ml-auto">{commands.filter(c => !c.disabled).length}/{commands.length} enabled</span>
+          </button>
+          {expandedCommands && (
+            <div className="mt-4 space-y-3">
+              <div className="flex flex-wrap gap-2 items-center">
+                <input value={cmdFilter} onChange={(e) => setCmdFilter(e.target.value)} placeholder="Search commands..."
+                  className="flex-1 min-w-[140px] px-3 py-1.5 rounded-lg bg-bg-elevated border border-border-primary text-xs text-text-primary focus:outline-none focus:border-accent-blue/50" />
+                <div className="flex flex-wrap gap-1">
+                  <button onClick={() => setCatFilter('')} className={cn('px-2 py-1 rounded text-[10px] font-medium transition-colors', !catFilter ? 'bg-accent-blue/20 text-accent-blue' : 'text-text-dim hover:text-text-secondary')}>All</button>
+                  {commandCategories.map(cat => (
+                    <button key={cat} onClick={() => setCatFilter(cat === catFilter ? '' : cat)} className={cn('px-2 py-1 rounded text-[10px] font-medium transition-colors capitalize', catFilter === cat ? 'bg-accent-blue/20 text-accent-blue' : 'text-text-dim hover:text-text-secondary')}>{cat}</button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-1.5 max-h-[500px] overflow-y-auto pr-1">
+                {filteredCmds.map((cmd) => (
+                  <div key={cmd.name} className={cn('flex items-center gap-3 p-2.5 rounded-lg border transition-all', cmd.disabled ? 'bg-bg-elevated/50 border-border-primary/50 opacity-60' : 'bg-bg-elevated border-border-primary')}>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className={cn('text-xs font-mono font-semibold', cmd.disabled ? 'text-text-dim line-through' : 'text-text-primary')}>/{cmd.name}</span>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-bg-secondary text-text-dim capitalize">{cmd.category}</span>
+                        {cmd.custom_level && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-accent-purple/20 text-accent-purple">{cmd.custom_level}</span>}
+                      </div>
+                      <p className="text-[10px] text-text-dim mt-0.5 truncate">{cmd.description}</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <select value={cmd.effective_level} onChange={(e) => setCommandPerm(cmd.name, e.target.value)} className="px-1.5 py-1 rounded bg-bg-secondary border border-border-primary text-[10px] text-text-secondary focus:outline-none focus:border-accent-blue/50">
+                        <option value="member">Member</option>
+                        <option value="mod">Mod</option>
+                        <option value="admin">Admin</option>
+                        <option value="owner">Owner</option>
+                      </select>
+                      <select value={cmd.channel_restricted || ''} onChange={(e) => setCommandChannel(cmd.name, e.target.value)} className="px-1.5 py-1 rounded bg-bg-secondary border border-border-primary text-[10px] text-text-secondary focus:outline-none focus:border-accent-blue/50 max-w-[120px]">
+                        <option value="">Any channel</option>
+                        {channels.map((c: any) => (
+                          <option key={c.id} value={c.id}>#{c.name}</option>
+                        ))}
+                      </select>
+                      <button onClick={() => toggleCommand(cmd.name)} className={cn('w-9 h-5 rounded-full transition-all relative', cmd.disabled ? 'bg-red-500/30' : 'bg-accent-green/30')}>
+                        <div className={cn('w-3.5 h-3.5 rounded-full absolute top-0.5 transition-all', cmd.disabled ? 'left-0.5 bg-red-400' : 'left-[18px] bg-accent-green')} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Server Channels Display */}
+      {selectedGuild && channels.length > 0 && (
+        <div className="rounded-xl bg-bg-secondary border border-border-primary p-5">
+          <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2 mb-3">
+            <Hash size={14} className="text-accent-blue" /> Server Channels
+          </h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+            {channels.map((ch: any) => (
+              <div key={ch.id} className="flex items-center gap-2 p-2 rounded-lg bg-bg-elevated border border-border-primary text-[11px]">
+                <Hash size={10} className="text-text-dim shrink-0" />
+                <span className="text-text-secondary truncate">{ch.name}</span>
+              </div>
+            ))}
           </div>
         </div>
       )}

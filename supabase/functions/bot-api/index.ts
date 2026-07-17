@@ -7,6 +7,74 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+const BOT_COMMANDS = [
+  { name: "ping", description: "Check bot latency", category: "utility", defaultLevel: "member" },
+  { name: "stats", description: "Bot and server stats", category: "utility", defaultLevel: "member" },
+  { name: "serverinfo", description: "Info about this server", category: "utility", defaultLevel: "member" },
+  { name: "servericon", description: "Show the server icon", category: "utility", defaultLevel: "member" },
+  { name: "botinfo", description: "Detailed bot information", category: "utility", defaultLevel: "member" },
+  { name: "userinfo", description: "Info about a user", category: "utility", defaultLevel: "member" },
+  { name: "avatar", description: "Show someone's avatar", category: "utility", defaultLevel: "member" },
+  { name: "help", description: "Show all commands", category: "utility", defaultLevel: "member" },
+  { name: "roll", description: "Roll dice (NdS format)", category: "fun", defaultLevel: "member" },
+  { name: "coinflip", description: "Flip a coin", category: "fun", defaultLevel: "member" },
+  { name: "rps", description: "Rock Paper Scissors vs bot", category: "fun", defaultLevel: "member" },
+  { name: "8ball", description: "Magic 8-ball", category: "fun", defaultLevel: "member" },
+  { name: "quote", description: "Random motivational quote", category: "fun", defaultLevel: "member" },
+  { name: "math", description: "Evaluate math expression", category: "fun", defaultLevel: "member" },
+  { name: "suggest", description: "Submit a suggestion", category: "engagement", defaultLevel: "member" },
+  { name: "poll", description: "Create a poll", category: "engagement", defaultLevel: "member" },
+  { name: "report", description: "Report a user to admins", category: "engagement", defaultLevel: "member" },
+  { name: "remindme", description: "Set a reminder (DM)", category: "engagement", defaultLevel: "member" },
+  { name: "site", description: "Show Yobest Studio website", category: "engagement", defaultLevel: "member" },
+  { name: "discord", description: "Get the Discord invite link", category: "engagement", defaultLevel: "member" },
+  { name: "rank", description: "Show your XP rank", category: "xp", defaultLevel: "member" },
+  { name: "leaderboard", description: "Top 10 XP leaderboard", category: "xp", defaultLevel: "member" },
+  { name: "ticket", description: "Open a support ticket", category: "tickets", defaultLevel: "member" },
+  { name: "closeticket", description: "Close this support ticket", category: "tickets", defaultLevel: "mod" },
+  { name: "snipe", description: "Show last deleted message", category: "utility", defaultLevel: "member" },
+  { name: "aiforget", description: "Clear AI chat memory in channel", category: "ai", defaultLevel: "member" },
+  { name: "enableai", description: "Enable AI in this channel", category: "ai", defaultLevel: "admin" },
+  { name: "disableai", description: "Disable AI in this channel", category: "ai", defaultLevel: "admin" },
+  { name: "generate", description: "AI Server Builder - generate layout", category: "ai", defaultLevel: "admin" },
+  { name: "agent", description: "AI Server Agent - edit with NL", category: "ai", defaultLevel: "owner" },
+  { name: "agentclear", description: "Clear AI agent session", category: "ai", defaultLevel: "owner" },
+  { name: "command", description: "Talk to bot in plain language", category: "ai", defaultLevel: "owner" },
+  { name: "warn", description: "Warn a user", category: "moderation", defaultLevel: "mod" },
+  { name: "warnings", description: "View warnings for a user", category: "moderation", defaultLevel: "mod" },
+  { name: "clearwarnings", description: "Clear all warnings", category: "moderation", defaultLevel: "mod" },
+  { name: "mute", description: "Timeout a user", category: "moderation", defaultLevel: "mod" },
+  { name: "unmute", description: "Remove timeout", category: "moderation", defaultLevel: "mod" },
+  { name: "purge", description: "Delete 1-100 messages", category: "moderation", defaultLevel: "mod" },
+  { name: "slowmode", description: "Set channel slowmode", category: "moderation", defaultLevel: "mod" },
+  { name: "lock", description: "Lock this channel", category: "moderation", defaultLevel: "mod" },
+  { name: "unlock", description: "Unlock this channel", category: "moderation", defaultLevel: "mod" },
+  { name: "setnickname", description: "Change nickname", category: "moderation", defaultLevel: "mod" },
+  { name: "ban", description: "Ban a user", category: "moderation", defaultLevel: "admin" },
+  { name: "kick", description: "Kick a user", category: "moderation", defaultLevel: "admin" },
+  { name: "announce", description: "Post announcement", category: "admin", defaultLevel: "admin" },
+  { name: "giveaway", description: "Start a giveaway", category: "admin", defaultLevel: "admin" },
+  { name: "settings", description: "Consolidated config command", category: "admin", defaultLevel: "admin" },
+  { name: "ticketpanel", description: "Post ticket button panel", category: "admin", defaultLevel: "admin" },
+  { name: "addcmd", description: "Add custom command", category: "admin", defaultLevel: "admin" },
+  { name: "removecmd", description: "Remove custom command", category: "admin", defaultLevel: "admin" },
+  { name: "listcmds", description: "List all custom commands", category: "admin", defaultLevel: "admin" },
+  { name: "reactionrole", description: "Set up reaction role", category: "admin", defaultLevel: "admin" },
+  { name: "clearxp", description: "Reset XP for a user", category: "admin", defaultLevel: "admin" },
+  { name: "announcescript", description: "Post script announcement", category: "admin", defaultLevel: "admin" },
+  { name: "roblox", description: "Roblox version tracker", category: "roblox", defaultLevel: "admin" },
+  { name: "addgame", description: "Add game to catalog", category: "games", defaultLevel: "admin" },
+  { name: "removegame", description: "Remove game from catalog", category: "games", defaultLevel: "admin" },
+  { name: "listgames", description: "List all games", category: "games", defaultLevel: "member" },
+  { name: "sharegame", description: "Share game in channel", category: "games", defaultLevel: "member" },
+  { name: "announcegame", description: "Post game announcement", category: "games", defaultLevel: "admin" },
+  { name: "games", description: "Browse game catalog", category: "games", defaultLevel: "member" },
+  { name: "searchgame", description: "Search catalog by keyword", category: "games", defaultLevel: "member" },
+  { name: "scanandclean", description: "Scan and clean messages", category: "owner", defaultLevel: "owner" },
+  { name: "testautomod", description: "Test the auto-mod pipeline", category: "owner", defaultLevel: "owner" },
+  { name: "aitest", description: "Test AI connection", category: "owner", defaultLevel: "owner" },
+];
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -46,10 +114,16 @@ serve(async (req) => {
         const lastHb = hb?.ts ? new Date(hb.ts).getTime() : 0;
         const isOnline = Date.now() - lastHb < 90_000;
 
+        const configMap: Record<string, string> = {};
+        (config || []).forEach((c: any) => { configMap[c.key] = c.value; });
+
         result = {
           is_online: isOnline,
           last_heartbeat: hb?.ts || null,
           config: config || [],
+          config_map: configMap,
+          disabled_commands: (() => { try { return JSON.parse(configMap.disabled_commands || "[]"); } catch { return []; } })(),
+          command_channels: (() => { try { return JSON.parse(configMap.command_channels || "{}"); } catch { return {}; } })(),
           stats: {
             pending_commands: pendingCmds || 0,
             executed_commands: executedCmds || 0,
@@ -61,6 +135,97 @@ serve(async (req) => {
             channels: typeof g.channels === 'string' ? JSON.parse(g.channels) : (g.channels || []),
           })),
         };
+        break;
+      }
+
+      case "list_commands": {
+        const { guild_id } = body;
+        let perms: Record<string, string> = {};
+        let disabled: string[] = [];
+        let channels: Record<string, string> = {};
+
+        if (guild_id) {
+          const { data: permRows } = await sb.from("bot_command_permissions").select("command, min_level").eq("guild_id", guild_id);
+          (permRows || []).forEach((r: any) => { perms[r.command] = r.min_level; });
+
+          const { data: configRows } = await sb.from("bot_config").select("key, value").in("key", ["disabled_commands", "command_channels"]);
+          (configRows || []).forEach((c: any) => {
+            try {
+              if (c.key === "disabled_commands") disabled = JSON.parse(c.value);
+              if (c.key === "command_channels") channels = JSON.parse(c.value);
+            } catch {}
+          });
+        }
+
+        result = {
+          commands: BOT_COMMANDS.map((cmd) => ({
+            ...cmd,
+            custom_level: perms[cmd.name] || null,
+            effective_level: perms[cmd.name] || cmd.defaultLevel,
+            disabled: disabled.includes(cmd.name),
+            channel_restricted: channels[cmd.name] || null,
+          })),
+          categories: [...new Set(BOT_COMMANDS.map(c => c.category))],
+        };
+        break;
+      }
+
+      case "update_command_permission": {
+        const { guild_id, command, min_level } = body;
+        if (!guild_id || !command) return new Response(JSON.stringify({ error: "guild_id and command required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        if (min_level) {
+          const { error } = await sb.from("bot_command_permissions").upsert({
+            guild_id, command, min_level,
+          }, { onConflict: "guild_id,command" });
+          if (error) throw error;
+        } else {
+          await sb.from("bot_command_permissions").delete().eq("guild_id", guild_id).eq("command", command);
+        }
+        result = { success: true };
+        break;
+      }
+
+      case "toggle_command": {
+        const { guild_id, command } = body;
+        if (!guild_id || !command) return new Response(JSON.stringify({ error: "guild_id and command required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+        const { data: row } = await sb.from("bot_config").select("value").eq("key", "disabled_commands").maybeSingle();
+        let disabled: string[] = [];
+        try { disabled = JSON.parse(row?.value || "[]"); } catch { disabled = []; }
+
+        if (disabled.includes(command)) {
+          disabled = disabled.filter((c: string) => c !== command);
+        } else {
+          disabled.push(command);
+        }
+
+        await sb.from("bot_config").upsert({
+          key: "disabled_commands", value: JSON.stringify(disabled),
+          updated_by: user.id, updated_at: new Date().toISOString(),
+        });
+        result = { success: true, disabled };
+        break;
+      }
+
+      case "set_command_channel": {
+        const { guild_id, command, channel_id } = body;
+        if (!guild_id || !command) return new Response(JSON.stringify({ error: "guild_id and command required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+        const { data: row } = await sb.from("bot_config").select("value").eq("key", "command_channels").maybeSingle();
+        let channels: Record<string, string> = {};
+        try { channels = JSON.parse(row?.value || "{}"); } catch { channels = {}; }
+
+        if (channel_id) {
+          channels[command] = channel_id;
+        } else {
+          delete channels[command];
+        }
+
+        await sb.from("bot_config").upsert({
+          key: "command_channels", value: JSON.stringify(channels),
+          updated_by: user.id, updated_at: new Date().toISOString(),
+        });
+        result = { success: true, channels };
         break;
       }
 
@@ -84,7 +249,9 @@ serve(async (req) => {
       }
 
       case "post_news": {
-        const { guild_id, channel_id, title, description, game_url, image_url } = body;
+        const { guild_id } = body;
+        const incoming = body.payload || body;
+        const { title, description, game_url, image_url, channel_id } = incoming;
         if (!guild_id || !title) return new Response(JSON.stringify({ error: "guild_id and title required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         const payload: any = { title, description: description || "" };
         if (channel_id) payload.channel_id = channel_id;
@@ -120,7 +287,6 @@ serve(async (req) => {
         await sb.from("bot_guild_settings").upsert({
           guild_id, ...settings, updated_at: new Date().toISOString(),
         });
-        // Tell the bot to reload settings
         await sb.from("web_commands").insert({
           guild_id, command: "reload_settings", payload: {}, status: "pending",
         });
@@ -135,7 +301,7 @@ serve(async (req) => {
         settings[channel_name] = channel_id || null;
         const { error } = await sb.from("bot_guild_settings").upsert({
           guild_id, ...settings,
-        }, { onConflict: 'guild_id' });
+        }, { onConflict: "guild_id" });
         if (error) throw error;
         result = { success: true };
         break;

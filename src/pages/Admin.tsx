@@ -1651,7 +1651,7 @@ function BotTab() {
           <Hash size={16} className="text-accent-blue" /> Server Management
         </h3>
         <div className="flex flex-wrap items-center gap-3">
-          <a href="https://discord.com/api/oauth2/authorize?client_id=1456027240977399818&permissions=8&scope=bot%20applications.commands"
+          <a href="https://discord.com/api/oauth2/authorize?client_id=1456027240977399818&permissions=8&scope=bot%20applications.commands&redirect_uri=https%3A%2F%2Fyobest-bytr.vercel.app%2Fadmin"
             target="_blank" rel="noopener noreferrer"
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#5865F2] text-white text-xs font-semibold hover:bg-[#4752C4] transition-colors">
             <Plus size={14} /> Add Bot to Server

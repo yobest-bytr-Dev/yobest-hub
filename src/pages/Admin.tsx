@@ -1361,6 +1361,7 @@ function botApiCall(action: string, data: Record<string, any> = {}) {
 
 function BotTab() {
   const { toast } = useToast()
+  const currentUser = useStore((s) => s.currentUser)
   const [loading, setLoading] = useState(true)
   const [isOnline, setIsOnline] = useState(false)
   const [lastHb, setLastHb] = useState<string | null>(null)
@@ -1376,7 +1377,10 @@ function BotTab() {
   const [sending, setSending] = useState(false)
   const [expandedConfig, setExpandedConfig] = useState(false)
   const [expandedHistory, setExpandedHistory] = useState(false)
+  const [expandedChannels, setExpandedChannels] = useState(false)
   const [configEdits, setConfigEdits] = useState<Record<string, string>>({})
+  const [guildSettings, setGuildSettings] = useState<any>(null)
+  const [newsChannel, setNewsChannel] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -1402,6 +1406,17 @@ function BotTab() {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  const loadGuildSettings = useCallback(async (guildId: string) => {
+    try {
+      const data = await botApiCall('get_guild_settings', { guild_id: guildId })
+      setGuildSettings(data.settings || {})
+    } catch { setGuildSettings({}) }
+  }, [])
+
+  useEffect(() => {
+    if (selectedGuild) loadGuildSettings(selectedGuild)
+  }, [selectedGuild, loadGuildSettings])
 
   const loadHistory = useCallback(async () => {
     try {
@@ -1446,6 +1461,7 @@ function BotTab() {
       const payload: any = { title: newsTitle, description: newsDesc }
       if (newsUrl) payload.game_url = newsUrl
       if (newsImage) payload.image_url = newsImage
+      if (newsChannel) payload.channel_id = newsChannel
       const data = await botApiCall('post_news', { guild_id: selectedGuild, payload })
       if (data.error) throw new Error(data.error)
       toast('News posted to Discord!', 'success')
@@ -1474,6 +1490,9 @@ function BotTab() {
 
   if (loading) return <div className="flex items-center justify-center py-20"><Loader2 size={24} className="animate-spin text-accent-blue" /></div>
 
+  const selectedGuildData = guilds.find((g: any) => g.guild_id === selectedGuild)
+  const channels: { id: string; name: string }[] = selectedGuildData?.channels || []
+
   const toggleConfigItems = [
     { key: 'ai_enabled', label: 'AI Chat', desc: 'AI-powered chatbot responses', icon: Sparkles },
     { key: 'xp_enabled', label: 'XP System', desc: 'Leveling and experience points', icon: TrendingUp },
@@ -1481,8 +1500,74 @@ function BotTab() {
     { key: 'welcome_enabled', label: 'Welcome Messages', desc: 'Greet new members', icon: MessageSquare },
   ]
 
+  const channelSettings = [
+    { key: 'welcome_channel', label: 'Welcome Channel', desc: 'Greet new members' },
+    { key: 'goodbye_channel', label: 'Goodbye Channel', desc: 'Farewell messages' },
+    { key: 'modlog_channel', label: 'Mod Log', desc: 'Moderation audit trail' },
+    { key: 'game_announce_channel', label: 'Game Announcements', desc: 'New game posts' },
+    { key: 'ticket_log_channel', label: 'Ticket Log', desc: 'Support ticket logs' },
+    { key: 'ticket_panel_channel', label: 'Ticket Panel', desc: 'Ticket creation panel' },
+    { key: 'roblox_updates_channel', label: 'Roblox Updates', desc: 'Roblox version alerts' },
+  ]
+
+  const saveChannelSetting = async (channelName: string, channelId: string) => {
+    if (!selectedGuild) return
+    try {
+      const data = await botApiCall('save_guild_channel', {
+        guild_id: selectedGuild, channel_name: channelName, channel_id: channelId || null,
+      })
+      if (data.error) throw new Error(data.error)
+      setGuildSettings((prev: any) => ({ ...prev, [channelName]: channelId || null }))
+      toast(`${channelName.replace(/_/g, ' ')} updated`, 'success')
+    } catch (e: any) {
+      toast(e.message || 'Failed', 'error')
+    }
+  }
+
   return (
     <div className="space-y-6">
+      {/* Discord Account Linking */}
+      <div className="rounded-xl bg-bg-secondary border border-border-primary p-5">
+        <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2 mb-3">
+          <Bot size={16} className="text-[#5865F2]" /> Discord Account
+        </h3>
+        {currentUser?.discord_user_id ? (
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-bg-elevated border border-border-primary">
+            {currentUser.discord_avatar && <img src={currentUser.discord_avatar} alt="" className="w-10 h-10 rounded-full" />}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-text-primary">{currentUser.discord_username || 'Linked'}</p>
+              <p className="text-[10px] text-green-400 font-medium">Account linked</p>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-4">
+            <p className="text-text-muted text-xs flex-1">Link your Discord account to manage the bot from here.</p>
+            <a href={`${supabaseUrl}/auth/v1/authorize?provider=discord&redirect_to=${encodeURIComponent(window.location.origin + '/admin')}`}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#5865F2] text-white text-xs font-semibold hover:bg-[#4752C4] transition-colors shrink-0">
+              <Gamepad2 size={14} /> Link Discord
+            </a>
+          </div>
+        )}
+      </div>
+
+      {/* Add Bot to Server */}
+      <div className="rounded-xl bg-bg-secondary border border-border-primary p-5">
+        <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2 mb-3">
+          <Hash size={16} className="text-accent-blue" /> Server Management
+        </h3>
+        <div className="flex flex-wrap items-center gap-3">
+          <a href="https://discord.com/api/oauth2/authorize?client_id=1456027240977399818&permissions=8&scope=bot%20applications.commands"
+            target="_blank" rel="noopener noreferrer"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#5865F2] text-white text-xs font-semibold hover:bg-[#4752C4] transition-colors">
+            <Plus size={14} /> Add Bot to Server
+          </a>
+          <button onClick={load} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-xs text-text-secondary hover:text-text-primary transition-colors">
+            <RefreshCw size={12} /> Refresh Servers
+          </button>
+        </div>
+      </div>
+
+      {/* Status Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h2 className="text-lg font-semibold text-text-primary">Discord Bot</h2>
@@ -1517,6 +1602,63 @@ function BotTab() {
         </div>
       )}
 
+      {/* Channel Settings */}
+      {selectedGuild && channels.length > 0 && (
+        <div className="rounded-xl bg-bg-secondary border border-border-primary p-5">
+          <button onClick={() => setExpandedChannels(!expandedChannels)} className="flex items-center gap-2 w-full text-left">
+            {expandedChannels ? <ChevronDown size={14} className="text-text-muted" /> : <ChevronRight size={14} className="text-text-muted" />}
+            <Hash size={14} className="text-accent-blue" />
+            <h3 className="text-sm font-semibold text-text-primary">Channel Settings</h3>
+            <span className="text-[9px] text-text-dim ml-auto">{channels.length} channels available</span>
+          </button>
+          {expandedChannels && (
+            <div className="mt-4 space-y-3">
+              {channelSettings.map((ch) => (
+                <div key={ch.key} className="flex items-center justify-between gap-3 p-3 rounded-lg bg-bg-elevated border border-border-primary">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-medium text-text-primary">{ch.label}</div>
+                    <div className="text-[10px] text-text-dim">{ch.desc}</div>
+                  </div>
+                  <select
+                    value={guildSettings?.[ch.key] || ''}
+                    onChange={(e) => saveChannelSetting(ch.key, e.target.value)}
+                    className="w-48 px-2 py-1.5 rounded-lg bg-bg-secondary border border-border-primary text-xs text-text-primary focus:outline-none focus:border-accent-blue/50">
+                    <option value="">Disabled</option>
+                    {channels.map((c: any) => (
+                      <option key={c.id} value={c.id}>#{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+              <div className="flex items-center justify-between gap-3 p-3 rounded-lg bg-bg-elevated border border-border-primary">
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-medium text-text-primary">Welcome Message</div>
+                  <div className="text-[10px] text-text-dim">Greeting text (use {'{user}'} for mention)</div>
+                </div>
+                <input
+                  value={guildSettings?.welcome_message || ''}
+                  onChange={(e) => setGuildSettings((prev: any) => ({ ...prev, welcome_message: e.target.value }))}
+                  onBlur={() => saveChannelSetting('welcome_message', guildSettings?.welcome_message || '')}
+                  placeholder="Welcome {user}!"
+                  className="w-48 px-2 py-1.5 rounded-lg bg-bg-secondary border border-border-primary text-xs text-text-primary focus:outline-none focus:border-accent-blue/50" />
+              </div>
+              <div className="flex items-center justify-between gap-3 p-3 rounded-lg bg-bg-elevated border border-border-primary">
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-medium text-text-primary">Goodbye Message</div>
+                  <div className="text-[10px] text-text-dim">Farewell text</div>
+                </div>
+                <input
+                  value={guildSettings?.goodbye_message || ''}
+                  onChange={(e) => setGuildSettings((prev: any) => ({ ...prev, goodbye_message: e.target.value }))}
+                  onBlur={() => saveChannelSetting('goodbye_message', guildSettings?.goodbye_message || '')}
+                  placeholder="Goodbye {user}!"
+                  className="w-48 px-2 py-1.5 rounded-lg bg-bg-secondary border border-border-primary text-xs text-text-primary focus:outline-none focus:border-accent-blue/50" />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { label: 'Guilds', value: stats.guild_count, icon: Hash, color: 'text-accent-blue' },
@@ -1544,6 +1686,9 @@ function BotTab() {
             </button>
             <button onClick={() => sendCommand('snapshot_stats')} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-xs text-text-secondary hover:text-accent-green hover:border-accent-green/30 transition-all">
               <BarChart3 size={12} /> Snapshot Stats
+            </button>
+            <button onClick={() => sendCommand('test_welcome')} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-xs text-text-secondary hover:text-accent-purple hover:border-accent-purple/30 transition-all">
+              <MessageSquare size={12} /> Test Welcome
             </button>
           </div>
         </div>
@@ -1574,6 +1719,16 @@ function BotTab() {
               <label className="text-[10px] text-text-dim font-semibold uppercase tracking-wider block mb-1.5">Image URL (optional)</label>
               <input value={newsImage} onChange={(e) => setNewsImage(e.target.value)} placeholder="https://...png"
                 className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50" />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="text-[10px] text-text-dim font-semibold uppercase tracking-wider block mb-1.5">Channel (optional)</label>
+              <select value={newsChannel} onChange={(e) => setNewsChannel(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50">
+                <option value="">Auto (first available channel)</option>
+                {channels.map((c: any) => (
+                  <option key={c.id} value={c.id}>#{c.name}</option>
+                ))}
+              </select>
             </div>
           </div>
           <button onClick={sendNews} disabled={sending || !newsTitle.trim()} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent-blue text-white text-xs font-semibold hover:opacity-90 disabled:opacity-50 transition-all">

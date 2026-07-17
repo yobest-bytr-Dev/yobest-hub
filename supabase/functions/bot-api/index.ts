@@ -20,7 +20,6 @@ serve(async (req) => {
     const body = await req.json();
     const { action } = body;
 
-    // Verify admin
     const authHeader = req.headers.get("Authorization") || "";
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const userClient = createClient(supabaseUrl, anonKey, {
@@ -42,10 +41,10 @@ serve(async (req) => {
         const { count: executedCmds } = await sb.from("web_commands").select("*", { count: "exact", head: true }).eq("status", "executed");
         const { count: failedCmds } = await sb.from("web_commands").select("*", { count: "exact", head: true }).eq("status", "failed");
         const { count: guildCount } = await sb.from("bot_guilds").select("*", { count: "exact", head: true });
-        const { data: guilds } = await sb.from("bot_guilds").select("guild_id, name, icon_url, member_count, boost_level").order("member_count", { ascending: false });
+        const { data: guilds } = await sb.from("bot_guilds").select("guild_id, name, icon_url, member_count, boost_level, channels").order("member_count", { ascending: false });
 
         const lastHb = hb?.ts ? new Date(hb.ts).getTime() : 0;
-        const isOnline = Date.now() - lastHb < 90_000; // 90s threshold
+        const isOnline = Date.now() - lastHb < 90_000;
 
         result = {
           is_online: isOnline,
@@ -57,7 +56,10 @@ serve(async (req) => {
             failed_commands: failedCmds || 0,
             guild_count: guildCount || 0,
           },
-          guilds: guilds || [],
+          guilds: (guilds || []).map((g: any) => ({
+            ...g,
+            channels: typeof g.channels === 'string' ? JSON.parse(g.channels) : (g.channels || []),
+          })),
         };
         break;
       }
@@ -118,6 +120,43 @@ serve(async (req) => {
         await sb.from("bot_guild_settings").upsert({
           guild_id, ...settings, updated_at: new Date().toISOString(),
         });
+        // Tell the bot to reload settings
+        await sb.from("web_commands").insert({
+          guild_id, command: "reload_settings", payload: {}, status: "pending",
+        });
+        result = { success: true };
+        break;
+      }
+
+      case "save_guild_channel": {
+        const { guild_id, channel_name, channel_id } = body;
+        if (!guild_id || !channel_name) return new Response(JSON.stringify({ error: "guild_id and channel_name required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const settings: any = { updated_at: new Date().toISOString() };
+        settings[channel_name] = channel_id || null;
+        const { error } = await sb.from("bot_guild_settings").upsert({
+          guild_id, ...settings,
+        }, { onConflict: 'guild_id' });
+        if (error) throw error;
+        result = { success: true };
+        break;
+      }
+
+      case "test_welcome": {
+        const { guild_id } = body;
+        if (!guild_id) return new Response(JSON.stringify({ error: "guild_id required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const { error } = await sb.from("web_commands").insert({
+          guild_id, command: "test_welcome", payload: {}, status: "pending",
+        });
+        if (error) throw error;
+        result = { success: true };
+        break;
+      }
+
+      case "sync_guilds": {
+        const { error } = await sb.from("web_commands").insert({
+          guild_id: body.guild_id || "*", command: "snapshot_stats", payload: {}, status: "pending",
+        });
+        if (error) throw error;
         result = { success: true };
         break;
       }

@@ -432,20 +432,22 @@ serve(async (req) => {
         let itemType = item_type || "game";
         let siteUrl = "";
         if (itemType === "asset") {
-          const { data: asset } = await sb.from("assets").select("id, title, description, thumbnail_url, drive_file_url, type, price_robux, downloads_count, created_at").eq("id", game_id).maybeSingle();
+          const { data: asset, error: assetErr } = await sb.from("assets").select("id, title, description, thumbnail_url, drive_file_url, type, price_robux, downloads_count, created_at").eq("id", game_id).maybeSingle();
+          if (assetErr) return new Response(JSON.stringify({ error: "Asset query failed: " + assetErr.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
           if (asset) {
             item = asset;
             siteUrl = `https://yobest-bytr.vercel.app/marketplace`;
           }
         } else {
-          const { data: exp } = await sb.from("experiences").select("id, title, description, thumbnail_url, game_url, category, price, is_official, likes_count, views_count, rating, rating_count, creator, created_at").eq("id", game_id).maybeSingle();
+          const { data: exp, error: expErr } = await sb.from("experiences").select("id, creator_id, title, description, thumbnail_url, game_url, category, price, is_official, likes_count, views_count, created_at").eq("id", game_id).maybeSingle();
+          if (expErr) return new Response(JSON.stringify({ error: "Game query failed: " + expErr.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
           if (exp) {
             item = exp;
             itemType = "game";
             siteUrl = `https://yobest-bytr.vercel.app/games/${exp.id}`;
           }
         }
-        if (!item) return new Response(JSON.stringify({ error: "Item not found" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        if (!item) return new Response(JSON.stringify({ error: "Item not found in database for id: " + game_id + " type: " + itemType }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         const payload: any = {
           game_title: item.title,
           game_description: item.description || "",
@@ -453,10 +455,15 @@ serve(async (req) => {
           item_type: itemType,
           site_url: siteUrl,
           thumbnail: item.thumbnail_url || "",
-          creator: item.creator || "",
+          creator: "",
           category: item.category || "",
         };
+        if (item.creator_id) {
+          const { data: creatorProfile } = await sb.from("profiles").select("username, display_name").eq("id", item.creator_id).maybeSingle();
+          if (creatorProfile) payload.creator = creatorProfile.display_name || creatorProfile.username || "";
+        }
         if (item.game_url) payload.game_url = item.game_url;
+        if (item.drive_file_url) payload.game_url = item.drive_file_url;
         if (item.price !== undefined) payload.price = item.price;
         if (item.is_official !== undefined) payload.is_official = item.is_official;
         if (item.type) payload.asset_type = item.type;
@@ -464,8 +471,6 @@ serve(async (req) => {
         if (item.downloads_count !== undefined) payload.downloads_count = item.downloads_count;
         if (item.likes_count !== undefined) payload.likes_count = item.likes_count;
         if (item.views_count !== undefined) payload.views_count = item.views_count;
-        if (item.rating !== undefined) payload.rating = item.rating;
-        if (item.rating_count !== undefined) payload.rating_count = item.rating_count;
         if (item.created_at) payload.created_at = item.created_at;
         const { data: wc, error: wcErr } = await sb.from("web_commands").insert({
           guild_id, command: "publish_game", payload, status: "pending",
@@ -493,14 +498,13 @@ serve(async (req) => {
             creator: "", category: a.type || "", created_at: a.created_at || "",
           }));
         } else {
-          const { data: allExps } = await sb.from("experiences").select("id, title, description, game_url, thumbnail_url, category, price, is_official, likes_count, views_count, rating, rating_count, creator, created_at").order("created_at", { ascending: false });
+          const { data: allExps } = await sb.from("experiences").select("id, creator_id, title, description, game_url, thumbnail_url, category, price, is_official, likes_count, views_count, created_at").order("created_at", { ascending: false });
           items = (allExps || []).map((e: any) => ({
             game_title: e.title, game_description: e.description || "", game_url: e.game_url || "", thumbnail: e.thumbnail_url || "",
             item_type: "game", site_url: `https://yobest-bytr.vercel.app/games/${e.id}`,
-            category: e.category || "", price: e.price ?? 0, is_official: e.is_official || false,
+            category: e.category || "", price: e.price || "Free", is_official: e.is_official || false,
             likes_count: e.likes_count ?? 0, views_count: e.views_count ?? 0,
-            rating: e.rating ?? 0, rating_count: e.rating_count ?? 0,
-            creator: e.creator || "", created_at: e.created_at || "",
+            creator: e.creator_id || "", created_at: e.created_at || "",
           }));
         }
         if (!items.length) { result = { success: true, posted: 0, reason: "No items found" }; break; }
@@ -532,14 +536,13 @@ serve(async (req) => {
             creator: "", category: a.type || "", created_at: a.created_at || "",
           }));
         } else {
-          const { data: selExps } = await sb.from("experiences").select("id, title, description, thumbnail_url, game_url, category, price, is_official, likes_count, views_count, rating, rating_count, creator, created_at").in("id", game_ids);
+          const { data: selExps } = await sb.from("experiences").select("id, creator_id, title, description, thumbnail_url, game_url, category, price, is_official, likes_count, views_count, created_at").in("id", game_ids);
           items2 = (selExps || []).map((e: any) => ({
             game_title: e.title, game_description: e.description || "", game_url: e.game_url || "", thumbnail: e.thumbnail_url || "",
             item_type: "game", site_url: `https://yobest-bytr.vercel.app/games/${e.id}`,
-            category: e.category || "", price: e.price ?? 0, is_official: e.is_official || false,
+            category: e.category || "", price: e.price || "Free", is_official: e.is_official || false,
             likes_count: e.likes_count ?? 0, views_count: e.views_count ?? 0,
-            rating: e.rating ?? 0, rating_count: e.rating_count ?? 0,
-            creator: e.creator || "", created_at: e.created_at || "",
+            creator: e.creator_id || "", created_at: e.created_at || "",
           }));
         }
         if (!items2.length) { result = { success: true, posted: 0, reason: "No matching items" }; break; }
@@ -554,8 +557,8 @@ serve(async (req) => {
       }
 
       case "get_games": {
-        const { data: exps } = await sb.from("experiences").select("id, title, description, game_url, thumbnail_url, category, price, is_official, created_at").order("created_at", { ascending: false }).limit(50);
-        const { data: assetsList } = await sb.from("assets").select("id, title, description, type, thumbnail_url, price_robux, downloads_count, created_at").order("created_at", { ascending: false }).limit(50);
+        const { data: exps } = await sb.from("experiences").select("id, title, description, game_url, thumbnail_url, category, price, is_official, views_count, likes_count, created_at").order("created_at", { ascending: false }).limit(50);
+        const { data: assetsList } = await sb.from("assets").select("id, title, description, type, thumbnail_url, price_robux, downloads_count, rating, created_at").order("created_at", { ascending: false }).limit(50);
         result = { experiences: exps || [], assets: assetsList || [] };
         break;
       }

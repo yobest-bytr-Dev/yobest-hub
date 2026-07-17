@@ -1770,9 +1770,10 @@ function BotTab() {
   if (loading) return <div className="flex items-center justify-center py-20"><Loader2 size={24} className="animate-spin text-accent-blue" /></div>
 
   const selectedGuildData = guilds.find((g: any) => g.guild_id === selectedGuild)
-  const channels: { id: string; name: string }[] = selectedGuildData?.channels || []
-  const categories: { id: string; name: string }[] = selectedGuildData?.categories || []
-  const roles: { id: string; name: string; color: string }[] = selectedGuildData?.roles || []
+  const parseJson = (v: any) => { if (!v) return []; if (Array.isArray(v)) return v; try { return JSON.parse(v); } catch { return []; } }
+  const channels: { id: string; name: string }[] = parseJson(selectedGuildData?.channels)
+  const categories: { id: string; name: string }[] = parseJson(selectedGuildData?.categories)
+  const roles: { id: string; name: string; color: string }[] = parseJson(selectedGuildData?.roles)
 
   const toggleConfigItems = [
     { key: 'ai_enabled', label: 'AI Chat', desc: 'AI-powered chatbot responses', icon: Sparkles },

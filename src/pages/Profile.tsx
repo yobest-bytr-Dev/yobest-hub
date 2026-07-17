@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { signOut, getSubmissions, getAiChats, getCurrentProfile } from '@/lib/api'
+import { supabase } from '@/config/supabase'
 import { getSiteAnalytics } from '@/lib/analytics'
 import { experiences } from '@/data/official-games'
 import { cn, formatNumber } from '@/lib/utils'
@@ -56,14 +57,12 @@ export default function Profile() {
           const discordUsername = discordData.full_name || discordData.preferred_username || discordData.name
           const discordAvatar = discordData.avatar_url
           if (discordUserId) {
-            import('@/config/supabase').then(({ supabase: sb }) => {
-              sb.from('profiles').update({
-                discord_user_id: String(discordUserId),
-                discord_username: discordUsername || null,
-                discord_avatar: discordAvatar || null,
-              }).eq('id', currentUser.id).then(() => {
-                setCurrentUser({ ...currentUser, discord_user_id: String(discordUserId), discord_username: discordUsername, discord_avatar: discordAvatar })
-              })
+            supabase.from('profiles').update({
+              discord_user_id: String(discordUserId),
+              discord_username: discordUsername || null,
+              discord_avatar: discordAvatar || null,
+            }).eq('id', currentUser.id).then(() => {
+              setCurrentUser({ ...currentUser, discord_user_id: String(discordUserId), discord_username: discordUsername, discord_avatar: discordAvatar })
             })
           }
         }

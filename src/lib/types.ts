@@ -55,6 +55,9 @@ export interface UserProfile {
   following_count: number
   games_count: number
   is_admin: boolean
+  discord_user_id?: string
+  discord_username?: string
+  discord_avatar?: string
   created_at: string
 }
 

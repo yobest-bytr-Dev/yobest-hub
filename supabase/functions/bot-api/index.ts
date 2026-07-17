@@ -375,6 +375,56 @@ serve(async (req) => {
         break;
       }
 
+      case "get_ai_channels": {
+        const { data: aiRow } = await sb.from("bot_config").select("value").eq("key", "ai_channels").maybeSingle();
+        let channels: string[] = [];
+        try { channels = JSON.parse(aiRow?.value || "[]"); } catch {}
+        result = { channels };
+        break;
+      }
+
+      case "enable_ai_channel": {
+        const { channel_id, guild_id } = body;
+        if (!channel_id || !guild_id) return new Response(JSON.stringify({ error: "channel_id and guild_id required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const { data: aiRow2 } = await sb.from("bot_config").select("value").eq("key", "ai_channels").maybeSingle();
+        let channels2: string[] = [];
+        try { channels2 = JSON.parse(aiRow2?.value || "[]"); } catch {}
+        if (!channels2.includes(channel_id)) channels2.push(channel_id);
+        await sb.from("bot_config").upsert({ key: "ai_channels", value: JSON.stringify(channels2), updated_by: user.id, updated_at: new Date().toISOString() });
+        const { error: wcErr } = await sb.from("web_commands").insert({
+          guild_id, command: "enable_ai_channel", payload: { channel_id }, status: "pending",
+        });
+        if (wcErr) throw wcErr;
+        result = { success: true, channels: channels2 };
+        break;
+      }
+
+      case "disable_ai_channel": {
+        const { channel_id: chId, guild_id: gId } = body;
+        if (!chId || !gId) return new Response(JSON.stringify({ error: "channel_id and guild_id required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const { data: aiRow3 } = await sb.from("bot_config").select("value").eq("key", "ai_channels").maybeSingle();
+        let channels3: string[] = [];
+        try { channels3 = JSON.parse(aiRow3?.value || "[]"); } catch {}
+        channels3 = channels3.filter((c: string) => c !== chId);
+        await sb.from("bot_config").upsert({ key: "ai_channels", value: JSON.stringify(channels3), updated_by: user.id, updated_at: new Date().toISOString() });
+        const { error: wcErr2 } = await sb.from("web_commands").insert({
+          guild_id: gId, command: "disable_ai_channel", payload: { channel_id: chId }, status: "pending",
+        });
+        if (wcErr2) throw wcErr2;
+        result = { success: true, channels: channels3 };
+        break;
+      }
+
+      case "get_guild_channels": {
+        const { guild_id: gId2 } = body;
+        if (!gId2) return new Response(JSON.stringify({ error: "guild_id required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const { data: guildRow } = await sb.from("bot_guilds").select("channels").eq("guild_id", gId2).maybeSingle();
+        let channels4: any[] = [];
+        try { channels4 = typeof guildRow?.channels === 'string' ? JSON.parse(guildRow.channels) : (guildRow?.channels || []); } catch {}
+        result = { channels: channels4 };
+        break;
+      }
+
       default:
         return new Response(JSON.stringify({ error: `Unknown action: ${action}` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }

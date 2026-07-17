@@ -1399,6 +1399,8 @@ function BotTab() {
   const [catFilter, setCatFilter] = useState('')
   const [feedChannels, setFeedChannels] = useState<Record<string, string>>({})
   const [expandedFeeds, setExpandedFeeds] = useState(false)
+  const [aiChannels, setAiChannels] = useState<string[]>([])
+  const [expandedAiChannels, setExpandedAiChannels] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -1529,6 +1531,29 @@ function BotTab() {
   }, [])
 
   useEffect(() => { if (expandedFeeds) loadFeeds() }, [expandedFeeds, loadFeeds])
+
+  const loadAiChannels = useCallback(async () => {
+    try {
+      const data = await botApiCall('get_ai_channels')
+      if (!data.error) setAiChannels(data.channels || [])
+    } catch {}
+  }, [])
+
+  useEffect(() => { if (expandedAiChannels) loadAiChannels() }, [expandedAiChannels, loadAiChannels])
+
+  const toggleAiChannel = async (channelId: string) => {
+    if (!selectedGuild) return
+    try {
+      const isAi = aiChannels.includes(channelId)
+      const action = isAi ? 'disable_ai_channel' : 'enable_ai_channel'
+      const data = await botApiCall(action, { channel_id: channelId, guild_id: selectedGuild })
+      if (data.error) throw new Error(data.error)
+      setAiChannels(data.channels || [])
+      toast(`AI ${isAi ? 'disabled' : 'enabled'} in #${channels.find((c: any) => c.id === channelId)?.name || channelId}`, 'success')
+    } catch (e: any) {
+      toast(e.message || 'Failed', 'error')
+    }
+  }
 
   const saveFeedChannel = async (feedType: string, channelId: string) => {
     try {
@@ -1774,6 +1799,40 @@ function BotTab() {
 
       {selectedGuild && (
         <div className="rounded-xl bg-bg-secondary border border-border-primary p-5">
+          <button onClick={() => { setExpandedAiChannels(!expandedAiChannels); if (!expandedAiChannels) loadAiChannels() }} className="flex items-center gap-2 w-full text-left">
+            {expandedAiChannels ? <ChevronDown size={14} className="text-text-muted" /> : <ChevronRight size={14} className="text-text-muted" />}
+            <Sparkles size={14} className="text-accent-purple" />
+            <h3 className="text-sm font-semibold text-text-primary">AI Chat Channels</h3>
+            <span className="text-[9px] text-text-dim ml-auto">{aiChannels.length} channel{aiChannels.length !== 1 ? 's' : ''} active</span>
+          </button>
+          {expandedAiChannels && (
+            <div className="mt-4 space-y-2">
+              <p className="text-[10px] text-text-dim mb-3">Enable or disable AI chat per channel. Only channels listed here will respond to AI mentions.</p>
+              {channels.length === 0 && <p className="text-xs text-text-muted text-center py-4">No channels found. Sync server first.</p>}
+              {channels.map((ch: any) => {
+                const isActive = aiChannels.includes(ch.id)
+                return (
+                  <div key={ch.id} className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-bg-elevated border border-border-primary">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <Hash size={12} className="text-text-dim shrink-0" />
+                      <span className="text-xs font-medium text-text-primary truncate">{ch.name}</span>
+                    </div>
+                    <button onClick={() => toggleAiChannel(ch.id)} className={cn('px-3 py-1 rounded-lg text-[10px] font-semibold transition-all', isActive ? 'bg-green-500/15 text-green-400 border border-green-500/25 hover:bg-green-500/25' : 'bg-bg-secondary text-text-dim border border-border-primary hover:text-text-secondary hover:border-accent-blue/30')}>
+                      {isActive ? 'AI On' : 'AI Off'}
+                    </button>
+                  </div>
+                )
+              })}
+              <button onClick={loadAiChannels} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-bg-elevated border border-border-primary text-[10px] text-text-dim hover:text-text-secondary transition-colors mt-2">
+                <RefreshCw size={10} /> Refresh
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {selectedGuild && (
+        <div className="rounded-xl bg-bg-secondary border border-border-primary p-5">
           <h3 className="text-sm font-semibold text-text-primary mb-3">Quick Actions</h3>
           <div className="flex flex-wrap gap-2">
             <button onClick={() => sendCommand('sync_commands')} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-xs text-text-secondary hover:text-accent-blue hover:border-accent-blue/30 transition-all">
@@ -1784,6 +1843,12 @@ function BotTab() {
             </button>
             <button onClick={() => sendCommand('test_welcome')} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-xs text-text-secondary hover:text-accent-purple hover:border-accent-purple/30 transition-all">
               <MessageSquare size={12} /> Test Welcome
+            </button>
+            <button onClick={() => sendCommand('reload_settings')} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-xs text-text-secondary hover:text-yellow-400 hover:border-yellow-400/30 transition-all">
+              <RefreshCw size={12} /> Reload Settings
+            </button>
+            <button onClick={async () => { try { const d = await botApiCall('send_command', { guild_id: selectedGuild, command: 'ping', payload: {} }); toast(d.error ? `Error: ${d.error}` : 'Ping sent — bot should respond in chat', d.error ? 'error' : 'success'); } catch (e: any) { toast(e.message, 'error'); } }} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-xs text-text-secondary hover:text-green-400 hover:border-green-400/30 transition-all">
+              <Power size={12} /> Test Connection
             </button>
           </div>
         </div>

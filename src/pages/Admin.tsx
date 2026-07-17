@@ -1584,6 +1584,7 @@ function BotTab() {
   }, [])
 
   useEffect(() => { if (expandedGames) loadGames() }, [expandedGames, loadGames])
+  useEffect(() => { if (expandedFeeds) loadGames() }, [expandedFeeds, loadGames])
 
   const publishGame = async (gameId: string, itemType: 'game' | 'asset' = 'game') => {
     if (!selectedGuild) { toast('Select a server first', 'error'); return }

@@ -1405,6 +1405,7 @@ function BotTab() {
   const [expandedGames, setExpandedGames] = useState(false)
   const [publishChannel, setPublishChannel] = useState('')
   const [publishing, setPublishing] = useState(false)
+  const [selectedGames, setSelectedGames] = useState<number[]>([])
   const [autoPublishGames, setAutoPublishGames] = useState('false')
   const [autoPublishAssets, setAutoPublishAssets] = useState('false')
   const [aiPrompt, setAiPrompt] = useState('')
@@ -1601,6 +1602,29 @@ function BotTab() {
       toast(e.message || 'Failed', 'error')
     }
     setPublishing(false)
+  }
+
+  const publishSelectedGames = async () => {
+    if (!selectedGuild) { toast('Select a server first', 'error'); return }
+    if (selectedGames.length === 0) { toast('Select games first', 'error'); return }
+    setPublishing(true)
+    try {
+      const data = await botApiCall('publish_selected_games', { guild_id: selectedGuild, game_ids: selectedGames, channel_id: publishChannel || undefined })
+      if (data.error) throw new Error(data.error)
+      toast(`Published ${data.posted} game${data.posted !== 1 ? 's' : ''} to Discord!`, 'success')
+      setSelectedGames([])
+    } catch (e: any) {
+      toast(e.message || 'Failed', 'error')
+    }
+    setPublishing(false)
+  }
+
+  const toggleGameSelection = (id: number) => {
+    setSelectedGames(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
+
+  const selectAllGames = () => {
+    setSelectedGames(botGames.map(g => g.id))
   }
 
   const toggleAutoPublish = async (key: string) => {
@@ -2155,21 +2179,43 @@ function BotTab() {
                       <option key={c.id} value={c.id}>#{c.name}</option>
                     ))}
                   </select>
+                  <button onClick={selectAllGames} className="px-2.5 py-1.5 rounded-lg bg-bg-elevated border border-border-primary text-[10px] text-text-dim hover:text-text-secondary transition-colors">
+                    Select All
+                  </button>
+                  <button onClick={() => setSelectedGames([])} className="px-2.5 py-1.5 rounded-lg bg-bg-elevated border border-border-primary text-[10px] text-text-dim hover:text-text-secondary transition-colors">
+                    Clear
+                  </button>
+                  {selectedGames.length > 0 && (
+                    <button onClick={publishSelectedGames} disabled={publishing} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-green/15 text-accent-green text-[10px] font-semibold hover:bg-accent-green/25 transition-colors disabled:opacity-50">
+                      {publishing ? <Loader2 size={10} className="animate-spin" /> : <Send size={10} />}
+                      Publish Selected ({selectedGames.length})
+                    </button>
+                  )}
                   <button onClick={publishAllGames} disabled={publishing} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-purple/15 text-accent-purple text-[10px] font-semibold hover:bg-accent-purple/25 transition-colors disabled:opacity-50">
                     {publishing ? <Loader2 size={10} className="animate-spin" /> : <Upload size={10} />}
-                    Publish All Games
+                    Publish All
                   </button>
                 </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {botGames.filter(g => g.status === 'live').slice(0, 20).map((game) => (
-                    <button key={game.id} onClick={() => publishGame(game.id)} disabled={publishing}
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-bg-elevated border border-border-primary text-[10px] text-text-secondary hover:text-accent-green hover:border-accent-green/30 transition-all disabled:opacity-50">
-                      <Gamepad2 size={10} /> {game.title}
-                    </button>
-                  ))}
-                  {botGames.filter(g => g.status === 'live').length === 0 && (
-                    <p className="text-[10px] text-text-dim">No live games. Add games via /addgame in Discord.</p>
+                <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
+                  {botGames.length === 0 && (
+                    <p className="text-[10px] text-text-dim text-center py-4">No games found. Add games via /addgame in Discord.</p>
                   )}
+                  {botGames.map((game) => (
+                    <div key={game.id} className={cn('flex items-center gap-3 p-2.5 rounded-lg border transition-all cursor-pointer', selectedGames.includes(game.id) ? 'bg-accent-blue/10 border-accent-blue/25' : 'bg-bg-elevated border-border-primary hover:border-border-accent')}>
+                      <input type="checkbox" checked={selectedGames.includes(game.id)} onChange={() => toggleGameSelection(game.id)} className="w-3.5 h-3.5 rounded border-border-primary text-accent-blue focus:ring-accent-blue/50 bg-bg-secondary" />
+                      <Gamepad2 size={14} className="text-accent-blue shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-medium text-text-primary truncate">{game.title}</div>
+                        <div className="text-[10px] text-text-dim truncate">{game.description || 'No description'}</div>
+                      </div>
+                      <span className={cn('text-[9px] px-1.5 py-0.5 rounded-full font-medium shrink-0', game.status === 'live' ? 'bg-green-500/15 text-green-400' : game.status === 'hidden' ? 'bg-red-500/15 text-red-400' : 'bg-yellow-500/15 text-yellow-400')}>
+                        {game.status || 'unknown'}
+                      </span>
+                      <button onClick={(e) => { e.stopPropagation(); publishGame(game.id) }} disabled={publishing} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-bg-secondary border border-border-primary text-[10px] text-text-dim hover:text-accent-green hover:border-accent-green/30 transition-all disabled:opacity-50 shrink-0">
+                        <Send size={9} /> Post
+                      </button>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>

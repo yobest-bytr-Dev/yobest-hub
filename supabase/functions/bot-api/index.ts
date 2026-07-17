@@ -449,8 +449,8 @@ serve(async (req) => {
         try { feeds2 = JSON.parse(feedConf2?.value || "{}"); } catch {}
         const targetChannel = chId3 || feeds2.game_feed || "";
         if (!targetChannel) return new Response(JSON.stringify({ error: "No channel specified and no game_feed channel configured" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-        const { data: games } = await sb.from("bot_games").select("id, title, description, play_url, image_url").eq("status", "live").order("created_at", { ascending: false });
-        if (!games?.length) { result = { success: true, posted: 0, reason: "No live games" }; break; }
+        const { data: games } = await sb.from("bot_games").select("id, title, description, play_url, image_url").order("created_at", { ascending: false });
+        if (!games?.length) { result = { success: true, posted: 0, reason: "No games found" }; break; }
         let posted = 0;
         for (const game of games) {
           const p: any = { game_title: game.title, game_description: game.description || "", channel_id: targetChannel };
@@ -460,6 +460,28 @@ serve(async (req) => {
           posted++;
         }
         result = { success: true, posted };
+        break;
+      }
+
+      case "publish_selected_games": {
+        const { guild_id: gId6, channel_id: chId6, game_ids } = body;
+        if (!gId6 || !game_ids?.length) return new Response(JSON.stringify({ error: "guild_id and game_ids required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const { data: feedConf3 } = await sb.from("bot_config").select("value").eq("key", "channel_feeds").maybeSingle();
+        let feeds3: Record<string, string> = {};
+        try { feeds3 = JSON.parse(feedConf3?.value || "{}"); } catch {}
+        const targetChannel2 = chId6 || feeds3.game_feed || "";
+        if (!targetChannel2) return new Response(JSON.stringify({ error: "No channel specified and no game_feed channel configured" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const { data: selGames } = await sb.from("bot_games").select("id, title, description, play_url, image_url").in("id", game_ids);
+        if (!selGames?.length) { result = { success: true, posted: 0, reason: "No matching games" }; break; }
+        let posted2 = 0;
+        for (const game of selGames) {
+          const p: any = { game_title: game.title, game_description: game.description || "", channel_id: targetChannel2 };
+          if (game.play_url) p.game_url = game.play_url;
+          if (game.image_url) p.game_image = game.image_url;
+          await sb.from("web_commands").insert({ guild_id: gId6, command: "publish_game", payload: p, status: "pending" });
+          posted2++;
+        }
+        result = { success: true, posted: posted2 };
         break;
       }
 

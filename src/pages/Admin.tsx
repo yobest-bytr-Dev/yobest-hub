@@ -2354,7 +2354,7 @@ function BotTab() {
                   {publishTab === 'games' && botGames.map((game) => (
                     <div key={game.id} className={cn('flex items-center gap-3 p-2.5 rounded-lg border transition-all cursor-pointer', selectedGames.includes(game.id) ? 'bg-accent-blue/10 border-accent-blue/25' : 'bg-bg-elevated border-border-primary hover:border-border-accent')}>
                       <input type="checkbox" checked={selectedGames.includes(game.id)} onChange={() => toggleGameSelection(game.id)} className="w-3.5 h-3.5 rounded border-border-primary text-accent-blue focus:ring-accent-blue/50 bg-bg-secondary" />
-                      {(game.thumbnail_url || game.download_url) ? <img src={game.thumbnail_url || game.download_url} alt="" className="w-8 h-8 rounded-lg object-cover shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} /> : <Gamepad2 size={14} className="text-accent-blue shrink-0" />}
+                      {(game.thumbnail_url || game.download_url) ? <img src={toDirectImageUrl(game.thumbnail_url || game.download_url)} alt="" className="w-8 h-8 rounded-lg object-cover shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} /> : <Gamepad2 size={14} className="text-accent-blue shrink-0" />}
                       <div className="flex-1 min-w-0">
                         <div className="text-xs font-medium text-text-primary truncate">{game.title}</div>
                         <div className="text-[10px] text-text-dim truncate">{game.description || 'No description'}</div>
@@ -2371,7 +2371,7 @@ function BotTab() {
                   {publishTab === 'assets' && botAssets.map((asset) => (
                     <div key={asset.id} className={cn('flex items-center gap-3 p-2.5 rounded-lg border transition-all cursor-pointer', selectedAssets.includes(asset.id) ? 'bg-accent-purple/10 border-accent-purple/25' : 'bg-bg-elevated border-border-primary hover:border-border-accent')}>
                       <input type="checkbox" checked={selectedAssets.includes(asset.id)} onChange={() => toggleGameSelection(asset.id)} className="w-3.5 h-3.5 rounded border-border-primary text-accent-purple focus:ring-accent-purple/50 bg-bg-secondary" />
-                      {asset.thumbnail_url ? <img src={asset.thumbnail_url} alt="" className="w-8 h-8 rounded-lg object-cover shrink-0" /> : <Upload size={14} className="text-accent-purple shrink-0" />}
+                      {asset.thumbnail_url ? <img src={toDirectImageUrl(asset.thumbnail_url)} alt="" className="w-8 h-8 rounded-lg object-cover shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} /> : <Upload size={14} className="text-accent-purple shrink-0" />}
                       <div className="flex-1 min-w-0">
                         <div className="text-xs font-medium text-text-primary truncate">{asset.title}</div>
                         <div className="text-[10px] text-text-dim truncate">{asset.description || 'No description'}</div>

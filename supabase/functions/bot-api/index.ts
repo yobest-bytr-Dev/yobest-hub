@@ -7,6 +7,15 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+function toDirectImageUrl(url: string): string {
+  if (!url) return "";
+  const fileIdMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  if (fileIdMatch) return `https://lh3.googleusercontent.com/d/${fileIdMatch[1]}=w800`;
+  const idParam = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (idParam) return `https://lh3.googleusercontent.com/d/${idParam[1]}=w800`;
+  return url;
+}
+
 const BOT_COMMANDS = [
   { name: "ping", description: "Check bot latency", category: "utility", defaultLevel: "member" },
   { name: "stats", description: "Bot and server stats", category: "utility", defaultLevel: "member" },
@@ -480,7 +489,7 @@ serve(async (req) => {
           channel_id: channel_id || "",
           item_type: itemType,
           site_url: siteUrl,
-          thumbnail: item.thumbnail_url || item.download_url || "",
+          thumbnail: toDirectImageUrl(item.thumbnail_url || item.download_url || ""),
           creator: "",
           category: item.category || "",
         };
@@ -518,7 +527,7 @@ serve(async (req) => {
         if (allType === "asset") {
           const { data: allAssets } = await sb.from("assets").select("id, title, description, thumbnail_url, drive_file_url, type, price_robux, downloads_count, created_at").order("created_at", { ascending: false });
           items = (allAssets || []).map((a: any) => ({
-            game_title: a.title, game_description: a.description || "", game_url: a.drive_file_url || "", thumbnail: a.thumbnail_url || "",
+            game_title: a.title, game_description: a.description || "", game_url: a.drive_file_url || "", thumbnail: toDirectImageUrl(a.thumbnail_url || ""),
             item_type: "asset", site_url: "https://yobest-bytr.vercel.app/marketplace",
             asset_type: a.type || "", price_robux: a.price_robux ?? 0, downloads_count: a.downloads_count ?? 0,
             creator: "", category: a.type || "", created_at: a.created_at || "",
@@ -526,7 +535,7 @@ serve(async (req) => {
         } else {
           const { data: allExps } = await sb.from("experiences").select("id, creator_id, title, description, game_url, download_url, thumbnail_url, category, price, is_official, likes_count, views_count, created_at").order("created_at", { ascending: false });
           items = (allExps || []).map((e: any) => ({
-            game_title: e.title, game_description: e.description || "", game_url: e.game_url || "", thumbnail: e.thumbnail_url || e.download_url || "",
+            game_title: e.title, game_description: e.description || "", game_url: e.game_url || "", thumbnail: toDirectImageUrl(e.thumbnail_url || e.download_url || ""),
             item_type: "game", site_url: `https://yobest-bytr.vercel.app/games/${e.id}`,
             category: e.category || "", price: e.price || "Free", is_official: e.is_official || false,
             likes_count: e.likes_count ?? 0, views_count: e.views_count ?? 0,
@@ -556,7 +565,7 @@ serve(async (req) => {
         if (selType === "asset") {
           const { data: selAssets } = await sb.from("assets").select("id, title, description, thumbnail_url, drive_file_url, type, price_robux, downloads_count, created_at").in("id", game_ids);
           items2 = (selAssets || []).map((a: any) => ({
-            game_title: a.title, game_description: a.description || "", game_url: a.drive_file_url || "", thumbnail: a.thumbnail_url || "",
+            game_title: a.title, game_description: a.description || "", game_url: a.drive_file_url || "", thumbnail: toDirectImageUrl(a.thumbnail_url || ""),
             item_type: "asset", site_url: "https://yobest-bytr.vercel.app/marketplace",
             asset_type: a.type || "", price_robux: a.price_robux ?? 0, downloads_count: a.downloads_count ?? 0,
             creator: "", category: a.type || "", created_at: a.created_at || "",
@@ -564,7 +573,7 @@ serve(async (req) => {
         } else {
           const { data: selExps } = await sb.from("experiences").select("id, creator_id, title, description, thumbnail_url, download_url, game_url, category, price, is_official, likes_count, views_count, created_at").in("id", game_ids);
           items2 = (selExps || []).map((e: any) => ({
-            game_title: e.title, game_description: e.description || "", game_url: e.game_url || "", thumbnail: e.thumbnail_url || e.download_url || "",
+            game_title: e.title, game_description: e.description || "", game_url: e.game_url || "", thumbnail: toDirectImageUrl(e.thumbnail_url || e.download_url || ""),
             item_type: "game", site_url: `https://yobest-bytr.vercel.app/games/${e.id}`,
             category: e.category || "", price: e.price || "Free", is_official: e.is_official || false,
             likes_count: e.likes_count ?? 0, views_count: e.views_count ?? 0,

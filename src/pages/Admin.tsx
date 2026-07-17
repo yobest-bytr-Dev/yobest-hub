@@ -1771,6 +1771,8 @@ function BotTab() {
 
   const selectedGuildData = guilds.find((g: any) => g.guild_id === selectedGuild)
   const channels: { id: string; name: string }[] = selectedGuildData?.channels || []
+  const categories: { id: string; name: string }[] = selectedGuildData?.categories || []
+  const roles: { id: string; name: string; color: string }[] = selectedGuildData?.roles || []
 
   const toggleConfigItems = [
     { key: 'ai_enabled', label: 'AI Chat', desc: 'AI-powered chatbot responses', icon: Sparkles },
@@ -1780,13 +1782,18 @@ function BotTab() {
   ]
 
   const channelSettings = [
-    { key: 'welcome_channel', label: 'Welcome Channel', desc: 'Greet new members' },
-    { key: 'goodbye_channel', label: 'Goodbye Channel', desc: 'Farewell messages' },
-    { key: 'modlog_channel', label: 'Mod Log', desc: 'Moderation audit trail' },
-    { key: 'game_announce_channel', label: 'Game Announcements', desc: 'New game posts' },
-    { key: 'ticket_log_channel', label: 'Ticket Log', desc: 'Support ticket logs' },
-    { key: 'ticket_panel_channel', label: 'Ticket Panel', desc: 'Ticket creation panel' },
-    { key: 'roblox_updates_channel', label: 'Roblox Updates', desc: 'Roblox version alerts' },
+    { key: 'welcome_channel', label: 'Welcome Channel', desc: 'Greet new members', icon: '👋', type: 'channel' as const },
+    { key: 'goodbye_channel', label: 'Goodbye Channel', desc: 'Farewell messages', icon: '👋', type: 'channel' as const },
+    { key: 'modlog_channel', label: 'Mod Log', desc: 'Moderation audit trail', icon: '🛡️', type: 'channel' as const },
+    { key: 'game_announce_channel', label: 'Game Announcements', desc: 'New game catalog posts', icon: '🎮', type: 'channel' as const },
+    { key: 'roblox_updates_channel', label: 'Roblox Updates', desc: 'Roblox/Studio version alerts', icon: '🔧', type: 'channel' as const },
+    { key: 'ticket_log_channel', label: 'Ticket Log', desc: 'Support ticket logs', icon: '🎫', type: 'channel' as const },
+    { key: 'ticket_panel_channel', label: 'Ticket Panel', desc: 'Ticket creation buttons', icon: '🎫', type: 'channel' as const },
+    { key: 'ticket_category', label: 'Ticket Category', desc: 'Category for ticket channels', icon: '📂', type: 'category' as const },
+  ]
+  const roleSettings = [
+    { key: 'mod_role_id', label: 'Mod Role', desc: 'Members with this role get mod permissions', icon: '🛡️' },
+    { key: 'auto_role_id', label: 'Auto Role', desc: 'Auto-assign to new members on join', icon: '🏷️' },
   ]
 
   const saveChannelSetting = async (channelName: string, channelId: string) => {
@@ -1887,51 +1894,99 @@ function BotTab() {
           <button onClick={() => setExpandedChannels(!expandedChannels)} className="flex items-center gap-2 w-full text-left">
             {expandedChannels ? <ChevronDown size={14} className="text-text-muted" /> : <ChevronRight size={14} className="text-text-muted" />}
             <Hash size={14} className="text-accent-blue" />
-            <h3 className="text-sm font-semibold text-text-primary">Channel Settings</h3>
-            <span className="text-[9px] text-text-dim ml-auto">{channels.length} channels available</span>
+            <h3 className="text-sm font-semibold text-text-primary">Channel & Role Settings</h3>
+            <span className="text-[9px] text-text-dim ml-auto">{channels.length} channels • {roles.length} roles</span>
           </button>
           {expandedChannels && (
-            <div className="mt-4 space-y-3">
+            <div className="mt-4 space-y-2">
               {channelSettings.map((ch) => (
-                <div key={ch.key} className="flex items-center justify-between gap-3 p-3 rounded-lg bg-bg-elevated border border-border-primary">
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs font-medium text-text-primary">{ch.label}</div>
-                    <div className="text-[10px] text-text-dim">{ch.desc}</div>
+                <div key={ch.key} className="flex items-center justify-between gap-3 p-3 rounded-lg bg-bg-elevated border border-border-primary hover:border-accent-blue/20 transition-colors">
+                  <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                    <span className="text-sm">{ch.icon}</span>
+                    <div>
+                      <div className="text-xs font-medium text-text-primary">{ch.label}</div>
+                      <div className="text-[10px] text-text-dim">{ch.desc}</div>
+                    </div>
                   </div>
                   <select
                     value={guildSettings?.[ch.key] || ''}
                     onChange={(e) => saveChannelSetting(ch.key, e.target.value)}
-                    className="w-48 px-2 py-1.5 rounded-lg bg-bg-secondary border border-border-primary text-xs text-text-primary focus:outline-none focus:border-accent-blue/50">
+                    className="w-48 px-2.5 py-1.5 rounded-lg bg-bg-secondary border border-border-primary text-xs text-text-primary focus:outline-none focus:border-accent-blue/50 transition-colors">
                     <option value="">Disabled</option>
-                    {channels.map((c: any) => (
+                    {ch.type === 'category' ? categories.map((c: any) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    )) : channels.map((c: any) => (
                       <option key={c.id} value={c.id}>#{c.name}</option>
                     ))}
                   </select>
                 </div>
               ))}
-              <div className="flex items-center justify-between gap-3 p-3 rounded-lg bg-bg-elevated border border-border-primary">
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-medium text-text-primary">Welcome Message</div>
-                  <div className="text-[10px] text-text-dim">Greeting text (use {'{user}'} for mention)</div>
+              {/* Role Settings */}
+              {roleSettings.map((r) => (
+                <div key={r.key} className="flex items-center justify-between gap-3 p-3 rounded-lg bg-bg-elevated border border-border-primary hover:border-accent-blue/20 transition-colors">
+                  <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                    <span className="text-sm">{r.icon}</span>
+                    <div>
+                      <div className="text-xs font-medium text-text-primary">{r.label}</div>
+                      <div className="text-[10px] text-text-dim">{r.desc}</div>
+                    </div>
+                  </div>
+                  <select
+                    value={guildSettings?.[r.key] || ''}
+                    onChange={(e) => saveChannelSetting(r.key, e.target.value)}
+                    className="w-48 px-2.5 py-1.5 rounded-lg bg-bg-secondary border border-border-primary text-xs text-text-primary focus:outline-none focus:border-accent-blue/50 transition-colors">
+                    <option value="">None</option>
+                    {roles.map((role: any) => (
+                      <option key={role.id} value={role.id}>{role.name}</option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+              {/* Text Inputs */}
+              <div className="flex items-center justify-between gap-3 p-3 rounded-lg bg-bg-elevated border border-border-primary hover:border-accent-blue/20 transition-colors">
+                <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                  <span className="text-sm">🎫</span>
+                  <div>
+                    <div className="text-xs font-medium text-text-primary">Ticket Name Prefix</div>
+                    <div className="text-[10px] text-text-dim">e.g. "ticket" → ticket-001</div>
+                  </div>
+                </div>
+                <input
+                  value={guildSettings?.ticket_name_prefix || ''}
+                  onChange={(e) => setGuildSettings((prev: any) => ({ ...prev, ticket_name_prefix: e.target.value }))}
+                  onBlur={() => saveChannelSetting('ticket_name_prefix', guildSettings?.ticket_name_prefix || '')}
+                  placeholder="ticket"
+                  className="w-48 px-2.5 py-1.5 rounded-lg bg-bg-secondary border border-border-primary text-xs text-text-primary focus:outline-none focus:border-accent-blue/50 transition-colors" />
+              </div>
+              <div className="flex items-center justify-between gap-3 p-3 rounded-lg bg-bg-elevated border border-border-primary hover:border-accent-blue/20 transition-colors">
+                <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                  <span className="text-sm">👋</span>
+                  <div>
+                    <div className="text-xs font-medium text-text-primary">Welcome Message</div>
+                    <div className="text-[10px] text-text-dim">Use {'{user}'} for mention</div>
+                  </div>
                 </div>
                 <input
                   value={guildSettings?.welcome_message || ''}
                   onChange={(e) => setGuildSettings((prev: any) => ({ ...prev, welcome_message: e.target.value }))}
                   onBlur={() => saveChannelSetting('welcome_message', guildSettings?.welcome_message || '')}
                   placeholder="Welcome {user}!"
-                  className="w-48 px-2 py-1.5 rounded-lg bg-bg-secondary border border-border-primary text-xs text-text-primary focus:outline-none focus:border-accent-blue/50" />
+                  className="w-48 px-2.5 py-1.5 rounded-lg bg-bg-secondary border border-border-primary text-xs text-text-primary focus:outline-none focus:border-accent-blue/50 transition-colors" />
               </div>
-              <div className="flex items-center justify-between gap-3 p-3 rounded-lg bg-bg-elevated border border-border-primary">
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-medium text-text-primary">Goodbye Message</div>
-                  <div className="text-[10px] text-text-dim">Farewell text</div>
+              <div className="flex items-center justify-between gap-3 p-3 rounded-lg bg-bg-elevated border border-border-primary hover:border-accent-blue/20 transition-colors">
+                <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                  <span className="text-sm">👋</span>
+                  <div>
+                    <div className="text-xs font-medium text-text-primary">Goodbye Message</div>
+                    <div className="text-[10px] text-text-dim">Farewell text</div>
+                  </div>
                 </div>
                 <input
                   value={guildSettings?.goodbye_message || ''}
                   onChange={(e) => setGuildSettings((prev: any) => ({ ...prev, goodbye_message: e.target.value }))}
                   onBlur={() => saveChannelSetting('goodbye_message', guildSettings?.goodbye_message || '')}
                   placeholder="Goodbye {user}!"
-                  className="w-48 px-2 py-1.5 rounded-lg bg-bg-secondary border border-border-primary text-xs text-text-primary focus:outline-none focus:border-accent-blue/50" />
+                  className="w-48 px-2.5 py-1.5 rounded-lg bg-bg-secondary border border-border-primary text-xs text-text-primary focus:outline-none focus:border-accent-blue/50 transition-colors" />
               </div>
             </div>
           )}

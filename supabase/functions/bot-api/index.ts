@@ -109,7 +109,7 @@ serve(async (req) => {
         const { count: executedCmds } = await sb.from("web_commands").select("*", { count: "exact", head: true }).eq("status", "executed");
         const { count: failedCmds } = await sb.from("web_commands").select("*", { count: "exact", head: true }).eq("status", "failed");
         const { count: guildCount } = await sb.from("bot_guilds").select("*", { count: "exact", head: true });
-        const { data: guilds } = await sb.from("bot_guilds").select("guild_id, name, icon_url, member_count, boost_level, channels").order("member_count", { ascending: false });
+        const { data: guilds } = await sb.from("bot_guilds").select("guild_id, name, icon_url, member_count, boost_level, channels, categories, roles").order("member_count", { ascending: false });
 
         const lastHb = hb?.ts ? new Date(hb.ts).getTime() : 0;
         const isOnline = Date.now() - lastHb < 90_000;
@@ -418,10 +418,14 @@ serve(async (req) => {
       case "get_guild_channels": {
         const { guild_id: gId2 } = body;
         if (!gId2) return new Response(JSON.stringify({ error: "guild_id required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-        const { data: guildRow } = await sb.from("bot_guilds").select("channels").eq("guild_id", gId2).maybeSingle();
+        const { data: guildRow } = await sb.from("bot_guilds").select("channels, categories, roles").eq("guild_id", gId2).maybeSingle();
         let channels4: any[] = [];
+        let categories4: any[] = [];
+        let roles4: any[] = [];
         try { channels4 = typeof guildRow?.channels === 'string' ? JSON.parse(guildRow.channels) : (guildRow?.channels || []); } catch {}
-        result = { channels: channels4 };
+        try { categories4 = typeof guildRow?.categories === 'string' ? JSON.parse(guildRow.categories) : (guildRow?.categories || []); } catch {}
+        try { roles4 = typeof guildRow?.roles === 'string' ? JSON.parse(guildRow.roles) : (guildRow?.roles || []); } catch {}
+        result = { channels: channels4, categories: categories4, roles: roles4 };
         break;
       }
 

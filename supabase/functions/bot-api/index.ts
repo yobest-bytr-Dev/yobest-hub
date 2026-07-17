@@ -425,6 +425,90 @@ serve(async (req) => {
         break;
       }
 
+      case "publish_game": {
+        const { guild_id, game_id, channel_id } = body;
+        if (!guild_id || !game_id) return new Response(JSON.stringify({ error: "guild_id and game_id required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const { data: game } = await sb.from("bot_games").select("*").eq("id", game_id).maybeSingle();
+        if (!game) return new Response(JSON.stringify({ error: "Game not found" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const payload: any = { title: game.title, description: game.description || "", channel_id: channel_id || "" };
+        if (game.play_url) payload.game_url = game.play_url;
+        if (game.image_url) payload.image_url = game.image_url;
+        const { data: wc, error: wcErr } = await sb.from("web_commands").insert({
+          guild_id, command: "post_news", payload, status: "pending",
+        }).select().single();
+        if (wcErr) throw wcErr;
+        result = { success: true, id: wc.id, game: game.title };
+        break;
+      }
+
+      case "publish_all_games": {
+        const { guild_id: gId3, channel_id: chId3 } = body;
+        if (!gId3) return new Response(JSON.stringify({ error: "guild_id required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const { data: feedConf2 } = await sb.from("bot_config").select("value").eq("key", "channel_feeds").maybeSingle();
+        let feeds2: Record<string, string> = {};
+        try { feeds2 = JSON.parse(feedConf2?.value || "{}"); } catch {}
+        const targetChannel = chId3 || feeds2.game_feed || "";
+        if (!targetChannel) return new Response(JSON.stringify({ error: "No channel specified and no game_feed channel configured" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const { data: games } = await sb.from("bot_games").select("id, title, description, play_url, image_url").eq("status", "live").order("created_at", { ascending: false });
+        if (!games?.length) { result = { success: true, posted: 0, reason: "No live games" }; break; }
+        let posted = 0;
+        for (const game of games) {
+          const p: any = { title: game.title, description: game.description || "", channel_id: targetChannel };
+          if (game.play_url) p.game_url = game.play_url;
+          if (game.image_url) p.image_url = game.image_url;
+          await sb.from("web_commands").insert({ guild_id: gId3, command: "post_news", payload: p, status: "pending" });
+          posted++;
+        }
+        result = { success: true, posted };
+        break;
+      }
+
+      case "get_games": {
+        const { data: gamesList } = await sb.from("bot_games").select("id, title, description, play_url, image_url, status, added_by, created_at").order("created_at", { ascending: false }).limit(50);
+        result = { games: gamesList || [] };
+        break;
+      }
+
+      case "ai_builder": {
+        const { guild_id: gId4, instruction, mode } = body;
+        if (!gId4 || !instruction) return new Response(JSON.stringify({ error: "guild_id and instruction required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const cmdName = mode === "generate" ? "generate" : "agent";
+        const { data: wc2, error: wcErr3 } = await sb.from("web_commands").insert({
+          guild_id: gId4, command: cmdName, payload: { instruction }, status: "pending",
+        }).select().single();
+        if (wcErr3) throw wcErr3;
+        result = { success: true, id: wc2.id, command: cmdName };
+        break;
+      }
+
+      case "get_agent_history": {
+        const { data: agentCmds } = await sb.from("web_commands")
+          .select("id, command, payload, status, result, created_at, executed_at")
+          .in("command", ["agent", "generate"])
+          .order("created_at", { ascending: false }).limit(20);
+        result = { history: agentCmds || [] };
+        break;
+      }
+
+      case "get_server_stats": {
+        const { guild_id: gId5 } = body;
+        if (!gId5) return new Response(JSON.stringify({ error: "guild_id required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const { data: guildData } = await sb.from("bot_guilds").select("*").eq("guild_id", gId5).maybeSingle();
+        const { data: history } = await sb.from("bot_guild_stats_history").select("member_count, captured_at").eq("guild_id", gId5).order("captured_at", { ascending: false }).limit(24);
+        result = { guild: guildData || null, history: history || [] };
+        break;
+      }
+
+      case "toggle_auto_publish": {
+        const { key, value } = body;
+        if (!key) return new Response(JSON.stringify({ error: "key required (auto_publish_games, auto_publish_assets)" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const { data: existing } = await sb.from("bot_config").select("value").eq("key", key).maybeSingle();
+        const newVal = existing?.value === "true" ? "false" : "true";
+        await sb.from("bot_config").upsert({ key, value: newVal, updated_by: user.id, updated_at: new Date().toISOString() });
+        result = { success: true, key, value: newVal };
+        break;
+      }
+
       default:
         return new Response(JSON.stringify({ error: `Unknown action: ${action}` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }

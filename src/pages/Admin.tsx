@@ -1401,6 +1401,19 @@ function BotTab() {
   const [expandedFeeds, setExpandedFeeds] = useState(false)
   const [aiChannels, setAiChannels] = useState<string[]>([])
   const [expandedAiChannels, setExpandedAiChannels] = useState(false)
+  const [botGames, setBotGames] = useState<any[]>([])
+  const [expandedGames, setExpandedGames] = useState(false)
+  const [publishChannel, setPublishChannel] = useState('')
+  const [publishing, setPublishing] = useState(false)
+  const [autoPublishGames, setAutoPublishGames] = useState('false')
+  const [autoPublishAssets, setAutoPublishAssets] = useState('false')
+  const [aiPrompt, setAiPrompt] = useState('')
+  const [aiMode, setAiMode] = useState<'agent' | 'generate'>('agent')
+  const [aiSending, setAiSending] = useState(false)
+  const [aiHistory, setAiHistory] = useState<any[]>([])
+  const [expandedAiBuilder, setExpandedAiBuilder] = useState(false)
+  const [expandedServerStats, setExpandedServerStats] = useState(false)
+  const [serverStatsData, setServerStatsData] = useState<any>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -1554,6 +1567,99 @@ function BotTab() {
       toast(e.message || 'Failed', 'error')
     }
   }
+
+  const loadGames = useCallback(async () => {
+    try {
+      const data = await botApiCall('get_games')
+      if (!data.error) setBotGames(data.games || [])
+    } catch {}
+  }, [])
+
+  useEffect(() => { if (expandedGames) loadGames() }, [expandedGames, loadGames])
+
+  const publishGame = async (gameId: number) => {
+    if (!selectedGuild) { toast('Select a server first', 'error'); return }
+    setPublishing(true)
+    try {
+      const data = await botApiCall('publish_game', { guild_id: selectedGuild, game_id: gameId, channel_id: publishChannel || undefined })
+      if (data.error) throw new Error(data.error)
+      toast(`Published "${data.game}" to Discord!`, 'success')
+    } catch (e: any) {
+      toast(e.message || 'Failed', 'error')
+    }
+    setPublishing(false)
+  }
+
+  const publishAllGames = async () => {
+    if (!selectedGuild) { toast('Select a server first', 'error'); return }
+    setPublishing(true)
+    try {
+      const data = await botApiCall('publish_all_games', { guild_id: selectedGuild, channel_id: publishChannel || undefined })
+      if (data.error) throw new Error(data.error)
+      toast(`Published ${data.posted} game${data.posted !== 1 ? 's' : ''} to Discord!`, 'success')
+    } catch (e: any) {
+      toast(e.message || 'Failed', 'error')
+    }
+    setPublishing(false)
+  }
+
+  const toggleAutoPublish = async (key: string) => {
+    try {
+      const data = await botApiCall('toggle_auto_publish', { key })
+      if (data.error) throw new Error(data.error)
+      if (key === 'auto_publish_games') setAutoPublishGames(data.value)
+      if (key === 'auto_publish_assets') setAutoPublishAssets(data.value)
+      toast(`${key.replace(/_/g, ' ')} ${data.value === 'true' ? 'enabled' : 'disabled'}`, 'success')
+    } catch (e: any) {
+      toast(e.message || 'Failed', 'error')
+    }
+  }
+
+  const loadAutoPublishConfig = useCallback(async () => {
+    try {
+      const data = await botApiCall('get_bot_status')
+      if (!data.error) {
+        setAutoPublishGames(data.config_map?.auto_publish_games || 'false')
+        setAutoPublishAssets(data.config_map?.auto_publish_assets || 'false')
+      }
+    } catch {}
+  }, [])
+
+  useEffect(() => { if (expandedFeeds) { loadFeeds(); loadAutoPublishConfig() } }, [expandedFeeds, loadFeeds, loadAutoPublishConfig])
+
+  const sendAiPrompt = async () => {
+    if (!selectedGuild || !aiPrompt.trim()) return
+    setAiSending(true)
+    try {
+      const data = await botApiCall('ai_builder', { guild_id: selectedGuild, instruction: aiPrompt, mode: aiMode })
+      if (data.error) throw new Error(data.error)
+      toast(`AI ${aiMode === 'generate' ? 'Server Builder' : 'Agent'} prompt sent!`, 'success')
+      setAiPrompt('')
+      if (expandedAiBuilder) loadAiHistory()
+    } catch (e: any) {
+      toast(e.message || 'Failed', 'error')
+    }
+    setAiSending(false)
+  }
+
+  const loadAiHistory = useCallback(async () => {
+    try {
+      const data = await botApiCall('get_agent_history')
+      if (!data.error) setAiHistory(data.history || [])
+    } catch {}
+  }, [])
+
+  useEffect(() => { if (expandedAiBuilder) loadAiHistory() }, [expandedAiBuilder, loadAiHistory])
+
+  const loadServerStats = useCallback(async () => {
+    if (!selectedGuild) return
+    try {
+      const data = await botApiCall('get_server_stats', { guild_id: selectedGuild })
+      if (!data.error) setServerStatsData(data)
+    } catch {}
+  }, [selectedGuild])
+
+  useEffect(() => { if (expandedServerStats && selectedGuild) loadServerStats() }, [expandedServerStats, selectedGuild, loadServerStats])
 
   const saveFeedChannel = async (feedType: string, channelId: string) => {
     try {
@@ -1976,34 +2082,195 @@ function BotTab() {
           <button onClick={() => { setExpandedFeeds(!expandedFeeds); if (!expandedFeeds) loadFeeds() }} className="flex items-center gap-2 w-full text-left">
             {expandedFeeds ? <ChevronDown size={14} className="text-text-muted" /> : <ChevronRight size={14} className="text-text-muted" />}
             <Radio size={14} className="text-accent-green" />
-            <h3 className="text-sm font-semibold text-text-primary">Channel Feeds</h3>
-            <span className="text-[9px] text-text-dim ml-auto">Auto-post to Discord when content is added</span>
+            <h3 className="text-sm font-semibold text-text-primary">Channel Feeds & Publishing</h3>
+            <span className="text-[9px] text-text-dim ml-auto">Auto-post and manual publish</span>
           </button>
           {expandedFeeds && (
-            <div className="mt-4 space-y-3">
-              {[
-                { key: 'game_feed', label: 'Game Feed', desc: 'Auto-post when new games are approved', icon: Gamepad2 },
-                { key: 'news_feed', label: 'News Feed', desc: 'Auto-post site news to Discord', icon: Send },
-                { key: 'submission_feed', label: 'Submission Feed', desc: 'Auto-post when community submissions are approved', icon: Users },
-                { key: 'announcement_feed', label: 'Announcements', desc: 'Auto-post site announcements', icon: Zap },
-              ].map((feed) => (
-                <div key={feed.key} className="flex items-center justify-between gap-3 p-3 rounded-lg bg-bg-elevated border border-border-primary">
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <feed.icon size={14} className="text-accent-green shrink-0" />
+            <div className="mt-4 space-y-4">
+              {/* Feed Channel Pickers */}
+              <div className="space-y-2">
+                <p className="text-[10px] text-text-dim font-semibold uppercase tracking-wider">Feed Channels</p>
+                {[
+                  { key: 'game_feed', label: 'Game Feed', desc: 'Auto-post when new games are approved', icon: Gamepad2 },
+                  { key: 'news_feed', label: 'News Feed', desc: 'Auto-post site news to Discord', icon: Send },
+                  { key: 'submission_feed', label: 'Submission Feed', desc: 'Auto-post when community submissions are approved', icon: Users },
+                  { key: 'announcement_feed', label: 'Announcements', desc: 'Auto-post site announcements', icon: Zap },
+                ].map((feed) => (
+                  <div key={feed.key} className="flex items-center justify-between gap-3 p-3 rounded-lg bg-bg-elevated border border-border-primary">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <feed.icon size={14} className="text-accent-green shrink-0" />
+                      <div>
+                        <div className="text-xs font-medium text-text-primary">{feed.label}</div>
+                        <div className="text-[10px] text-text-dim">{feed.desc}</div>
+                      </div>
+                    </div>
+                    <select value={feedChannels[feed.key] || ''} onChange={(e) => saveFeedChannel(feed.key, e.target.value)}
+                      className="w-48 px-2 py-1.5 rounded-lg bg-bg-secondary border border-border-primary text-xs text-text-primary focus:outline-none focus:border-accent-blue/50">
+                      <option value="">Disabled</option>
+                      {channels.map((c: any) => (
+                        <option key={c.id} value={c.id}>#{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+
+              {/* Auto-Publish Toggles */}
+              <div className="space-y-2">
+                <p className="text-[10px] text-text-dim font-semibold uppercase tracking-wider">Auto-Publish</p>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-bg-elevated border border-border-primary">
+                  <div className="flex items-center gap-3">
+                    <Gamepad2 size={14} className={autoPublishGames === 'true' ? 'text-accent-green' : 'text-text-dim'} />
                     <div>
-                      <div className="text-xs font-medium text-text-primary">{feed.label}</div>
-                      <div className="text-[10px] text-text-dim">{feed.desc}</div>
+                      <div className="text-xs font-medium text-text-primary">Auto-Publish Games</div>
+                      <div className="text-[10px] text-text-dim">Post new games to game_feed channel automatically</div>
                     </div>
                   </div>
-                  <select value={feedChannels[feed.key] || ''} onChange={(e) => saveFeedChannel(feed.key, e.target.value)}
-                    className="w-48 px-2 py-1.5 rounded-lg bg-bg-secondary border border-border-primary text-xs text-text-primary focus:outline-none focus:border-accent-blue/50">
-                    <option value="">Disabled</option>
+                  <button onClick={() => toggleAutoPublish('auto_publish_games')} className={cn('p-1 rounded-lg transition-colors', autoPublishGames === 'true' ? 'text-green-400 hover:bg-green-500/10' : 'text-text-dim hover:bg-bg-secondary')}>
+                    {autoPublishGames === 'true' ? <ToggleRight size={24} /> : <ToggleLeft size={24} />}
+                  </button>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-bg-elevated border border-border-primary">
+                  <div className="flex items-center gap-3">
+                    <Upload size={14} className={autoPublishAssets === 'true' ? 'text-accent-green' : 'text-text-dim'} />
+                    <div>
+                      <div className="text-xs font-medium text-text-primary">Auto-Publish Assets</div>
+                      <div className="text-[10px] text-text-dim">Post new assets to Discord automatically</div>
+                    </div>
+                  </div>
+                  <button onClick={() => toggleAutoPublish('auto_publish_assets')} className={cn('p-1 rounded-lg transition-colors', autoPublishAssets === 'true' ? 'text-green-400 hover:bg-green-500/10' : 'text-text-dim hover:bg-bg-secondary')}>
+                    {autoPublishAssets === 'true' ? <ToggleRight size={24} /> : <ToggleLeft size={24} />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Manual Game Publish */}
+              <div className="space-y-2">
+                <p className="text-[10px] text-text-dim font-semibold uppercase tracking-wider">Manual Publish</p>
+                <div className="flex items-center gap-2">
+                  <select value={publishChannel} onChange={(e) => setPublishChannel(e.target.value)}
+                    className="flex-1 px-2 py-1.5 rounded-lg bg-bg-elevated border border-border-primary text-xs text-text-primary focus:outline-none focus:border-accent-blue/50">
+                    <option value="">Auto channel</option>
                     {channels.map((c: any) => (
                       <option key={c.id} value={c.id}>#{c.name}</option>
                     ))}
                   </select>
+                  <button onClick={publishAllGames} disabled={publishing} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-purple/15 text-accent-purple text-[10px] font-semibold hover:bg-accent-purple/25 transition-colors disabled:opacity-50">
+                    {publishing ? <Loader2 size={10} className="animate-spin" /> : <Upload size={10} />}
+                    Publish All Games
+                  </button>
                 </div>
-              ))}
+                <div className="flex flex-wrap gap-1.5">
+                  {botGames.filter(g => g.status === 'live').slice(0, 20).map((game) => (
+                    <button key={game.id} onClick={() => publishGame(game.id)} disabled={publishing}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-bg-elevated border border-border-primary text-[10px] text-text-secondary hover:text-accent-green hover:border-accent-green/30 transition-all disabled:opacity-50">
+                      <Gamepad2 size={10} /> {game.title}
+                    </button>
+                  ))}
+                  {botGames.filter(g => g.status === 'live').length === 0 && (
+                    <p className="text-[10px] text-text-dim">No live games. Add games via /addgame in Discord.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* AI Server Builder */}
+      {selectedGuild && (
+        <div className="rounded-xl bg-bg-secondary border border-border-primary p-5">
+          <button onClick={() => { setExpandedAiBuilder(!expandedAiBuilder); if (!expandedAiBuilder) loadAiHistory() }} className="flex items-center gap-2 w-full text-left">
+            {expandedAiBuilder ? <ChevronDown size={14} className="text-text-muted" /> : <ChevronRight size={14} className="text-text-muted" />}
+            <Sparkles size={14} className="text-accent-purple" />
+            <h3 className="text-sm font-semibold text-text-primary">AI Server Builder</h3>
+            <span className="text-[9px] text-text-dim ml-auto">Generate and edit server with AI</span>
+          </button>
+          {expandedAiBuilder && (
+            <div className="mt-4 space-y-3">
+              <div className="flex gap-2">
+                <button onClick={() => setAiMode('agent')} className={cn('px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all', aiMode === 'agent' ? 'bg-accent-purple/15 text-accent-purple border border-accent-purple/25' : 'bg-bg-elevated text-text-dim border border-border-primary hover:text-text-secondary')}>
+                  <Bot size={10} className="inline mr-1" /> Agent (Edit Server)
+                </button>
+                <button onClick={() => setAiMode('generate')} className={cn('px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all', aiMode === 'generate' ? 'bg-accent-blue/15 text-accent-blue border border-accent-blue/25' : 'bg-bg-elevated text-text-dim border border-border-primary hover:text-text-secondary')}>
+                  <Sparkles size={10} className="inline mr-1" /> Generate (New Layout)
+                </button>
+              </div>
+              <p className="text-[10px] text-text-dim">
+                {aiMode === 'agent' ? 'Tell the AI what to change — rename channels, create categories, adjust roles, set permissions...' : 'Describe a server layout and the AI will generate categories, channels, and roles from scratch.'}
+              </p>
+              <div className="flex gap-2">
+                <input value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendAiPrompt()}
+                  placeholder={aiMode === 'agent' ? 'e.g. Create a #memes channel in the Fun category...' : 'e.g. A gaming community server with voice channels...'}
+                  className="flex-1 px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-xs text-text-primary focus:outline-none focus:border-accent-purple/50" />
+                <button onClick={sendAiPrompt} disabled={aiSending || !aiPrompt.trim()} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent-purple text-white text-xs font-semibold hover:opacity-90 disabled:opacity-50 transition-all">
+                  {aiSending ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+                  Send
+                </button>
+              </div>
+              {aiHistory.length > 0 && (
+                <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
+                  <p className="text-[10px] text-text-dim font-semibold uppercase tracking-wider">Recent AI Activity</p>
+                  {aiHistory.map((cmd) => (
+                    <div key={cmd.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-bg-elevated border border-border-primary text-xs">
+                      <span className={cn('px-1.5 py-0.5 rounded text-[9px] font-bold',
+                        cmd.status === 'pending' && 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/20',
+                        cmd.status === 'done' && 'bg-green-500/15 text-green-400 border border-green-500/20',
+                        cmd.status === 'error' && 'bg-red-500/15 text-red-400 border border-red-500/20',
+                        cmd.status === 'executed' && 'bg-green-500/15 text-green-400 border border-green-500/20',
+                        cmd.status === 'failed' && 'bg-red-500/15 text-red-400 border border-red-500/20'
+                      )}>{cmd.status}</span>
+                      <span className="font-mono text-text-primary">{cmd.command}</span>
+                      <span className="text-text-dim truncate flex-1">{cmd.payload?.instruction || JSON.stringify(cmd.payload || {}).slice(0, 60)}</span>
+                      <span className="text-text-dim shrink-0">{new Date(cmd.created_at).toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Server Stats */}
+      {selectedGuild && (
+        <div className="rounded-xl bg-bg-secondary border border-border-primary p-5">
+          <button onClick={() => { setExpandedServerStats(!expandedServerStats); if (!expandedServerStats) loadServerStats() }} className="flex items-center gap-2 w-full text-left">
+            {expandedServerStats ? <ChevronDown size={14} className="text-text-muted" /> : <ChevronRight size={14} className="text-text-muted" />}
+            <BarChart3 size={14} className="text-accent-orange" />
+            <h3 className="text-sm font-semibold text-text-primary">Server Stats</h3>
+            <span className="text-[9px] text-text-dim ml-auto">Live server information</span>
+          </button>
+          {expandedServerStats && serverStatsData?.guild && (
+            <div className="mt-4 space-y-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {[
+                  { label: 'Members', value: serverStatsData.guild.member_count },
+                  { label: 'Boost Level', value: serverStatsData.guild.boost_level },
+                  { label: 'Boosts', value: serverStatsData.guild.boost_count },
+                  { label: 'Channels', value: (typeof serverStatsData.guild.channels === 'string' ? JSON.parse(serverStatsData.guild.channels || '[]') : serverStatsData.guild.channels || []).length },
+                ].map((s) => (
+                  <div key={s.label} className="p-3 rounded-lg bg-bg-elevated border border-border-primary">
+                    <div className="text-lg font-bold text-text-primary">{s.value}</div>
+                    <div className="text-[10px] text-text-dim">{s.label}</div>
+                  </div>
+                ))}
+              </div>
+              {serverStatsData.history?.length > 0 && (
+                <div className="p-3 rounded-lg bg-bg-elevated border border-border-primary">
+                  <p className="text-[10px] text-text-dim font-semibold mb-2">Member Growth (recent snapshots)</p>
+                  <div className="flex items-end gap-1 h-16">
+                    {[...serverStatsData.history].reverse().map((h: any, i: number) => {
+                      const max = Math.max(...serverStatsData.history.map((x: any) => x.member_count))
+                      const pct = max > 0 ? (h.member_count / max) * 100 : 50
+                      return <div key={i} className="flex-1 bg-accent-blue/30 rounded-t" style={{ height: `${Math.max(pct, 5)}%` }} title={`${h.member_count} members`} />
+                    })}
+                  </div>
+                  <div className="flex justify-between text-[8px] text-text-dim mt-1">
+                    <span>Oldest</span><span>Newest</span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

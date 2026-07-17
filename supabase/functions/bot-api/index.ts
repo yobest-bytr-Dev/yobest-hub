@@ -465,7 +465,7 @@ serve(async (req) => {
             siteUrl = `https://yobest-bytr.vercel.app/marketplace`;
           }
         } else {
-          const { data: exp, error: expErr } = await sb.from("experiences").select("id, creator_id, title, description, thumbnail_url, game_url, category, price, is_official, likes_count, views_count, created_at").eq("id", game_id).maybeSingle();
+          const { data: exp, error: expErr } = await sb.from("experiences").select("id, creator_id, title, description, thumbnail_url, download_url, game_url, category, price, is_official, likes_count, views_count, created_at").eq("id", game_id).maybeSingle();
           if (expErr) return new Response(JSON.stringify({ error: "Game query failed: " + expErr.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
           if (exp) {
             item = exp;
@@ -480,7 +480,7 @@ serve(async (req) => {
           channel_id: channel_id || "",
           item_type: itemType,
           site_url: siteUrl,
-          thumbnail: item.thumbnail_url || "",
+          thumbnail: item.thumbnail_url || item.download_url || "",
           creator: "",
           category: item.category || "",
         };
@@ -524,9 +524,9 @@ serve(async (req) => {
             creator: "", category: a.type || "", created_at: a.created_at || "",
           }));
         } else {
-          const { data: allExps } = await sb.from("experiences").select("id, creator_id, title, description, game_url, thumbnail_url, category, price, is_official, likes_count, views_count, created_at").order("created_at", { ascending: false });
+          const { data: allExps } = await sb.from("experiences").select("id, creator_id, title, description, game_url, download_url, thumbnail_url, category, price, is_official, likes_count, views_count, created_at").order("created_at", { ascending: false });
           items = (allExps || []).map((e: any) => ({
-            game_title: e.title, game_description: e.description || "", game_url: e.game_url || "", thumbnail: e.thumbnail_url || "",
+            game_title: e.title, game_description: e.description || "", game_url: e.game_url || "", thumbnail: e.thumbnail_url || e.download_url || "",
             item_type: "game", site_url: `https://yobest-bytr.vercel.app/games/${e.id}`,
             category: e.category || "", price: e.price || "Free", is_official: e.is_official || false,
             likes_count: e.likes_count ?? 0, views_count: e.views_count ?? 0,
@@ -562,9 +562,9 @@ serve(async (req) => {
             creator: "", category: a.type || "", created_at: a.created_at || "",
           }));
         } else {
-          const { data: selExps } = await sb.from("experiences").select("id, creator_id, title, description, thumbnail_url, game_url, category, price, is_official, likes_count, views_count, created_at").in("id", game_ids);
+          const { data: selExps } = await sb.from("experiences").select("id, creator_id, title, description, thumbnail_url, download_url, game_url, category, price, is_official, likes_count, views_count, created_at").in("id", game_ids);
           items2 = (selExps || []).map((e: any) => ({
-            game_title: e.title, game_description: e.description || "", game_url: e.game_url || "", thumbnail: e.thumbnail_url || "",
+            game_title: e.title, game_description: e.description || "", game_url: e.game_url || "", thumbnail: e.thumbnail_url || e.download_url || "",
             item_type: "game", site_url: `https://yobest-bytr.vercel.app/games/${e.id}`,
             category: e.category || "", price: e.price || "Free", is_official: e.is_official || false,
             likes_count: e.likes_count ?? 0, views_count: e.views_count ?? 0,

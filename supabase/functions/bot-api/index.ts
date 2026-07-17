@@ -318,6 +318,28 @@ serve(async (req) => {
         break;
       }
 
+      case "test_channel": {
+        const { guild_id: gIdT, channel_id: chIdT, channel_name: chNameT } = body;
+        if (!gIdT || !chIdT) return new Response(JSON.stringify({ error: "guild_id and channel_id required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const { error: tcErr } = await sb.from("web_commands").insert({
+          guild_id: gIdT, command: "test_channel", payload: { channel_id: chIdT, channel_name: chNameT || "channel" }, status: "pending",
+        });
+        if (tcErr) throw tcErr;
+        result = { success: true };
+        break;
+      }
+
+      case "set_bot_status": {
+        const { guild_id: gIdS, status, activity } = body;
+        if (!gIdS) return new Response(JSON.stringify({ error: "guild_id required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const { error: sbErr } = await sb.from("web_commands").insert({
+          guild_id: gIdS, command: "set_bot_status", payload: { status: status || "online", activity: activity || "" }, status: "pending",
+        });
+        if (sbErr) throw sbErr;
+        result = { success: true };
+        break;
+      }
+
       case "sync_guilds": {
         const { error } = await sb.from("web_commands").insert({
           guild_id: body.guild_id || "*", command: "snapshot_stats", payload: {}, status: "pending",

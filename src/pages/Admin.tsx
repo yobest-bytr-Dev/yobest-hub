@@ -1811,6 +1811,17 @@ function BotTab() {
     }
   }
 
+  const testChannel = async (channelId: string, channelName: string) => {
+    if (!selectedGuild) return
+    try {
+      const data = await botApiCall('test_channel', { guild_id: selectedGuild, channel_id: channelId, channel_name: channelName })
+      if (data.error) throw new Error(data.error)
+      toast(`Test message sent to #${channelName}!`, 'success')
+    } catch (e: any) {
+      toast(e.message || 'Failed to send test', 'error')
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Discord Account Linking */}
@@ -1909,17 +1920,22 @@ function BotTab() {
                       <div className="text-[10px] text-text-dim">{ch.desc}</div>
                     </div>
                   </div>
-                  <select
-                    value={guildSettings?.[ch.key] || ''}
-                    onChange={(e) => saveChannelSetting(ch.key, e.target.value)}
-                    className="w-48 px-2.5 py-1.5 rounded-lg bg-bg-secondary border border-border-primary text-xs text-text-primary focus:outline-none focus:border-accent-blue/50 transition-colors">
-                    <option value="">Disabled</option>
-                    {ch.type === 'category' ? categories.map((c: any) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    )) : channels.map((c: any) => (
-                      <option key={c.id} value={c.id}>#{c.name}</option>
-                    ))}
-                  </select>
+                  <div className="flex items-center gap-1.5">
+                    <select
+                      value={guildSettings?.[ch.key] || ''}
+                      onChange={(e) => saveChannelSetting(ch.key, e.target.value)}
+                      className="w-40 px-2.5 py-1.5 rounded-lg bg-bg-secondary border border-border-primary text-xs text-text-primary focus:outline-none focus:border-accent-blue/50 transition-colors">
+                      <option value="">Disabled</option>
+                      {ch.type === 'category' ? categories.map((c: any) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      )) : channels.map((c: any) => (
+                        <option key={c.id} value={c.id}>#{c.name}</option>
+                      ))}
+                    </select>
+                    {guildSettings?.[ch.key] && ch.type !== 'category' && (
+                      <button onClick={() => testChannel(guildSettings[ch.key], channels.find((c: any) => c.id === guildSettings[ch.key])?.name || 'channel')} className="px-2 py-1.5 rounded-lg bg-bg-secondary border border-border-primary text-[10px] text-accent-blue hover:bg-accent-blue/10 hover:border-accent-blue/30 transition-all shrink-0" title="Send test message">🧪</button>
+                    )}
+                  </div>
                 </div>
               ))}
               {/* Role Settings */}
@@ -2065,6 +2081,48 @@ function BotTab() {
             <button onClick={async () => { try { const d = await botApiCall('send_command', { guild_id: selectedGuild, command: 'ping', payload: {} }); toast(d.error ? `Error: ${d.error}` : 'Ping sent — bot should respond in chat', d.error ? 'error' : 'success'); } catch (e: any) { toast(e.message, 'error'); } }} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-xs text-text-secondary hover:text-green-400 hover:border-green-400/30 transition-all">
               <Power size={12} /> Test Connection
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Bot Status Control */}
+      {selectedGuild && (
+        <div className="rounded-xl bg-bg-secondary border border-border-primary p-5">
+          <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2 mb-3">
+            <Bot size={14} className="text-[#5865F2]" /> Bot Status
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] text-text-dim mb-1 block">Status</label>
+              <div className="flex gap-1.5">
+                {[
+                  { value: 'online', label: '🟢 Online', color: 'green' },
+                  { value: 'idle', label: '🟡 Idle', color: 'yellow' },
+                  { value: 'dnd', label: '🔴 DND', color: 'red' },
+                  { value: 'invisible', label: '⚫ Invisible', color: 'slate' },
+                ].map((s) => (
+                  <button key={s.value} onClick={async () => {
+                    const data = await botApiCall('set_bot_status', { guild_id: selectedGuild, status: s.value, activity: '' })
+                    if (data.error) toast(data.error, 'error'); else toast(`Bot status → ${s.label}`, 'success')
+                  }} className={`flex-1 px-2 py-1.5 rounded-lg bg-bg-elevated border border-border-primary text-[10px] text-text-secondary hover:border-accent-${s.color}-400/50 hover:text-accent-${s.color}-400 transition-all`}>
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="text-[10px] text-text-dim mb-1 block">Custom Activity Text</label>
+              <div className="flex gap-1.5">
+                <input id="bot-activity-input" placeholder="e.g. Playing Roblox" className="flex-1 px-2.5 py-1.5 rounded-lg bg-bg-secondary border border-border-primary text-xs text-text-primary focus:outline-none focus:border-accent-blue/50 transition-colors" />
+                <button onClick={async () => {
+                  const val = (document.getElementById('bot-activity-input') as HTMLInputElement)?.value || ''
+                  const data = await botApiCall('set_bot_status', { guild_id: selectedGuild, status: 'online', activity: val })
+                  if (data.error) toast(data.error, 'error'); else toast(`Activity → "${val || 'default'}"`, 'success')
+                }} className="px-3 py-1.5 rounded-lg bg-accent-blue/10 border border-accent-blue/30 text-[10px] text-accent-blue hover:bg-accent-blue/20 transition-all shrink-0">
+                  Set
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

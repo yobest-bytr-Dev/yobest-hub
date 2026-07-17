@@ -1604,10 +1604,10 @@ function BotTab() {
         ) : (
           <div className="flex items-center gap-4">
             <p className="text-text-muted text-xs flex-1">Link your Discord account to manage the bot from here.</p>
-            <a href={`${supabaseUrl}/auth/v1/authorize?provider=discord&redirect_to=${encodeURIComponent(window.location.origin + '/admin')}`}
+            <button onClick={() => supabase.auth.signInWithOAuth({ provider: 'discord', options: { redirectTo: window.location.origin + '/admin' } })}
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#5865F2] text-white text-xs font-semibold hover:bg-[#4752C4] transition-colors shrink-0">
               <Gamepad2 size={14} /> Link Discord
-            </a>
+            </button>
           </div>
         )}
       </div>

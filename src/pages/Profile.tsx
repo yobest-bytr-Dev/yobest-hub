@@ -467,10 +467,10 @@ export default function Profile() {
               ) : (
                 <div>
                   <p className="text-text-muted text-xs mb-3">Link your Discord account to control the bot from this site.</p>
-                  <a href={`${import.meta.env.VITE_SUPABASE_URL}/auth/v1/authorize?provider=discord&redirect_to=${encodeURIComponent(window.location.origin + '/profile')}`}
+                  <button onClick={() => supabase.auth.signInWithOAuth({ provider: 'discord', options: { redirectTo: window.location.origin + '/profile' } })}
                     className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#5865F2] text-white text-xs font-semibold hover:bg-[#4752C4] transition-colors">
                     <Gamepad size={14} /> Link Discord
-                  </a>
+                  </button>
                 </div>
               )}
             </div>

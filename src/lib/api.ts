@@ -130,17 +130,40 @@ export async function getCurrentProfile(): Promise<UserProfile | null> {
     if (!profile.username && metaRobloxUsername) {
       profile.username = metaRobloxUsername
     }
+    const discordId = meta.provider_id || meta.sub || null
+    const discordUsername = meta.roblox_username || meta.name || meta.full_name || null
+    const discordAvatar = meta.picture || meta.avatar_url || null
+    if (discordId && !profile.discord_user_id) {
+      profile.discord_user_id = discordId
+      profile.discord_username = discordUsername
+      profile.discord_avatar = discordAvatar
+      supabase.from('profiles').upsert({
+        id: user.id,
+        discord_user_id: discordId,
+        discord_username: discordUsername,
+        discord_avatar: discordAvatar,
+      }, { onConflict: 'id' }).then(({ error }) => {
+        if (error) console.warn('Backfill discord data (non-fatal):', error.message)
+      })
+    }
     return profile
   }
 
   const robloxUsername = metaRobloxUsername || user.email?.split('@')[0] || 'User'
 
+  const discordId = meta.provider_id || meta.sub || null
+  const discordUsername = meta.name || meta.full_name || null
+  const discordAvatar = meta.picture || meta.avatar_url || null
+
   const fallbackProfile: UserProfile = {
     id: user.id,
     username: robloxUsername,
     display_name: meta.display_name || robloxUsername,
-    avatar_url: '',
+    avatar_url: discordAvatar || '',
     roblox_id: metaRobloxId || undefined,
+    discord_user_id: discordId || undefined,
+    discord_username: discordUsername || undefined,
+    discord_avatar: discordAvatar || undefined,
     bio: meta.bio || '',
     followers_count: 0,
     following_count: 0,
@@ -154,6 +177,9 @@ export async function getCurrentProfile(): Promise<UserProfile | null> {
     username: robloxUsername,
     display_name: meta.display_name || robloxUsername,
     roblox_id: metaRobloxId || null,
+    discord_user_id: discordId || null,
+    discord_username: discordUsername || null,
+    discord_avatar: discordAvatar || null,
     bio: meta.bio || '',
   }, { onConflict: 'id' }).then(({ error }) => {
     if (error) console.warn('Auto-create profile (non-fatal):', error.message)

@@ -353,11 +353,22 @@ function SubmissionsTab() {
 
   useEffect(() => { load() }, [load])
 
-  const handleApprove = async (id: string) => {
+  const handleApprove = async (id: string, sub?: any) => {
     try {
       const data = await apiCall('approve_submission', { id })
       if (data.error) throw new Error(data.error)
       toast('Submission approved!', 'success')
+      if (sub?.title) {
+        try {
+          await botApiCall('auto_post', {
+            feed_type: 'game_feed',
+            title: `New Game: ${sub.title}`,
+            description: sub.description || `New game "${sub.title}" has been added to the catalog!`,
+            url: sub.play_url || undefined,
+            image_url: sub.image_url || undefined,
+          })
+        } catch {}
+      }
       load()
     } catch (e: any) {
       toast(e.message || 'Failed', 'error')
@@ -438,7 +449,7 @@ function SubmissionsTab() {
                 <div className="flex items-center gap-1 shrink-0">
                   {sub.status === 'pending' && (
                     <>
-                      <button onClick={() => handleApprove(sub.id)} className="px-2 py-1 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors text-[10px] font-bold" title="Approve">
+                      <button onClick={() => handleApprove(sub.id, sub)} className="px-2 py-1 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors text-[10px] font-bold" title="Approve">
                         <CheckCircle size={14} />
                       </button>
                       <button onClick={() => handleReject(sub.id)} className="px-2 py-1 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors text-[10px] font-bold" title="Reject">
@@ -1386,6 +1397,8 @@ function BotTab() {
   const [expandedCommands, setExpandedCommands] = useState(false)
   const [cmdFilter, setCmdFilter] = useState('')
   const [catFilter, setCatFilter] = useState('')
+  const [feedChannels, setFeedChannels] = useState<Record<string, string>>({})
+  const [expandedFeeds, setExpandedFeeds] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -1507,6 +1520,26 @@ function BotTab() {
   useEffect(() => {
     if (expandedCommands && selectedGuild) loadCommands()
   }, [expandedCommands, selectedGuild, loadCommands])
+
+  const loadFeeds = useCallback(async () => {
+    try {
+      const data = await botApiCall('get_feed_channels')
+      if (!data.error) setFeedChannels(data.feeds || {})
+    } catch {}
+  }, [])
+
+  useEffect(() => { if (expandedFeeds) loadFeeds() }, [expandedFeeds, loadFeeds])
+
+  const saveFeedChannel = async (feedType: string, channelId: string) => {
+    try {
+      const data = await botApiCall('save_feed_channel', { feed_type: feedType, channel_id: channelId || null })
+      if (data.error) throw new Error(data.error)
+      setFeedChannels(data.feeds || {})
+      toast(`${feedType.replace(/_/g, ' ')} ${channelId ? 'set' : 'cleared'}`, 'success')
+    } catch (e: any) {
+      toast(e.message || 'Failed', 'error')
+    }
+  }
 
   const toggleCommand = async (cmd: string) => {
     if (!selectedGuild) return
@@ -1650,7 +1683,7 @@ function BotTab() {
           <label className="text-[10px] text-text-dim font-semibold uppercase tracking-wider block mb-2">Select Server</label>
           <div className="flex flex-wrap gap-2">
             {guilds.map((g) => (
-              <button key={g.guild_id} onClick={() => setSelectedGuild(g.guild_id)}
+              <button key={g.guild_id} onClick={() => { setSelectedGuild(g.guild_id); botApiCall('update_config', { key: 'default_guild_id', value: g.guild_id }).catch(() => {}) }}
                 className={cn('flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium transition-all',
                   selectedGuild === g.guild_id
                     ? 'bg-accent-blue/15 text-accent-blue border-accent-blue/25'
@@ -1870,6 +1903,44 @@ function BotTab() {
             {sending ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
             Send to Discord
           </button>
+        </div>
+      )}
+
+      {selectedGuild && (
+        <div className="rounded-xl bg-bg-secondary border border-border-primary p-5">
+          <button onClick={() => { setExpandedFeeds(!expandedFeeds); if (!expandedFeeds) loadFeeds() }} className="flex items-center gap-2 w-full text-left">
+            {expandedFeeds ? <ChevronDown size={14} className="text-text-muted" /> : <ChevronRight size={14} className="text-text-muted" />}
+            <Radio size={14} className="text-accent-green" />
+            <h3 className="text-sm font-semibold text-text-primary">Channel Feeds</h3>
+            <span className="text-[9px] text-text-dim ml-auto">Auto-post to Discord when content is added</span>
+          </button>
+          {expandedFeeds && (
+            <div className="mt-4 space-y-3">
+              {[
+                { key: 'game_feed', label: 'Game Feed', desc: 'Auto-post when new games are approved', icon: Gamepad2 },
+                { key: 'news_feed', label: 'News Feed', desc: 'Auto-post site news to Discord', icon: Send },
+                { key: 'submission_feed', label: 'Submission Feed', desc: 'Auto-post when community submissions are approved', icon: Users },
+                { key: 'announcement_feed', label: 'Announcements', desc: 'Auto-post site announcements', icon: Zap },
+              ].map((feed) => (
+                <div key={feed.key} className="flex items-center justify-between gap-3 p-3 rounded-lg bg-bg-elevated border border-border-primary">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <feed.icon size={14} className="text-accent-green shrink-0" />
+                    <div>
+                      <div className="text-xs font-medium text-text-primary">{feed.label}</div>
+                      <div className="text-[10px] text-text-dim">{feed.desc}</div>
+                    </div>
+                  </div>
+                  <select value={feedChannels[feed.key] || ''} onChange={(e) => saveFeedChannel(feed.key, e.target.value)}
+                    className="w-48 px-2 py-1.5 rounded-lg bg-bg-secondary border border-border-primary text-xs text-text-primary focus:outline-none focus:border-accent-blue/50">
+                    <option value="">Disabled</option>
+                    {channels.map((c: any) => (
+                      <option key={c.id} value={c.id}>#{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

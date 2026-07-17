@@ -40,6 +40,22 @@ export default function Navbar() {
         loadFollowing()
       }
     }).catch(() => {})
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        try {
+          const profile = await getCurrentProfile()
+          if (profile) {
+            const savedDeco = localStorage.getItem('yobest_avatar_decoration')
+            if (savedDeco) profile.avatar_decoration = savedDeco
+            setCurrentUser(profile)
+            loadFollowing()
+          }
+        } catch {}
+      } else if (event === 'SIGNED_OUT') {
+        setCurrentUser(null)
+      }
+    })
+    return () => subscription.unsubscribe()
   }, [setCurrentUser, loadFollowing])
 
   useEffect(() => {

@@ -327,6 +327,54 @@ serve(async (req) => {
         break;
       }
 
+      case "get_feed_channels": {
+        const { data: row } = await sb.from("bot_config").select("value").eq("key", "channel_feeds").maybeSingle();
+        let feeds: Record<string, string> = {};
+        try { feeds = JSON.parse(row?.value || "{}"); } catch {}
+        result = { feeds };
+        break;
+      }
+
+      case "save_feed_channel": {
+        const { feed_type, channel_id, guild_id } = body;
+        if (!feed_type) return new Response(JSON.stringify({ error: "feed_type required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const { data: feedRow } = await sb.from("bot_config").select("value").eq("key", "channel_feeds").maybeSingle();
+        let feeds: Record<string, string> = {};
+        try { feeds = JSON.parse(feedRow?.value || "{}"); } catch {}
+        if (channel_id) {
+          feeds[feed_type] = channel_id;
+        } else {
+          delete feeds[feed_type];
+        }
+        await sb.from("bot_config").upsert({
+          key: "channel_feeds", value: JSON.stringify(feeds),
+          updated_by: user.id, updated_at: new Date().toISOString(),
+        });
+        result = { success: true, feeds };
+        break;
+      }
+
+      case "auto_post": {
+        const { feed_type, title, description, url, image_url } = body;
+        if (!feed_type || !title) return new Response(JSON.stringify({ error: "feed_type and title required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const { data: feedConfig } = await sb.from("bot_config").select("value").eq("key", "channel_feeds").maybeSingle();
+        let feeds: Record<string, string> = {};
+        try { feeds = JSON.parse(feedConfig?.value || "{}"); } catch {}
+        const channelId = feeds[feed_type];
+        if (!channelId) { result = { success: false, reason: "No channel configured for " + feed_type }; break; }
+        const { data: gRow } = await sb.from("bot_config").select("value").eq("key", "default_guild_id").maybeSingle();
+        const guildId = gRow?.value || body.guild_id || "";
+        const payload: any = { channel_id: channelId, title, description: description || "" };
+        if (url) payload.game_url = url;
+        if (image_url) payload.image_url = image_url;
+        const { data, error } = await sb.from("web_commands").insert({
+          guild_id: guildId, command: "auto_post", payload, status: "pending",
+        }).select().single();
+        if (error) throw error;
+        result = { success: true, id: data.id };
+        break;
+      }
+
       default:
         return new Response(JSON.stringify({ error: `Unknown action: ${action}` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }

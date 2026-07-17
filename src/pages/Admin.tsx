@@ -1402,10 +1402,13 @@ function BotTab() {
   const [aiChannels, setAiChannels] = useState<string[]>([])
   const [expandedAiChannels, setExpandedAiChannels] = useState(false)
   const [botGames, setBotGames] = useState<any[]>([])
+  const [botAssets, setBotAssets] = useState<any[]>([])
   const [expandedGames, setExpandedGames] = useState(false)
   const [publishChannel, setPublishChannel] = useState('')
   const [publishing, setPublishing] = useState(false)
   const [selectedGames, setSelectedGames] = useState<number[]>([])
+  const [selectedAssets, setSelectedAssets] = useState<number[]>([])
+  const [publishTab, setPublishTab] = useState<'games' | 'assets'>('games')
   const [autoPublishGames, setAutoPublishGames] = useState('false')
   const [autoPublishAssets, setAutoPublishAssets] = useState('false')
   const [aiPrompt, setAiPrompt] = useState('')
@@ -1572,17 +1575,20 @@ function BotTab() {
   const loadGames = useCallback(async () => {
     try {
       const data = await botApiCall('get_games')
-      if (!data.error) setBotGames(data.games || [])
+      if (!data.error) {
+        setBotGames(data.experiences || [])
+        setBotAssets(data.assets || [])
+      }
     } catch {}
   }, [])
 
   useEffect(() => { if (expandedGames) loadGames() }, [expandedGames, loadGames])
 
-  const publishGame = async (gameId: number) => {
+  const publishGame = async (gameId: string, itemType: 'game' | 'asset' = 'game') => {
     if (!selectedGuild) { toast('Select a server first', 'error'); return }
     setPublishing(true)
     try {
-      const data = await botApiCall('publish_game', { guild_id: selectedGuild, game_id: gameId, channel_id: publishChannel || undefined })
+      const data = await botApiCall('publish_game', { guild_id: selectedGuild, game_id: gameId, item_type: itemType === 'asset' ? 'asset' : undefined, channel_id: publishChannel || undefined })
       if (data.error) throw new Error(data.error)
       toast(`Published "${data.game}" to Discord!`, 'success')
     } catch (e: any) {
@@ -1595,9 +1601,10 @@ function BotTab() {
     if (!selectedGuild) { toast('Select a server first', 'error'); return }
     setPublishing(true)
     try {
-      const data = await botApiCall('publish_all_games', { guild_id: selectedGuild, channel_id: publishChannel || undefined })
+      const isAssets = publishTab === 'assets'
+      const data = await botApiCall('publish_all_games', { guild_id: selectedGuild, channel_id: publishChannel || undefined, item_type: isAssets ? 'asset' : undefined })
       if (data.error) throw new Error(data.error)
-      toast(`Published ${data.posted} game${data.posted !== 1 ? 's' : ''} to Discord!`, 'success')
+      toast(`Published ${data.posted} item${data.posted !== 1 ? 's' : ''} to Discord!`, 'success')
     } catch (e: any) {
       toast(e.message || 'Failed', 'error')
     }
@@ -1606,13 +1613,15 @@ function BotTab() {
 
   const publishSelectedGames = async () => {
     if (!selectedGuild) { toast('Select a server first', 'error'); return }
-    if (selectedGames.length === 0) { toast('Select games first', 'error'); return }
+    const isAssets = publishTab === 'assets'
+    const sel = isAssets ? selectedAssets : selectedGames
+    if (sel.length === 0) { toast('Select items first', 'error'); return }
     setPublishing(true)
     try {
-      const data = await botApiCall('publish_selected_games', { guild_id: selectedGuild, game_ids: selectedGames, channel_id: publishChannel || undefined })
+      const data = await botApiCall('publish_selected_games', { guild_id: selectedGuild, game_ids: sel, item_type: isAssets ? 'asset' : undefined, channel_id: publishChannel || undefined })
       if (data.error) throw new Error(data.error)
-      toast(`Published ${data.posted} game${data.posted !== 1 ? 's' : ''} to Discord!`, 'success')
-      setSelectedGames([])
+      toast(`Published ${data.posted} item${data.posted !== 1 ? 's' : ''} to Discord!`, 'success')
+      if (isAssets) setSelectedAssets([]); else setSelectedGames([])
     } catch (e: any) {
       toast(e.message || 'Failed', 'error')
     }
@@ -1620,12 +1629,30 @@ function BotTab() {
   }
 
   const toggleGameSelection = (id: number) => {
-    setSelectedGames(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+    const isAssets = publishTab === 'assets'
+    if (isAssets) {
+      setSelectedAssets(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+    } else {
+      setSelectedGames(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+    }
   }
 
   const selectAllGames = () => {
-    setSelectedGames(botGames.map(g => g.id))
+    const isAssets = publishTab === 'assets'
+    if (isAssets) {
+      setSelectedAssets(botAssets.map(g => g.id))
+    } else {
+      setSelectedGames(botGames.map(g => g.id))
+    }
   }
+
+  const clearSelection = () => {
+    setSelectedGames([])
+    setSelectedAssets([])
+  }
+
+  const currentItems = publishTab === 'assets' ? botAssets : botGames
+  const currentSelection = publishTab === 'assets' ? selectedAssets : selectedGames
 
   const toggleAutoPublish = async (key: string) => {
     try {
@@ -2168,9 +2195,17 @@ function BotTab() {
                 </div>
               </div>
 
-              {/* Manual Game Publish */}
+              {/* Manual Publish */}
               <div className="space-y-2">
-                <p className="text-[10px] text-text-dim font-semibold uppercase tracking-wider">Manual Publish</p>
+                <p className="text-[10px] text-text-dim font-semibold uppercase tracking-wider">Publish from Site</p>
+                <div className="flex gap-2">
+                  <button onClick={() => { setPublishTab('games'); setSelectedGames([]) }} className={cn('px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all', publishTab === 'games' ? 'bg-accent-blue/15 text-accent-blue border border-accent-blue/25' : 'bg-bg-elevated text-text-dim border border-border-primary hover:text-text-secondary')}>
+                    <Gamepad2 size={10} className="inline mr-1" /> Games ({botGames.length})
+                  </button>
+                  <button onClick={() => { setPublishTab('assets'); setSelectedAssets([]) }} className={cn('px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all', publishTab === 'assets' ? 'bg-accent-purple/15 text-accent-purple border border-accent-purple/25' : 'bg-bg-elevated text-text-dim border border-border-primary hover:text-text-secondary')}>
+                    <Upload size={10} className="inline mr-1" /> Assets ({botAssets.length})
+                  </button>
+                </div>
                 <div className="flex items-center gap-2">
                   <select value={publishChannel} onChange={(e) => setPublishChannel(e.target.value)}
                     className="flex-1 px-2 py-1.5 rounded-lg bg-bg-elevated border border-border-primary text-xs text-text-primary focus:outline-none focus:border-accent-blue/50">
@@ -2182,13 +2217,13 @@ function BotTab() {
                   <button onClick={selectAllGames} className="px-2.5 py-1.5 rounded-lg bg-bg-elevated border border-border-primary text-[10px] text-text-dim hover:text-text-secondary transition-colors">
                     Select All
                   </button>
-                  <button onClick={() => setSelectedGames([])} className="px-2.5 py-1.5 rounded-lg bg-bg-elevated border border-border-primary text-[10px] text-text-dim hover:text-text-secondary transition-colors">
+                  <button onClick={clearSelection} className="px-2.5 py-1.5 rounded-lg bg-bg-elevated border border-border-primary text-[10px] text-text-dim hover:text-text-secondary transition-colors">
                     Clear
                   </button>
-                  {selectedGames.length > 0 && (
+                  {currentSelection.length > 0 && (
                     <button onClick={publishSelectedGames} disabled={publishing} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-green/15 text-accent-green text-[10px] font-semibold hover:bg-accent-green/25 transition-colors disabled:opacity-50">
                       {publishing ? <Loader2 size={10} className="animate-spin" /> : <Send size={10} />}
-                      Publish Selected ({selectedGames.length})
+                      Publish Selected ({currentSelection.length})
                     </button>
                   )}
                   <button onClick={publishAllGames} disabled={publishing} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-purple/15 text-accent-purple text-[10px] font-semibold hover:bg-accent-purple/25 transition-colors disabled:opacity-50">
@@ -2197,21 +2232,39 @@ function BotTab() {
                   </button>
                 </div>
                 <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
-                  {botGames.length === 0 && (
-                    <p className="text-[10px] text-text-dim text-center py-4">No games found. Add games via /addgame in Discord.</p>
+                  {currentItems.length === 0 && (
+                    <p className="text-[10px] text-text-dim text-center py-4">No {publishTab} found on the site yet.</p>
                   )}
-                  {botGames.map((game) => (
+                  {publishTab === 'games' && botGames.map((game) => (
                     <div key={game.id} className={cn('flex items-center gap-3 p-2.5 rounded-lg border transition-all cursor-pointer', selectedGames.includes(game.id) ? 'bg-accent-blue/10 border-accent-blue/25' : 'bg-bg-elevated border-border-primary hover:border-border-accent')}>
                       <input type="checkbox" checked={selectedGames.includes(game.id)} onChange={() => toggleGameSelection(game.id)} className="w-3.5 h-3.5 rounded border-border-primary text-accent-blue focus:ring-accent-blue/50 bg-bg-secondary" />
-                      <Gamepad2 size={14} className="text-accent-blue shrink-0" />
+                      {game.thumbnail_url ? <img src={game.thumbnail_url} alt="" className="w-8 h-8 rounded-lg object-cover shrink-0" /> : <Gamepad2 size={14} className="text-accent-blue shrink-0" />}
                       <div className="flex-1 min-w-0">
                         <div className="text-xs font-medium text-text-primary truncate">{game.title}</div>
                         <div className="text-[10px] text-text-dim truncate">{game.description || 'No description'}</div>
                       </div>
-                      <span className={cn('text-[9px] px-1.5 py-0.5 rounded-full font-medium shrink-0', game.status === 'live' ? 'bg-green-500/15 text-green-400' : game.status === 'hidden' ? 'bg-red-500/15 text-red-400' : 'bg-yellow-500/15 text-yellow-400')}>
-                        {game.status || 'unknown'}
-                      </span>
-                      <button onClick={(e) => { e.stopPropagation(); publishGame(game.id) }} disabled={publishing} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-bg-secondary border border-border-primary text-[10px] text-text-dim hover:text-accent-green hover:border-accent-green/30 transition-all disabled:opacity-50 shrink-0">
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {game.is_official && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-yellow-500/15 text-yellow-400 font-medium">Official</span>}
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-bg-secondary text-text-dim">{game.category || 'Uncategorized'}</span>
+                      </div>
+                      <button onClick={(e) => { e.stopPropagation(); publishGame(game.id, 'game') }} disabled={publishing} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-bg-secondary border border-border-primary text-[10px] text-text-dim hover:text-accent-green hover:border-accent-green/30 transition-all disabled:opacity-50 shrink-0">
+                        <Send size={9} /> Post
+                      </button>
+                    </div>
+                  ))}
+                  {publishTab === 'assets' && botAssets.map((asset) => (
+                    <div key={asset.id} className={cn('flex items-center gap-3 p-2.5 rounded-lg border transition-all cursor-pointer', selectedAssets.includes(asset.id) ? 'bg-accent-purple/10 border-accent-purple/25' : 'bg-bg-elevated border-border-primary hover:border-border-accent')}>
+                      <input type="checkbox" checked={selectedAssets.includes(asset.id)} onChange={() => toggleGameSelection(asset.id)} className="w-3.5 h-3.5 rounded border-border-primary text-accent-purple focus:ring-accent-purple/50 bg-bg-secondary" />
+                      {asset.thumbnail_url ? <img src={asset.thumbnail_url} alt="" className="w-8 h-8 rounded-lg object-cover shrink-0" /> : <Upload size={14} className="text-accent-purple shrink-0" />}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-medium text-text-primary truncate">{asset.title}</div>
+                        <div className="text-[10px] text-text-dim truncate">{asset.description || 'No description'}</div>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-accent-purple/15 text-accent-purple font-medium capitalize">{asset.type}</span>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-bg-secondary text-text-dim">{asset.price_robux === 0 ? 'Free' : `${asset.price_robux} R$`}</span>
+                      </div>
+                      <button onClick={(e) => { e.stopPropagation(); publishGame(asset.id, 'asset') }} disabled={publishing} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-bg-secondary border border-border-primary text-[10px] text-text-dim hover:text-accent-green hover:border-accent-green/30 transition-all disabled:opacity-50 shrink-0">
                         <Send size={9} /> Post
                       </button>
                     </div>

@@ -426,36 +426,48 @@ serve(async (req) => {
       }
 
       case "publish_game": {
-        const { guild_id, game_id, channel_id } = body;
+        const { guild_id, game_id, channel_id, item_type } = body;
         if (!guild_id || !game_id) return new Response(JSON.stringify({ error: "guild_id and game_id required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-        const { data: game } = await sb.from("bot_games").select("*").eq("id", game_id).maybeSingle();
-        if (!game) return new Response(JSON.stringify({ error: "Game not found" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-        const payload: any = { game_title: game.title, game_description: game.description || "", channel_id: channel_id || "" };
-        if (game.play_url) payload.game_url = game.play_url;
-        if (game.image_url) payload.game_image = game.image_url;
+        let item: any = null;
+        if (item_type === "asset") {
+          const { data: asset } = await sb.from("assets").select("id, title, description, thumbnail_url, drive_file_url").eq("id", game_id).maybeSingle();
+          if (asset) item = { ...asset, game_url: asset.drive_file_url || "" };
+        } else {
+          const { data: exp } = await sb.from("experiences").select("id, title, description, thumbnail_url, game_url").eq("id", game_id).maybeSingle();
+          if (exp) item = exp;
+        }
+        if (!item) return new Response(JSON.stringify({ error: "Item not found" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const payload: any = { game_title: item.title, game_description: item.description || "", channel_id: channel_id || "" };
+        if (item.game_url) payload.game_url = item.game_url;
+        if (item.thumbnail_url) payload.game_image = item.thumbnail_url;
         const { data: wc, error: wcErr } = await sb.from("web_commands").insert({
           guild_id, command: "publish_game", payload, status: "pending",
         }).select().single();
         if (wcErr) throw wcErr;
-        result = { success: true, id: wc.id, game: game.title };
+        result = { success: true, id: wc.id, game: item.title };
         break;
       }
 
       case "publish_all_games": {
-        const { guild_id: gId3, channel_id: chId3 } = body;
+        const { guild_id: gId3, channel_id: chId3, item_type: allType } = body;
         if (!gId3) return new Response(JSON.stringify({ error: "guild_id required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         const { data: feedConf2 } = await sb.from("bot_config").select("value").eq("key", "channel_feeds").maybeSingle();
         let feeds2: Record<string, string> = {};
         try { feeds2 = JSON.parse(feedConf2?.value || "{}"); } catch {}
         const targetChannel = chId3 || feeds2.game_feed || "";
         if (!targetChannel) return new Response(JSON.stringify({ error: "No channel specified and no game_feed channel configured" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-        const { data: games } = await sb.from("bot_games").select("id, title, description, play_url, image_url").order("created_at", { ascending: false });
-        if (!games?.length) { result = { success: true, posted: 0, reason: "No games found" }; break; }
+        let items: any[] = [];
+        if (allType === "asset") {
+          const { data: allAssets } = await sb.from("assets").select("id, title, description, thumbnail_url, drive_file_url").order("created_at", { ascending: false });
+          items = (allAssets || []).map((a: any) => ({ game_title: a.title, game_description: a.description || "", game_url: a.drive_file_url || "", game_image: a.thumbnail_url || "" }));
+        } else {
+          const { data: allExps } = await sb.from("experiences").select("id, title, description, game_url, thumbnail_url").order("created_at", { ascending: false });
+          items = (allExps || []).map((e: any) => ({ game_title: e.title, game_description: e.description || "", game_url: e.game_url || "", game_image: e.thumbnail_url || "" }));
+        }
+        if (!items.length) { result = { success: true, posted: 0, reason: "No items found" }; break; }
         let posted = 0;
-        for (const game of games) {
-          const p: any = { game_title: game.title, game_description: game.description || "", channel_id: targetChannel };
-          if (game.play_url) p.game_url = game.play_url;
-          if (game.image_url) p.game_image = game.image_url;
+        for (const item of items) {
+          const p: any = { ...item, channel_id: targetChannel };
           await sb.from("web_commands").insert({ guild_id: gId3, command: "publish_game", payload: p, status: "pending" });
           posted++;
         }
@@ -464,20 +476,25 @@ serve(async (req) => {
       }
 
       case "publish_selected_games": {
-        const { guild_id: gId6, channel_id: chId6, game_ids } = body;
+        const { guild_id: gId6, channel_id: chId6, game_ids, item_type: selType } = body;
         if (!gId6 || !game_ids?.length) return new Response(JSON.stringify({ error: "guild_id and game_ids required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         const { data: feedConf3 } = await sb.from("bot_config").select("value").eq("key", "channel_feeds").maybeSingle();
         let feeds3: Record<string, string> = {};
         try { feeds3 = JSON.parse(feedConf3?.value || "{}"); } catch {}
         const targetChannel2 = chId6 || feeds3.game_feed || "";
         if (!targetChannel2) return new Response(JSON.stringify({ error: "No channel specified and no game_feed channel configured" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-        const { data: selGames } = await sb.from("bot_games").select("id, title, description, play_url, image_url").in("id", game_ids);
-        if (!selGames?.length) { result = { success: true, posted: 0, reason: "No matching games" }; break; }
+        let items2: any[] = [];
+        if (selType === "asset") {
+          const { data: selAssets } = await sb.from("assets").select("id, title, description, thumbnail_url, drive_file_url").in("id", game_ids);
+          items2 = (selAssets || []).map((a: any) => ({ game_title: a.title, game_description: a.description || "", game_url: a.drive_file_url || "", game_image: a.thumbnail_url || "" }));
+        } else {
+          const { data: selExps } = await sb.from("experiences").select("id, title, description, thumbnail_url, game_url").in("id", game_ids);
+          items2 = (selExps || []).map((e: any) => ({ game_title: e.title, game_description: e.description || "", game_url: e.game_url || "", game_image: e.thumbnail_url || "" }));
+        }
+        if (!items2.length) { result = { success: true, posted: 0, reason: "No matching items" }; break; }
         let posted2 = 0;
-        for (const game of selGames) {
-          const p: any = { game_title: game.title, game_description: game.description || "", channel_id: targetChannel2 };
-          if (game.play_url) p.game_url = game.play_url;
-          if (game.image_url) p.game_image = game.image_url;
+        for (const item of items2) {
+          const p: any = { ...item, channel_id: targetChannel2 };
           await sb.from("web_commands").insert({ guild_id: gId6, command: "publish_game", payload: p, status: "pending" });
           posted2++;
         }
@@ -486,8 +503,9 @@ serve(async (req) => {
       }
 
       case "get_games": {
-        const { data: gamesList } = await sb.from("bot_games").select("id, title, description, play_url, image_url, status, added_by, created_at").order("created_at", { ascending: false }).limit(50);
-        result = { games: gamesList || [] };
+        const { data: exps } = await sb.from("experiences").select("id, title, description, game_url, thumbnail_url, category, price, is_official, created_at").order("created_at", { ascending: false }).limit(50);
+        const { data: assetsList } = await sb.from("assets").select("id, title, description, type, thumbnail_url, price_robux, downloads_count, created_at").order("created_at", { ascending: false }).limit(50);
+        result = { experiences: exps || [], assets: assetsList || [] };
         break;
       }
 

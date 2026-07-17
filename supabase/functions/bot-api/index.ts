@@ -430,11 +430,11 @@ serve(async (req) => {
         if (!guild_id || !game_id) return new Response(JSON.stringify({ error: "guild_id and game_id required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         const { data: game } = await sb.from("bot_games").select("*").eq("id", game_id).maybeSingle();
         if (!game) return new Response(JSON.stringify({ error: "Game not found" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-        const payload: any = { title: game.title, description: game.description || "", channel_id: channel_id || "" };
+        const payload: any = { game_title: game.title, game_description: game.description || "", channel_id: channel_id || "" };
         if (game.play_url) payload.game_url = game.play_url;
-        if (game.image_url) payload.image_url = game.image_url;
+        if (game.image_url) payload.game_image = game.image_url;
         const { data: wc, error: wcErr } = await sb.from("web_commands").insert({
-          guild_id, command: "post_news", payload, status: "pending",
+          guild_id, command: "publish_game", payload, status: "pending",
         }).select().single();
         if (wcErr) throw wcErr;
         result = { success: true, id: wc.id, game: game.title };
@@ -453,10 +453,10 @@ serve(async (req) => {
         if (!games?.length) { result = { success: true, posted: 0, reason: "No live games" }; break; }
         let posted = 0;
         for (const game of games) {
-          const p: any = { title: game.title, description: game.description || "", channel_id: targetChannel };
+          const p: any = { game_title: game.title, game_description: game.description || "", channel_id: targetChannel };
           if (game.play_url) p.game_url = game.play_url;
-          if (game.image_url) p.image_url = game.image_url;
-          await sb.from("web_commands").insert({ guild_id: gId3, command: "post_news", payload: p, status: "pending" });
+          if (game.image_url) p.game_image = game.image_url;
+          await sb.from("web_commands").insert({ guild_id: gId3, command: "publish_game", payload: p, status: "pending" });
           posted++;
         }
         result = { success: true, posted };

@@ -432,13 +432,13 @@ serve(async (req) => {
         let itemType = item_type || "game";
         let siteUrl = "";
         if (itemType === "asset") {
-          const { data: asset } = await sb.from("assets").select("id, title, description, thumbnail_url, drive_file_url, type, price_robux, downloads_count").eq("id", game_id).maybeSingle();
+          const { data: asset } = await sb.from("assets").select("id, title, description, thumbnail_url, drive_file_url, type, price_robux, downloads_count, created_at").eq("id", game_id).maybeSingle();
           if (asset) {
             item = asset;
             siteUrl = `https://yobest-bytr.vercel.app/marketplace`;
           }
         } else {
-          const { data: exp } = await sb.from("experiences").select("id, title, description, thumbnail_url, game_url, category, price, is_official, likes_count").eq("id", game_id).maybeSingle();
+          const { data: exp } = await sb.from("experiences").select("id, title, description, thumbnail_url, game_url, category, price, is_official, likes_count, views_count, rating, rating_count, creator, created_at").eq("id", game_id).maybeSingle();
           if (exp) {
             item = exp;
             itemType = "game";
@@ -452,16 +452,21 @@ serve(async (req) => {
           channel_id: channel_id || "",
           item_type: itemType,
           site_url: siteUrl,
+          thumbnail: item.thumbnail_url || "",
+          creator: item.creator || "",
+          category: item.category || "",
         };
         if (item.game_url) payload.game_url = item.game_url;
-        if (item.thumbnail_url) payload.game_image = item.thumbnail_url;
-        if (item.category) payload.category = item.category;
-        if (item.price) payload.price = item.price;
-        if (item.is_official) payload.is_official = true;
+        if (item.price !== undefined) payload.price = item.price;
+        if (item.is_official !== undefined) payload.is_official = item.is_official;
         if (item.type) payload.asset_type = item.type;
         if (item.price_robux !== undefined) payload.price_robux = item.price_robux;
         if (item.downloads_count !== undefined) payload.downloads_count = item.downloads_count;
         if (item.likes_count !== undefined) payload.likes_count = item.likes_count;
+        if (item.views_count !== undefined) payload.views_count = item.views_count;
+        if (item.rating !== undefined) payload.rating = item.rating;
+        if (item.rating_count !== undefined) payload.rating_count = item.rating_count;
+        if (item.created_at) payload.created_at = item.created_at;
         const { data: wc, error: wcErr } = await sb.from("web_commands").insert({
           guild_id, command: "publish_game", payload, status: "pending",
         }).select().single();
@@ -480,18 +485,22 @@ serve(async (req) => {
         if (!targetChannel) return new Response(JSON.stringify({ error: "No channel specified and no game_feed channel configured" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         let items: any[] = [];
         if (allType === "asset") {
-          const { data: allAssets } = await sb.from("assets").select("id, title, description, thumbnail_url, drive_file_url, type, price_robux, downloads_count").order("created_at", { ascending: false });
+          const { data: allAssets } = await sb.from("assets").select("id, title, description, thumbnail_url, drive_file_url, type, price_robux, downloads_count, created_at").order("created_at", { ascending: false });
           items = (allAssets || []).map((a: any) => ({
-            game_title: a.title, game_description: a.description || "", game_url: a.drive_file_url || "", game_image: a.thumbnail_url || "",
+            game_title: a.title, game_description: a.description || "", game_url: a.drive_file_url || "", thumbnail: a.thumbnail_url || "",
             item_type: "asset", site_url: "https://yobest-bytr.vercel.app/marketplace",
             asset_type: a.type || "", price_robux: a.price_robux ?? 0, downloads_count: a.downloads_count ?? 0,
+            creator: "", category: a.type || "", created_at: a.created_at || "",
           }));
         } else {
-          const { data: allExps } = await sb.from("experiences").select("id, title, description, game_url, thumbnail_url, category, price, is_official, likes_count").order("created_at", { ascending: false });
+          const { data: allExps } = await sb.from("experiences").select("id, title, description, game_url, thumbnail_url, category, price, is_official, likes_count, views_count, rating, rating_count, creator, created_at").order("created_at", { ascending: false });
           items = (allExps || []).map((e: any) => ({
-            game_title: e.title, game_description: e.description || "", game_url: e.game_url || "", game_image: e.thumbnail_url || "",
+            game_title: e.title, game_description: e.description || "", game_url: e.game_url || "", thumbnail: e.thumbnail_url || "",
             item_type: "game", site_url: `https://yobest-bytr.vercel.app/games/${e.id}`,
-            category: e.category || "", price: e.price ?? 0, is_official: e.is_official || false, likes_count: e.likes_count ?? 0,
+            category: e.category || "", price: e.price ?? 0, is_official: e.is_official || false,
+            likes_count: e.likes_count ?? 0, views_count: e.views_count ?? 0,
+            rating: e.rating ?? 0, rating_count: e.rating_count ?? 0,
+            creator: e.creator || "", created_at: e.created_at || "",
           }));
         }
         if (!items.length) { result = { success: true, posted: 0, reason: "No items found" }; break; }
@@ -515,18 +524,22 @@ serve(async (req) => {
         if (!targetChannel2) return new Response(JSON.stringify({ error: "No channel specified and no game_feed channel configured" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         let items2: any[] = [];
         if (selType === "asset") {
-          const { data: selAssets } = await sb.from("assets").select("id, title, description, thumbnail_url, drive_file_url, type, price_robux, downloads_count").in("id", game_ids);
+          const { data: selAssets } = await sb.from("assets").select("id, title, description, thumbnail_url, drive_file_url, type, price_robux, downloads_count, created_at").in("id", game_ids);
           items2 = (selAssets || []).map((a: any) => ({
-            game_title: a.title, game_description: a.description || "", game_url: a.drive_file_url || "", game_image: a.thumbnail_url || "",
+            game_title: a.title, game_description: a.description || "", game_url: a.drive_file_url || "", thumbnail: a.thumbnail_url || "",
             item_type: "asset", site_url: "https://yobest-bytr.vercel.app/marketplace",
             asset_type: a.type || "", price_robux: a.price_robux ?? 0, downloads_count: a.downloads_count ?? 0,
+            creator: "", category: a.type || "", created_at: a.created_at || "",
           }));
         } else {
-          const { data: selExps } = await sb.from("experiences").select("id, title, description, thumbnail_url, game_url, category, price, is_official, likes_count").in("id", game_ids);
+          const { data: selExps } = await sb.from("experiences").select("id, title, description, thumbnail_url, game_url, category, price, is_official, likes_count, views_count, rating, rating_count, creator, created_at").in("id", game_ids);
           items2 = (selExps || []).map((e: any) => ({
-            game_title: e.title, game_description: e.description || "", game_url: e.game_url || "", game_image: e.thumbnail_url || "",
+            game_title: e.title, game_description: e.description || "", game_url: e.game_url || "", thumbnail: e.thumbnail_url || "",
             item_type: "game", site_url: `https://yobest-bytr.vercel.app/games/${e.id}`,
-            category: e.category || "", price: e.price ?? 0, is_official: e.is_official || false, likes_count: e.likes_count ?? 0,
+            category: e.category || "", price: e.price ?? 0, is_official: e.is_official || false,
+            likes_count: e.likes_count ?? 0, views_count: e.views_count ?? 0,
+            rating: e.rating ?? 0, rating_count: e.rating_count ?? 0,
+            creator: e.creator || "", created_at: e.created_at || "",
           }));
         }
         if (!items2.length) { result = { success: true, posted: 0, reason: "No matching items" }; break; }

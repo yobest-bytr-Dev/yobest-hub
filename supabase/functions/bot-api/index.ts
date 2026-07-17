@@ -429,17 +429,39 @@ serve(async (req) => {
         const { guild_id, game_id, channel_id, item_type } = body;
         if (!guild_id || !game_id) return new Response(JSON.stringify({ error: "guild_id and game_id required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         let item: any = null;
-        if (item_type === "asset") {
-          const { data: asset } = await sb.from("assets").select("id, title, description, thumbnail_url, drive_file_url").eq("id", game_id).maybeSingle();
-          if (asset) item = { ...asset, game_url: asset.drive_file_url || "" };
+        let itemType = item_type || "game";
+        let siteUrl = "";
+        if (itemType === "asset") {
+          const { data: asset } = await sb.from("assets").select("id, title, description, thumbnail_url, drive_file_url, type, price_robux, downloads_count").eq("id", game_id).maybeSingle();
+          if (asset) {
+            item = asset;
+            siteUrl = `https://yobest-bytr.vercel.app/marketplace`;
+          }
         } else {
-          const { data: exp } = await sb.from("experiences").select("id, title, description, thumbnail_url, game_url").eq("id", game_id).maybeSingle();
-          if (exp) item = exp;
+          const { data: exp } = await sb.from("experiences").select("id, title, description, thumbnail_url, game_url, category, price, is_official, likes_count").eq("id", game_id).maybeSingle();
+          if (exp) {
+            item = exp;
+            itemType = "game";
+            siteUrl = `https://yobest-bytr.vercel.app/games/${exp.id}`;
+          }
         }
         if (!item) return new Response(JSON.stringify({ error: "Item not found" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-        const payload: any = { game_title: item.title, game_description: item.description || "", channel_id: channel_id || "" };
+        const payload: any = {
+          game_title: item.title,
+          game_description: item.description || "",
+          channel_id: channel_id || "",
+          item_type: itemType,
+          site_url: siteUrl,
+        };
         if (item.game_url) payload.game_url = item.game_url;
         if (item.thumbnail_url) payload.game_image = item.thumbnail_url;
+        if (item.category) payload.category = item.category;
+        if (item.price) payload.price = item.price;
+        if (item.is_official) payload.is_official = true;
+        if (item.type) payload.asset_type = item.type;
+        if (item.price_robux !== undefined) payload.price_robux = item.price_robux;
+        if (item.downloads_count !== undefined) payload.downloads_count = item.downloads_count;
+        if (item.likes_count !== undefined) payload.likes_count = item.likes_count;
         const { data: wc, error: wcErr } = await sb.from("web_commands").insert({
           guild_id, command: "publish_game", payload, status: "pending",
         }).select().single();
@@ -458,11 +480,19 @@ serve(async (req) => {
         if (!targetChannel) return new Response(JSON.stringify({ error: "No channel specified and no game_feed channel configured" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         let items: any[] = [];
         if (allType === "asset") {
-          const { data: allAssets } = await sb.from("assets").select("id, title, description, thumbnail_url, drive_file_url").order("created_at", { ascending: false });
-          items = (allAssets || []).map((a: any) => ({ game_title: a.title, game_description: a.description || "", game_url: a.drive_file_url || "", game_image: a.thumbnail_url || "" }));
+          const { data: allAssets } = await sb.from("assets").select("id, title, description, thumbnail_url, drive_file_url, type, price_robux, downloads_count").order("created_at", { ascending: false });
+          items = (allAssets || []).map((a: any) => ({
+            game_title: a.title, game_description: a.description || "", game_url: a.drive_file_url || "", game_image: a.thumbnail_url || "",
+            item_type: "asset", site_url: "https://yobest-bytr.vercel.app/marketplace",
+            asset_type: a.type || "", price_robux: a.price_robux ?? 0, downloads_count: a.downloads_count ?? 0,
+          }));
         } else {
-          const { data: allExps } = await sb.from("experiences").select("id, title, description, game_url, thumbnail_url").order("created_at", { ascending: false });
-          items = (allExps || []).map((e: any) => ({ game_title: e.title, game_description: e.description || "", game_url: e.game_url || "", game_image: e.thumbnail_url || "" }));
+          const { data: allExps } = await sb.from("experiences").select("id, title, description, game_url, thumbnail_url, category, price, is_official, likes_count").order("created_at", { ascending: false });
+          items = (allExps || []).map((e: any) => ({
+            game_title: e.title, game_description: e.description || "", game_url: e.game_url || "", game_image: e.thumbnail_url || "",
+            item_type: "game", site_url: `https://yobest-bytr.vercel.app/games/${e.id}`,
+            category: e.category || "", price: e.price ?? 0, is_official: e.is_official || false, likes_count: e.likes_count ?? 0,
+          }));
         }
         if (!items.length) { result = { success: true, posted: 0, reason: "No items found" }; break; }
         let posted = 0;
@@ -485,11 +515,19 @@ serve(async (req) => {
         if (!targetChannel2) return new Response(JSON.stringify({ error: "No channel specified and no game_feed channel configured" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         let items2: any[] = [];
         if (selType === "asset") {
-          const { data: selAssets } = await sb.from("assets").select("id, title, description, thumbnail_url, drive_file_url").in("id", game_ids);
-          items2 = (selAssets || []).map((a: any) => ({ game_title: a.title, game_description: a.description || "", game_url: a.drive_file_url || "", game_image: a.thumbnail_url || "" }));
+          const { data: selAssets } = await sb.from("assets").select("id, title, description, thumbnail_url, drive_file_url, type, price_robux, downloads_count").in("id", game_ids);
+          items2 = (selAssets || []).map((a: any) => ({
+            game_title: a.title, game_description: a.description || "", game_url: a.drive_file_url || "", game_image: a.thumbnail_url || "",
+            item_type: "asset", site_url: "https://yobest-bytr.vercel.app/marketplace",
+            asset_type: a.type || "", price_robux: a.price_robux ?? 0, downloads_count: a.downloads_count ?? 0,
+          }));
         } else {
-          const { data: selExps } = await sb.from("experiences").select("id, title, description, thumbnail_url, game_url").in("id", game_ids);
-          items2 = (selExps || []).map((e: any) => ({ game_title: e.title, game_description: e.description || "", game_url: e.game_url || "", game_image: e.thumbnail_url || "" }));
+          const { data: selExps } = await sb.from("experiences").select("id, title, description, thumbnail_url, game_url, category, price, is_official, likes_count").in("id", game_ids);
+          items2 = (selExps || []).map((e: any) => ({
+            game_title: e.title, game_description: e.description || "", game_url: e.game_url || "", game_image: e.thumbnail_url || "",
+            item_type: "game", site_url: `https://yobest-bytr.vercel.app/games/${e.id}`,
+            category: e.category || "", price: e.price ?? 0, is_official: e.is_official || false, likes_count: e.likes_count ?? 0,
+          }));
         }
         if (!items2.length) { result = { success: true, posted: 0, reason: "No matching items" }; break; }
         let posted2 = 0;

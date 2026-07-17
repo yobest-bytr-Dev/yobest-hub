@@ -1574,11 +1574,12 @@ function BotTab() {
 
   const loadGames = useCallback(async () => {
     try {
-      const data = await botApiCall('get_games')
-      if (!data.error) {
-        setBotGames(data.experiences || [])
-        setBotAssets(data.assets || [])
-      }
+      const [expRes, assetRes] = await Promise.all([
+        supabase.from('experiences').select('id, title, description, game_url, thumbnail_url, category, price, is_official, created_at').order('created_at', { ascending: false }).limit(50),
+        supabase.from('assets').select('id, title, description, type, thumbnail_url, price_robux, downloads_count, created_at').order('created_at', { ascending: false }).limit(50),
+      ])
+      if (expRes.data) setBotGames(expRes.data)
+      if (assetRes.data) setBotAssets(assetRes.data)
     } catch {}
   }, [])
 

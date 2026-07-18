@@ -480,30 +480,22 @@ serve(async (req) => {
         let item: any = null;
         let itemType = item_type || "game";
         let siteUrl = "";
-        if (itemType === "asset") {
-          const { data: asset, error: assetErr } = await sb.from("assets").select("id, title, description, thumbnail_url, drive_file_url, type, price_robux, downloads_count, created_at").eq("id", game_id).maybeSingle();
-          if (assetErr) return new Response(JSON.stringify({ error: "Asset query failed: " + assetErr.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-          if (asset) {
-            item = asset;
-            siteUrl = `https://yobest-bytr.vercel.app/marketplace`;
-          }
-        } else {
-          const { data: exp, error: expErr } = await sb.from("experiences").select("id, creator_id, title, description, thumbnail_url, video_url, download_url, game_url, category, price, is_official, likes_count, views_count, created_at").eq("id", game_id).maybeSingle();
-          if (expErr) return new Response(JSON.stringify({ error: "Game query failed: " + expErr.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-          if (exp) {
-            item = exp;
-            itemType = "game";
-            siteUrl = `https://yobest-bytr.vercel.app/games/${exp.id}`;
-          }
-        }
-        if (!item) {
-          if (body.game_title) {
-            item = { title: body.game_title, description: body.game_description || "", thumbnail_url: body.thumbnail || "", video_url: body.video_url || "", game_url: body.game_url || "", category: body.category || "", price: body.price || "Free", is_official: body.is_official ?? false, likes_count: body.likes_count ?? 0, views_count: body.views_count ?? 0, download_url: body.download_url || "", creator_id: "" };
-            siteUrl = `https://yobest-bytr.vercel.app/games/${game_id}`;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(game_id);
+        if (body.game_title) {
+          item = { title: body.game_title, description: body.game_description || "", thumbnail_url: body.thumbnail || "", video_url: body.video_url || "", game_url: body.game_url || "", category: body.category || "", price: body.price || "Free", is_official: body.is_official ?? false, likes_count: body.likes_count ?? 0, views_count: body.views_count ?? 0, download_url: body.download_url || "", creator_id: "" };
+          siteUrl = `https://yobest-bytr.vercel.app/games/${game_id}`;
+        } else if (isUuid) {
+          if (itemType === "asset") {
+            const { data: asset, error: assetErr } = await sb.from("assets").select("id, title, description, thumbnail_url, drive_file_url, type, price_robux, downloads_count, created_at").eq("id", game_id).maybeSingle();
+            if (assetErr) return new Response(JSON.stringify({ error: "Asset query failed: " + assetErr.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+            if (asset) { item = asset; siteUrl = `https://yobest-bytr.vercel.app/marketplace`; }
           } else {
-            return new Response(JSON.stringify({ error: "Item not found in database for id: " + game_id + " type: " + itemType }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+            const { data: exp, error: expErr } = await sb.from("experiences").select("id, creator_id, title, description, thumbnail_url, video_url, download_url, game_url, category, price, is_official, likes_count, views_count, created_at").eq("id", game_id).maybeSingle();
+            if (expErr) return new Response(JSON.stringify({ error: "Game query failed: " + expErr.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+            if (exp) { item = exp; itemType = "game"; siteUrl = `https://yobest-bytr.vercel.app/games/${exp.id}`; }
           }
         }
+        if (!item) return new Response(JSON.stringify({ error: "Item not found for id: " + game_id }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         const payload: any = {
           game_title: item.title,
           game_description: item.description || "",

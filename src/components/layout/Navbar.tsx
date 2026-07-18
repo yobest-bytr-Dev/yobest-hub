@@ -51,7 +51,22 @@ export default function Navbar() {
             loadFollowing()
           }
         } catch {}
-      } else if (event === 'SIGNED_OUT') {
+      } else if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+        if (!session) {
+          setCurrentUser(null)
+        } else if (event === 'TOKEN_REFRESHED' && session?.user) {
+          try {
+            const profile = await getCurrentProfile()
+            if (profile) setCurrentUser(profile)
+          } catch {
+            await supabase.auth.signOut()
+            setCurrentUser(null)
+          }
+        }
+      }
+    }, (error) => {
+      if (error?.message?.includes('refresh_token') || error?.message?.includes('Invalid') || error?.status === 400) {
+        supabase.auth.signOut().catch(() => {})
         setCurrentUser(null)
       }
     })

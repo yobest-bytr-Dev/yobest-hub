@@ -16,6 +16,7 @@ import { useToast } from '@/components/ui/Toast'
 import RobloxAvatar from '@/components/ui/RobloxAvatar'
 import { uploadToGoogleDrive, toDirectImageUrl } from '@/lib/drive-upload'
 import ImagePicker from '@/components/ui/ImagePicker'
+import { experiences as officialGamesData } from '@/data/official-games'
 
 const ADMIN_USERNAME = 'ByocefS'
 
@@ -1578,7 +1579,16 @@ function BotTab() {
         supabase.from('experiences').select('id, title, description, game_url, download_url, thumbnail_url, video_url, gallery_images, category, price, is_official, created_at').order('created_at', { ascending: false }).limit(50),
         supabase.from('assets').select('id, title, description, type, thumbnail_url, gallery_images, price_robux, downloads_count, created_at').order('created_at', { ascending: false }).limit(50),
       ])
-      if (expRes.data) setBotGames(expRes.data)
+      const dbGames = expRes.data || []
+      const officialIds = new Set(dbGames.map(g => g.id))
+      const merged = [...officialGamesData.map(g => ({
+        ...g,
+        video_url: (g as any).video_url || '',
+        gallery_images: (g as any).gallery_images || [],
+        created_at: (g as any).created_at || new Date().toISOString(),
+        thumbnail_url: (g as any).thumbnail_url || '',
+      })), ...dbGames.filter(g => !officialIds.has(g.id))]
+      setBotGames(merged)
       if (assetRes.data) setBotAssets(assetRes.data)
     } catch {}
   }, [])
@@ -1588,9 +1598,9 @@ function BotTab() {
 
   const getGameThumb = (game: any) => {
     if (game.thumbnail_url) return toDirectImageUrl(game.thumbnail_url)
-    if (game.download_url) return toDirectImageUrl(game.download_url)
     const ytId = extractYoutubeId(game.video_url)
     if (ytId) return `https://img.youtube.com/vi/${ytId}/mqdefault.jpg`
+    if (game.download_url && /\.(jpg|jpeg|png|gif|webp|drive|google)/i.test(game.download_url)) return toDirectImageUrl(game.download_url)
     if (game.gallery_images?.length) return toDirectImageUrl(game.gallery_images[0])
     return ''
   }
@@ -1604,6 +1614,24 @@ function BotTab() {
     if (!selectedGuild) { toast('Select a server first', 'error'); return }
     setPublishing(true)
     try {
+      if (itemType !== 'asset') {
+        const officialGame = officialGamesData.find(g => g.id === gameId)
+        if (officialGame) {
+          const thumb = getGameThumb(officialGame)
+          const data = await botApiCall('publish_game', {
+            guild_id: selectedGuild, game_id: gameId, channel_id: publishChannel || undefined,
+            game_title: officialGame.title, game_description: officialGame.description || '',
+            thumbnail: thumb, video_url: officialGame.video_url || '', game_url: officialGame.game_url || '',
+            download_url: officialGame.download_url || '', category: officialGame.category || '',
+            price: officialGame.price || 'Free', is_official: true,
+            likes_count: officialGame.likes_count || 0, views_count: officialGame.views_count || 0,
+          })
+          if (data.error) throw new Error(data.error)
+          toast(`Published "${data.game}" to Discord!`, 'success')
+          setPublishing(false)
+          return
+        }
+      }
       const data = await botApiCall('publish_game', { guild_id: selectedGuild, game_id: gameId, item_type: itemType === 'asset' ? 'asset' : undefined, channel_id: publishChannel || undefined })
       if (data.error) throw new Error(data.error)
       toast(`Published "${data.game}" to Discord!`, 'success')

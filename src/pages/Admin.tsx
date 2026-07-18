@@ -11,7 +11,7 @@ import {
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '@/store/useStore'
 import { supabase, supabaseUrl, supabaseAnonKey } from '@/config/supabase'
-import { formatNumber, cn } from '@/lib/utils'
+import { formatNumber, cn, extractYoutubeId } from '@/lib/utils'
 import { useToast } from '@/components/ui/Toast'
 import RobloxAvatar from '@/components/ui/RobloxAvatar'
 import { uploadToGoogleDrive, toDirectImageUrl } from '@/lib/drive-upload'
@@ -1575,8 +1575,8 @@ function BotTab() {
   const loadGames = useCallback(async () => {
     try {
       const [expRes, assetRes] = await Promise.all([
-        supabase.from('experiences').select('id, title, description, game_url, download_url, thumbnail_url, category, price, is_official, created_at').order('created_at', { ascending: false }).limit(50),
-        supabase.from('assets').select('id, title, description, type, thumbnail_url, price_robux, downloads_count, created_at').order('created_at', { ascending: false }).limit(50),
+        supabase.from('experiences').select('id, title, description, game_url, download_url, thumbnail_url, video_url, gallery_images, category, price, is_official, created_at').order('created_at', { ascending: false }).limit(50),
+        supabase.from('assets').select('id, title, description, type, thumbnail_url, gallery_images, price_robux, downloads_count, created_at').order('created_at', { ascending: false }).limit(50),
       ])
       if (expRes.data) setBotGames(expRes.data)
       if (assetRes.data) setBotAssets(assetRes.data)
@@ -1585,6 +1585,20 @@ function BotTab() {
 
   useEffect(() => { if (expandedGames) loadGames() }, [expandedGames, loadGames])
   useEffect(() => { if (expandedFeeds) loadGames() }, [expandedFeeds, loadGames])
+
+  const getGameThumb = (game: any) => {
+    if (game.thumbnail_url) return toDirectImageUrl(game.thumbnail_url)
+    if (game.download_url) return toDirectImageUrl(game.download_url)
+    const ytId = extractYoutubeId(game.video_url)
+    if (ytId) return `https://img.youtube.com/vi/${ytId}/mqdefault.jpg`
+    if (game.gallery_images?.length) return toDirectImageUrl(game.gallery_images[0])
+    return ''
+  }
+  const getAssetThumb = (asset: any) => {
+    if (asset.thumbnail_url) return toDirectImageUrl(asset.thumbnail_url)
+    if (asset.gallery_images?.length) return toDirectImageUrl(asset.gallery_images[0])
+    return ''
+  }
 
   const publishGame = async (gameId: string, itemType: 'game' | 'asset' = 'game') => {
     if (!selectedGuild) { toast('Select a server first', 'error'); return }
@@ -2351,10 +2365,12 @@ function BotTab() {
                   {currentItems.length === 0 && (
                     <p className="text-[10px] text-text-dim text-center py-4">No {publishTab} found on the site yet.</p>
                   )}
-                  {publishTab === 'games' && botGames.map((game) => (
+                  {publishTab === 'games' && botGames.map((game) => {
+                    const thumb = getGameThumb(game)
+                    return (
                     <div key={game.id} className={cn('flex items-center gap-3 p-2.5 rounded-lg border transition-all cursor-pointer', selectedGames.includes(game.id) ? 'bg-accent-blue/10 border-accent-blue/25' : 'bg-bg-elevated border-border-primary hover:border-border-accent')}>
                       <input type="checkbox" checked={selectedGames.includes(game.id)} onChange={() => toggleGameSelection(game.id)} className="w-3.5 h-3.5 rounded border-border-primary text-accent-blue focus:ring-accent-blue/50 bg-bg-secondary" />
-                      {(game.thumbnail_url || game.download_url) ? <img src={toDirectImageUrl(game.thumbnail_url || game.download_url)} alt="" className="w-8 h-8 rounded-lg object-cover shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} /> : <Gamepad2 size={14} className="text-accent-blue shrink-0" />}
+                      {thumb ? <img src={thumb} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0 border border-border-primary" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} /> : <div className="w-12 h-12 rounded-lg bg-bg-tertiary flex items-center justify-center shrink-0 border border-border-primary"><Gamepad2 size={16} className="text-accent-blue" /></div>}
                       <div className="flex-1 min-w-0">
                         <div className="text-xs font-medium text-text-primary truncate">{game.title}</div>
                         <div className="text-[10px] text-text-dim truncate">{game.description || 'No description'}</div>
@@ -2367,11 +2383,14 @@ function BotTab() {
                         <Send size={9} /> Post
                       </button>
                     </div>
-                  ))}
-                  {publishTab === 'assets' && botAssets.map((asset) => (
+                    )
+                  })}
+                  {publishTab === 'assets' && botAssets.map((asset) => {
+                    const thumb = getAssetThumb(asset)
+                    return (
                     <div key={asset.id} className={cn('flex items-center gap-3 p-2.5 rounded-lg border transition-all cursor-pointer', selectedAssets.includes(asset.id) ? 'bg-accent-purple/10 border-accent-purple/25' : 'bg-bg-elevated border-border-primary hover:border-border-accent')}>
                       <input type="checkbox" checked={selectedAssets.includes(asset.id)} onChange={() => toggleGameSelection(asset.id)} className="w-3.5 h-3.5 rounded border-border-primary text-accent-purple focus:ring-accent-purple/50 bg-bg-secondary" />
-                      {asset.thumbnail_url ? <img src={toDirectImageUrl(asset.thumbnail_url)} alt="" className="w-8 h-8 rounded-lg object-cover shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} /> : <Upload size={14} className="text-accent-purple shrink-0" />}
+                      {thumb ? <img src={thumb} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0 border border-border-primary" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} /> : <div className="w-12 h-12 rounded-lg bg-bg-tertiary flex items-center justify-center shrink-0 border border-border-primary"><Upload size={16} className="text-accent-purple" /></div>}
                       <div className="flex-1 min-w-0">
                         <div className="text-xs font-medium text-text-primary truncate">{asset.title}</div>
                         <div className="text-[10px] text-text-dim truncate">{asset.description || 'No description'}</div>
@@ -2384,7 +2403,8 @@ function BotTab() {
                         <Send size={9} /> Post
                       </button>
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             </div>

@@ -11,6 +11,7 @@ import type { Asset, Release } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { useNavigate } from 'react-router-dom'
 import AdBanner from '@/components/AdBanner'
+import Gallery from '@/components/ui/Gallery'
 
 const typeIcons = { script: Code, model: Box, uikit: Palette }
 const typeLabels = { script: 'Script', model: 'Model', uikit: 'UI Kit' }
@@ -90,19 +91,7 @@ function AssetDetailModal({ asset, onClose }: { asset: Asset; onClose: () => voi
 
           {(() => {
             const gallery = asset.gallery_images || []
-            return gallery.length > 0 ? (
-              <div>
-                <h4 className="text-[11px] font-semibold text-text-muted mb-2 uppercase tracking-wide">Gallery</h4>
-                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
-                  {gallery.map((img, i) => (
-                    <a key={i} href={toDirectImageUrl(img)} target="_blank" rel="noopener noreferrer"
-                      className="shrink-0 w-32 h-24 rounded-lg overflow-hidden bg-bg-tertiary border border-border-primary hover:border-accent-blue/30 transition-all group">
-                      <img src={toDirectImageUrl(img)} alt={`Gallery ${i + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform" loading="lazy" />
-                    </a>
-                  ))}
-                </div>
-              </div>
-            ) : null
+            return gallery.length > 0 ? <Gallery images={gallery} alt={asset.title} /> : null
           })()}
 
           <div className="flex items-center gap-4 text-xs text-text-muted">

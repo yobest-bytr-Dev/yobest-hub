@@ -280,6 +280,7 @@ serve(async (req) => {
         if (channel_id) payload.channel_id = channel_id;
         if (game_url) payload.game_url = game_url;
         if (image_url) payload.image_url = image_url;
+        if (incoming.mention) payload.mention = incoming.mention;
         const { data, error } = await sb.from("web_commands").insert({
           guild_id, command: "post_news", payload, status: "pending",
         }).select().single();
@@ -436,8 +437,10 @@ serve(async (req) => {
         try { channels2 = JSON.parse(aiRow2?.value || "[]"); } catch {}
         if (!channels2.includes(channel_id)) channels2.push(channel_id);
         await sb.from("bot_config").upsert({ key: "ai_channels", value: JSON.stringify(channels2), updated_by: user.id, updated_at: new Date().toISOString() });
+        const enablePayload: any = { channel_id };
+        if (body.mention) enablePayload.mention = body.mention;
         const { error: wcErr } = await sb.from("web_commands").insert({
-          guild_id, command: "enable_ai_channel", payload: { channel_id }, status: "pending",
+          guild_id, command: "enable_ai_channel", payload: enablePayload, status: "pending",
         });
         if (wcErr) throw wcErr;
         result = { success: true, channels: channels2 };
@@ -452,8 +455,10 @@ serve(async (req) => {
         try { channels3 = JSON.parse(aiRow3?.value || "[]"); } catch {}
         channels3 = channels3.filter((c: string) => c !== chId);
         await sb.from("bot_config").upsert({ key: "ai_channels", value: JSON.stringify(channels3), updated_by: user.id, updated_at: new Date().toISOString() });
+        const disablePayload: any = { channel_id: chId };
+        if (body.mention) disablePayload.mention = body.mention;
         const { error: wcErr2 } = await sb.from("web_commands").insert({
-          guild_id: gId, command: "disable_ai_channel", payload: { channel_id: chId }, status: "pending",
+          guild_id: gId, command: "disable_ai_channel", payload: disablePayload, status: "pending",
         });
         if (wcErr2) throw wcErr2;
         result = { success: true, channels: channels3 };
@@ -520,6 +525,7 @@ serve(async (req) => {
         if (item.likes_count !== undefined) payload.likes_count = item.likes_count;
         if (item.views_count !== undefined) payload.views_count = item.views_count;
         if (item.created_at) payload.created_at = item.created_at;
+        if (body.mention) payload.mention = body.mention;
         const { data: wc, error: wcErr } = await sb.from("web_commands").insert({
           guild_id, command: "publish_game", payload, status: "pending",
         }).select().single();
@@ -559,6 +565,7 @@ serve(async (req) => {
         let posted = 0;
         for (const item of items) {
           const p: any = { ...item, channel_id: targetChannel };
+          if (body.mention) p.mention = body.mention;
           await sb.from("web_commands").insert({ guild_id: gId3, command: "publish_game", payload: p, status: "pending" });
           posted++;
         }
@@ -597,6 +604,7 @@ serve(async (req) => {
         let posted2 = 0;
         for (const item of items2) {
           const p: any = { ...item, channel_id: targetChannel2 };
+          if (body.mention) p.mention = body.mention;
           await sb.from("web_commands").insert({ guild_id: gId6, command: "publish_game", payload: p, status: "pending" });
           posted2++;
         }

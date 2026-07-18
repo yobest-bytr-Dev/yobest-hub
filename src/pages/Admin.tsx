@@ -6,7 +6,7 @@ import {
   XCircle, ExternalLink, ArrowLeft, Crown, Mail, Calendar, TrendingUp, RefreshCw,
   Wrench, Plus, Clock, Sparkles, Save, Upload, Ban, ShieldOff, ImagePlus, Tag, X,
   ShoppingCart, AlertTriangle, Bot, Send, Radio, Hash, Volume2, Zap, Power,
-  CircleDot, ToggleLeft, ToggleRight, ChevronDown, ChevronRight, Terminal
+  CircleDot, ToggleLeft, ToggleRight, ChevronDown, ChevronRight, Terminal, AtSign
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '@/store/useStore'
@@ -1418,6 +1418,8 @@ function BotTab() {
   const [expandedAiBuilder, setExpandedAiBuilder] = useState(false)
   const [expandedServerStats, setExpandedServerStats] = useState(false)
   const [serverStatsData, setServerStatsData] = useState<any>(null)
+  const [mentionTarget, setMentionTarget] = useState<'none' | 'everyone' | 'here' | 'role'>('none')
+  const [mentionRoleId, setMentionRoleId] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -1495,7 +1497,7 @@ function BotTab() {
     if (!selectedGuild) { toast('Select a server first', 'error'); return }
     setSending(true)
     try {
-      const payload: any = { title: newsTitle, description: newsDesc }
+      const payload: any = { title: newsTitle, description: newsDesc, ...getMentionPayload() }
       if (newsUrl) payload.game_url = newsUrl
       if (newsImage) payload.image_url = newsImage
       if (newsChannel) payload.channel_id = newsChannel
@@ -1563,7 +1565,7 @@ function BotTab() {
     try {
       const isAi = aiChannels.includes(channelId)
       const action = isAi ? 'disable_ai_channel' : 'enable_ai_channel'
-      const data = await botApiCall(action, { channel_id: channelId, guild_id: selectedGuild })
+      const data = await botApiCall(action, { channel_id: channelId, guild_id: selectedGuild, ...getMentionPayload() })
       if (data.error) throw new Error(data.error)
       setAiChannels(data.channels || [])
       toast(`AI ${isAi ? 'disabled' : 'enabled'} in #${channels.find((c: any) => c.id === channelId)?.name || channelId}`, 'success')
@@ -1604,11 +1606,18 @@ function BotTab() {
     return ''
   }
 
+  const getMentionPayload = () => {
+    if (mentionTarget === 'everyone') return { mention: '@everyone' }
+    if (mentionTarget === 'here') return { mention: '@here' }
+    if (mentionTarget === 'role' && mentionRoleId) return { mention: `<@&${mentionRoleId}>` }
+    return {}
+  }
+
   const publishGame = async (gameId: string, itemType: 'game' | 'asset' = 'game') => {
     if (!selectedGuild) { toast('Select a server first', 'error'); return }
     setPublishing(true)
     try {
-      const data = await botApiCall('publish_game', { guild_id: selectedGuild, game_id: gameId, item_type: itemType === 'asset' ? 'asset' : undefined, channel_id: publishChannel || undefined })
+      const data = await botApiCall('publish_game', { guild_id: selectedGuild, game_id: gameId, item_type: itemType === 'asset' ? 'asset' : undefined, channel_id: publishChannel || undefined, ...getMentionPayload() })
       if (data.error) throw new Error(data.error)
       toast(`Published "${data.game}" to Discord!`, 'success')
     } catch (e: any) {
@@ -1622,7 +1631,7 @@ function BotTab() {
     setPublishing(true)
     try {
       const isAssets = publishTab === 'assets'
-      const data = await botApiCall('publish_all_games', { guild_id: selectedGuild, channel_id: publishChannel || undefined, item_type: isAssets ? 'asset' : undefined })
+      const data = await botApiCall('publish_all_games', { guild_id: selectedGuild, channel_id: publishChannel || undefined, item_type: isAssets ? 'asset' : undefined, ...getMentionPayload() })
       if (data.error) throw new Error(data.error)
       toast(`Published ${data.posted} item${data.posted !== 1 ? 's' : ''} to Discord!`, 'success')
     } catch (e: any) {
@@ -1638,7 +1647,7 @@ function BotTab() {
     if (sel.length === 0) { toast('Select items first', 'error'); return }
     setPublishing(true)
     try {
-      const data = await botApiCall('publish_selected_games', { guild_id: selectedGuild, game_ids: sel, item_type: isAssets ? 'asset' : undefined, channel_id: publishChannel || undefined })
+      const data = await botApiCall('publish_selected_games', { guild_id: selectedGuild, game_ids: sel, item_type: isAssets ? 'asset' : undefined, channel_id: publishChannel || undefined, ...getMentionPayload() })
       if (data.error) throw new Error(data.error)
       toast(`Published ${data.posted} item${data.posted !== 1 ? 's' : ''} to Discord!`, 'success')
       if (isAssets) setSelectedAssets([]); else setSelectedGames([])
@@ -2272,6 +2281,39 @@ function BotTab() {
           </button>
           {expandedFeeds && (
             <div className="mt-4 space-y-4">
+              {/* Mention Target */}
+              <div className="space-y-2">
+                <p className="text-[10px] text-text-dim font-semibold uppercase tracking-wider">Message Mention</p>
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-bg-elevated border border-border-primary">
+                  <AtSign size={14} className={mentionTarget !== 'none' ? 'text-accent-blue' : 'text-text-dim'} />
+                  <div className="flex-1">
+                    <div className="text-xs font-medium text-text-primary">Notify Recipients</div>
+                    <div className="text-[10px] text-text-dim">Add a mention to all bot messages (publish, news, auto-post)</div>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {[
+                      { value: 'none', label: 'None' },
+                      { value: 'everyone', label: '@everyone' },
+                      { value: 'here', label: '@here' },
+                      { value: 'role', label: '@role' },
+                    ].map((opt) => (
+                      <button key={opt.value} onClick={() => { setMentionTarget(opt.value as any); if (opt.value === 'role' && !mentionRoleId) setMentionRoleId(channels[0]?.id || '') }}
+                        className={cn('px-2 py-1 rounded-lg text-[10px] font-medium transition-all border',
+                          mentionTarget === opt.value ? 'bg-accent-blue/15 text-accent-blue border-accent-blue/25' : 'bg-bg-secondary text-text-dim border-border-primary hover:text-text-secondary')}>
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {mentionTarget === 'role' && (
+                  <div className="flex items-center gap-2 ml-7">
+                    <span className="text-[10px] text-text-dim">Role ID:</span>
+                    <input value={mentionRoleId} onChange={(e) => setMentionRoleId(e.target.value)} placeholder="Discord role ID"
+                      className="flex-1 px-2 py-1 rounded-lg bg-bg-secondary border border-border-primary text-xs text-text-primary focus:outline-none focus:border-accent-blue/50" />
+                  </div>
+                )}
+              </div>
+
               {/* Feed Channel Pickers */}
               <div className="space-y-2">
                 <p className="text-[10px] text-text-dim font-semibold uppercase tracking-wider">Feed Channels</p>

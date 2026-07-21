@@ -329,7 +329,8 @@ const COMPONENT_TEMPLATES: { name: string; icon: string; desc: string; fn: Templ
 export default function UIGenerator() {
   const [elements, setElements] = useState<UIEl[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [buildMode, setBuildMode] = useState(true)
+  const [showPreview, setShowPreview] = useState(false)
+  const [dragThreshold, setDragThreshold] = useState(false)
   const [device, setDevice] = useState(0)
   const [zoom, setZoom] = useState(0.55)
   const [pan, setPan] = useState({ x: 0, y: 0 })
@@ -366,7 +367,7 @@ export default function UIGenerator() {
 
   // Drag & Resize
   const [dragging, setDragging] = useState(false)
-  const [dragData, setDragData] = useState<{ sx: number; sy: number; ox: number; oy: number } | null>(null)
+  const [dragData, setDragData] = useState<{ sx: number; sy: number; ox: number; oy: number; startX: number; startY: number } | null>(null)
   const [resizing, setResizing] = useState(false)
   const [resizeData, setResizeData] = useState<{ sx: number; sy: number; ow: number; oh: number; corner: string } | null>(null)
 
@@ -393,8 +394,11 @@ export default function UIGenerator() {
   const addEl = useCallback((type: string, parentId?: string | null) => {
     const id = uid()
     const count = elements.filter(e => e.type === type).length + 1
+    // Only add as child if parent is a container
+    const parentEl = parentId ? elements.find(e => e.id === parentId) : null
+    const actualParent = parentEl && CONTAINER_TYPES.includes(parentEl.type) ? parentId : null
     const el: UIEl = {
-      id, type, name: `${type}${count}`, parentId: parentId ?? null,
+      id, type, name: `${type}${count}`, parentId: actualParent,
       position: { X: 0.5, Y: 0.5 }, size: { X: 0.3, Y: 0.2 },
       props: {
         BackgroundColor3: type === 'TextLabel' || type === 'TextButton' || type === 'TextBox' ? '#2a2a3e' : '#1a1a2e',
@@ -405,7 +409,7 @@ export default function UIGenerator() {
     }
     if (type === 'ScrollingFrame') { el.props.ScrollBarThickness = 8; el.props.CanvasSize = { X: 0, Y: 2 } }
     const newEls = [...elements, el]
-    if (parentId) { const p = newEls.find(e => e.id === parentId); if (p) p.children = [...p.children, id] }
+    if (actualParent) { const p = newEls.find(e => e.id === actualParent); if (p) p.children = [...p.children, id] }
     setElements(newEls); pushHist(newEls); setSelectedId(id)
   }, [elements, pushHist])
 
@@ -563,7 +567,7 @@ export default function UIGenerator() {
     const um: ChatMsg = { role: 'user', content: msg }
     setMessages(p => [...p, um]); setInput(''); setIsLoading(true)
     try {
-      const cs = elements.map(e => ({ name: e.name, type: e.type, position: e.position, size: e.size, props: { ...e.props, Text: e.props.Text || '', BackgroundColor3: e.props.BackgroundColor3, TextColor3: e.props.TextColor3, Font: e.props.Font, CornerRadius: e.props.CornerRadius, Image: e.props.Image || '', BackgroundTransparency: e.props.BackgroundTransparency, TextScaled: e.props.TextScaled } }))
+      const cs = elements.map(e => ({ name: e.name, type: e.type, parent: e.parentId ? elements.find(p => p.id === e.parentId)?.name || null : null, position: e.position, size: e.size, props: e.props }))
       const r = await fetch(CHAT_API, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: [{ role: 'user', content: msg }], canvas_state: cs }),
@@ -610,21 +614,29 @@ export default function UIGenerator() {
     if (e.button === 1 || (e.button === 0 && e.altKey)) {
       setIsPanning(true); setPanStart({ x: e.clientX, y: e.clientY, px: pan.x, py: pan.y }); return
     }
-    if (buildMode && selectedId && canvasRef.current) {
+    if (e.button === 0 && selectedId && canvasRef.current) {
       const el = elements.find(x => x.id === selectedId); if (!el || el.locked) return
       const rect = canvasRef.current.getBoundingClientRect()
       const sx = (e.clientX - rect.left) / rect.width
       const sy = (e.clientY - rect.top) / rect.height
-      setDragging(true)
-      setDragData({ sx, sy, ox: el.position.X, oy: el.position.Y })
+      setDragData({ sx, sy, ox: el.position.X, oy: el.position.Y, startX: e.clientX, startY: e.clientY })
+      setDragThreshold(false)
     }
-  }, [buildMode, selectedId, elements, pan])
+  }, [selectedId, elements, pan])
 
   const handleCanvasMove = useCallback((e: React.MouseEvent) => {
     if (isPanning) {
       setPan({ x: panStart.px + (e.clientX - panStart.x), y: panStart.py + (e.clientY - panStart.y) }); return
     }
-    if (dragging && dragData && selectedId && canvasRef.current) {
+    if (dragData && selectedId && canvasRef.current) {
+      // Check drag threshold (3px)
+      if (!dragThreshold) {
+        const dx = e.clientX - dragData.startX
+        const dy = e.clientY - dragData.startY
+        if (Math.abs(dx) < 3 && Math.abs(dy) < 3) return
+        setDragThreshold(true)
+        setDragging(true)
+      }
       const rect = canvasRef.current.getBoundingClientRect()
       const dx = ((e.clientX - rect.left) / rect.width - dragData.sx) / zoom
       const dy = ((e.clientY - rect.top) / rect.height - dragData.sy) / zoom
@@ -639,14 +651,16 @@ export default function UIGenerator() {
       let nw = resizeData.ow, nh = resizeData.oh
       if (resizeData.corner.includes('e')) nw = Math.max(0.01, resizeData.ow + dx)
       if (resizeData.corner.includes('s')) nh = Math.max(0.01, resizeData.oh + dy)
+      if (resizeData.corner.includes('w')) nw = Math.max(0.01, resizeData.ow - dx)
+      if (resizeData.corner.includes('n')) nh = Math.max(0.01, resizeData.oh - dy)
       setElements(prev => prev.map(el => el.id === selectedId ? { ...el, size: { X: snap(nw), Y: snap(nh) } } : el))
     }
-  }, [isPanning, panStart, dragging, dragData, resizing, resizeData, selectedId, zoom, snap])
+  }, [isPanning, panStart, dragData, resizing, resizeData, selectedId, zoom, snap, dragThreshold])
 
   const handleCanvasUp = useCallback(() => {
-    if (dragging || resizing) pushHist(elements)
-    setIsPanning(false); setDragging(false); setResizing(false); setDragData(null); setResizeData(null)
-  }, [dragging, resizing, elements, pushHist])
+    if (dragging) pushHist(elements)
+    setIsPanning(false); setDragging(false); setResizing(false); setDragData(null); setResizeData(null); setDragThreshold(false)
+  }, [dragging, elements, pushHist])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -657,7 +671,7 @@ export default function UIGenerator() {
       if (e.ctrlKey && e.key === 'y') { e.preventDefault(); redo() }
       if (e.ctrlKey && e.key === 'd') { e.preventDefault(); if (selectedId) duplicateEl(selectedId) }
       if (e.key === 'Escape') setSelectedId(null)
-      if (selectedId && buildMode) {
+      if (selectedId && !building) {
         const nudge = e.shiftKey ? 0.01 : 0.005
         const el = elements.find(x => x.id === selectedId); if (!el) return
         if (e.key === 'ArrowLeft') { e.preventDefault(); updateEl(selectedId, { position: { X: Math.max(0, el.position.X - nudge), Y: el.position.Y } }) }
@@ -667,7 +681,7 @@ export default function UIGenerator() {
       }
     }
     window.addEventListener('keydown', handler); return () => window.removeEventListener('keydown', handler)
-  }, [selectedId, buildMode, elements, removeEl, updateEl, undo, redo, duplicateEl])
+  }, [selectedId, building, elements, removeEl, updateEl, undo, redo, duplicateEl])
 
   const suggestedPrompts = [
     'Shop with 4 items, prices, and buy buttons',
@@ -932,8 +946,8 @@ export default function UIGenerator() {
         <div className="h-4 w-px bg-border-primary" />
 
         {/* Tools */}
-        <button onClick={() => setBuildMode(!buildMode)} className={cn('flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all', buildMode ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'text-text-dim hover:text-text-muted border border-transparent')}>
-          <MousePointer2 size={11} /> Select
+        <button onClick={() => setShowPreview(!showPreview)} className={cn('flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all', showPreview ? 'bg-accent-purple/10 text-accent-purple border border-accent-purple/20' : 'text-text-dim hover:text-text-muted border border-transparent')}>
+          <Eye size={11} /> Preview
         </button>
         <button onClick={() => setShowGrid(!showGrid)} className={cn('flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all', showGrid ? 'bg-accent-purple/10 text-accent-purple border border-accent-purple/20' : 'text-text-dim hover:text-text-muted border border-transparent')}>
           <Grid3X3 size={11} /> Grid
@@ -1045,8 +1059,8 @@ export default function UIGenerator() {
 
         {/* ─── Canvas ─── */}
         <div className="flex-1 overflow-hidden bg-[#08080c] relative"
-          onMouseDown={handleCanvasDown} onMouseMove={handleCanvasMove} onMouseUp={handleCanvasUp} onMouseLeave={handleCanvasUp}
-          onClick={() => setSelectedId(null)} style={{ cursor: isPanning ? 'grabbing' : 'default' }}>
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setSelectedId(null); handleCanvasDown(e) }} onMouseMove={handleCanvasMove} onMouseUp={handleCanvasUp} onMouseLeave={handleCanvasUp}
+          style={{ cursor: isPanning ? 'grabbing' : 'default' }}>
           <div ref={canvasRef} className="absolute" style={{
             width: cw, height: ch,
             left: `calc(50% + ${pan.x}px)`, top: `calc(50% + ${pan.y}px)`,
@@ -1086,11 +1100,19 @@ export default function UIGenerator() {
                       style={{
                         ...style,
                         borderStyle: isContainer ? 'dashed' : style.borderStyle,
+                        outline: selectedId === el.id ? '2px solid #3b82f6' : style.outline,
+                        outlineOffset: '2px',
                       }}
-                      className={cn('cursor-pointer select-none', isBuilding && 'el-building', isContainer && 'hover:ring-1 hover:ring-white/10')}
+                      className={cn('cursor-pointer select-none group', isBuilding && 'el-building', isContainer && 'hover:ring-1 hover:ring-white/10')}
                       onClick={(e) => { e.stopPropagation(); setSelectedId(el.id) }}
-                      onMouseDown={(e) => { e.stopPropagation(); if (buildMode && !el.locked) { setSelectedId(el.id); handleCanvasDown(e) } }}>
+                      onMouseDown={(e) => { e.stopPropagation(); if (!el.locked) { setSelectedId(el.id); handleCanvasDown(e) } }}>
                       {childEls.map(child => renderEl(child, true))}
+                      {/* Hover label */}
+                      {selectedId !== el.id && (
+                        <div className="absolute -top-5 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded text-[8px] font-mono bg-black/80 text-white/70 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                          {el.name} ({el.type})
+                        </div>
+                      )}
                       {/* Layout grid lines */}
                       {showLayoutGrid && childEls.length === 0 && (
                         <div className="absolute inset-0 pointer-events-none">
@@ -1142,7 +1164,7 @@ export default function UIGenerator() {
               )}
             </div>
             {/* Resize handles */}
-            {selected && buildMode && !selected.locked && (
+            {selected && !selected.locked && !showPreview && (
               <>
                 {['nw', 'ne', 'sw', 'se'].map(c => (
                   <div key={c} className={cn('absolute w-3 h-3 bg-white border-2 border-accent-blue rounded-full z-50 shadow-lg',
@@ -1379,7 +1401,7 @@ export default function UIGenerator() {
                   <div className="flex items-end gap-1.5 bg-bg-elevated rounded-lg px-2.5 py-1.5 border border-border-primary focus-within:border-accent-purple/50 transition-colors">
                     <textarea value={input} onChange={e => setInput(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg() } }}
-                      placeholder="Describe your UI..." rows={1}
+                      placeholder={elements.length > 0 ? "Edit existing elements or add new ones..." : "Describe your UI and AI builds it..."} rows={1}
                       className="flex-1 bg-transparent text-text-primary text-[10px] resize-none focus:outline-none placeholder:text-text-dim max-h-16" />
                     <button onClick={() => sendMsg()} disabled={!input.trim() || isLoading || building}
                       className={cn('h-6 w-6 rounded-md flex-shrink-0 flex items-center justify-center transition-all', input.trim() && !isLoading && !building ? 'bg-accent-purple text-white' : 'bg-bg-tertiary text-text-dim')}>
@@ -1411,6 +1433,49 @@ export default function UIGenerator() {
           </div>
         </div>
       </div>
+
+      {/* ─── Preview Mode ─── */}
+      {showPreview && (
+        <div className="fixed inset-0 z-[60] bg-[#08080c] flex items-center justify-center">
+          <div className="relative" style={{ width: cw, height: ch }}>
+            <div className="absolute inset-0 bg-[#1a1a2e] rounded-lg shadow-2xl overflow-hidden">
+              {(() => {
+                const renderPreviewEl = (el: UIEl, isRoot = false): React.ReactNode => {
+                  if (!el.visible) return null
+                  const childEls = el.children.map(cid => elements.find(e => e.id === cid)).filter(Boolean) as UIEl[]
+                  const style: React.CSSProperties = {
+                    position: 'absolute', left: `${el.position.X * 100}%`, top: `${el.position.Y * 100}%`,
+                    width: `${el.size.X * 100}%`, height: `${el.size.Y * 100}%`,
+                    transform: 'translate(-50%, -50%)',
+                    backgroundColor: (el.props.BackgroundTransparency ?? 0) >= 1 ? 'transparent' : parseColor(el.props.BackgroundColor3),
+                    borderRadius: el.props.CornerRadius || 0, zIndex: el.zIndex || 1, overflow: 'hidden',
+                    border: el.props.BorderSizePixel > 0 ? `${el.props.BorderSizePixel}px solid ${parseColor(el.props.BorderColor3)}` : undefined,
+                  }
+                  return (
+                    <div key={el.id} style={style} className="select-none">
+                      {childEls.map(child => renderPreviewEl(child))}
+                      {(el.type === 'TextLabel' || el.type === 'TextButton' || el.type === 'TextBox') && childEls.length === 0 && (
+                        <span style={{ color: parseColor(el.props.TextColor3), fontSize: el.props.TextScaled ? undefined : (el.props.TextSize || 14), textAlign: el.props.TextXAlignment === 'Left' ? 'left' : el.props.TextXAlignment === 'Right' ? 'right' : 'center' }} className="px-2 font-bold truncate w-full block">{el.props.Text || (el.type === 'TextBox' ? 'Input...' : 'Text')}</span>
+                      )}
+                      {el.type === 'ImageLabel' && el.props.Image && childEls.length === 0 && (
+                        <img src={el.props.Image} alt="" className="w-full h-full object-cover" style={{ opacity: 1 - (el.props.ImageTransparency || 0) }} />
+                      )}
+                    </div>
+                  )
+                }
+                return roots.map(el => renderPreviewEl(el, true))
+              })()}
+            </div>
+          </div>
+          <button onClick={() => setShowPreview(false)}
+            className="fixed top-4 right-4 flex items-center gap-2 px-4 py-2 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 text-white text-xs font-medium hover:bg-black/80 transition-all z-50">
+            <X size={14} /> Exit Preview
+          </button>
+          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 text-white/50 text-[10px] z-50">
+            Preview Mode — {elements.length} elements — {dev.w}×{dev.h}
+          </div>
+        </div>
+      )}
 
       {/* ─── Export Modal ─── */}
       {showExport && (

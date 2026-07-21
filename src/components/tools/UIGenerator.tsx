@@ -47,6 +47,19 @@ const PROP_GROUPS: Record<string, string[]> = {
   'Scroll': ['ScrollBarThickness', 'ScrollBarImageColor3', 'CanvasSize', 'AutomaticCanvasSize'],
 }
 
+const FONT_OPTIONS = ['Legacy', 'Gotham', 'GothamBold', 'GothamBlack', 'SourceSans', 'SourceSansBold', 'Arial', 'ArialBold', 'HighwayGothic', 'HighwayGothicBold', 'Cartoon', 'Code', 'FredokaOne', 'Granite', 'Jura', 'ShoppingCart']
+const TEXT_X_ALIGN_OPTIONS = ['Left', 'Center', 'Right']
+const TEXT_Y_ALIGN_OPTIONS = ['Top', 'Center', 'Bottom']
+const AUTOMATIC_CANVAS_SIZE_OPTIONS = ['None', 'X', 'Y', 'XY']
+const COLOR_PRESETS = ['#0d1117', '#161b22', '#1e293b', '#334155', '#3b82f6', '#8b5cf6', '#10b981', '#ef4444', '#f59e0b', '#f1f5f9', '#ffffff', '#000000']
+const CONTAINER_TYPES = ['Frame', 'ScrollingFrame']
+
+const ELEMENT_TYPE_ICONS: Record<string, string> = {
+  Frame: '▬', TextLabel: 'Aa', TextButton: '☐', ImageLabel: '🖼', ScrollingFrame: '☰', TextBox: '□',
+}
+
+const LAYOUT_TYPE_ICONS: Record<string, string> = { none: '⊞', grid: '▦', list: '☰' }
+
 let _id = 0
 const uid = () => `e${++_id}`
 
@@ -86,9 +99,52 @@ export interface UIEl {
   id: string; type: string; name: string; parentId: string | null
   position: { X: number; Y: number }; size: { X: number; Y: number }
   props: Record<string, any>; children: string[]; zIndex: number; locked: boolean; visible: boolean
+  layout?: 'none' | 'grid' | 'list' | 'page'
+  layoutProps?: { cellSize?: { X: number; Y: number }; padding?: number; gap?: number; fillDirection?: 'Horizontal' | 'Vertical' }
 }
 
 interface ChatMsg { role: 'user' | 'assistant'; content: string; commands?: any[] }
+
+// ─── Layout application ──────────────────────────────────────
+function applyLayout(el: UIEl, allElements: UIEl[]): UIEl[] {
+  if (!el.layout || el.layout === 'none') return allElements
+  const childIds = el.children
+  if (childIds.length === 0) return allElements
+  const updated = [...allElements]
+  const layoutProps = el.layoutProps || {}
+  const padding = layoutProps.padding ?? 0.01
+  const gap = layoutProps.gap ?? 0.005
+  const cellSize = layoutProps.cellSize || { X: 0.2, Y: 0.15 }
+
+  if (el.layout === 'list') {
+    const usableW = el.size.X - padding * 2
+    const usableH = el.size.Y - padding * 2
+    childIds.forEach((cid, i) => {
+      const idx = updated.findIndex(e => e.id === cid)
+      if (idx < 0) return
+      const child = updated[idx]
+      const cx = el.position.X - el.size.X / 2 + padding + child.size.X / 2
+      const cy = el.position.Y - el.size.Y / 2 + padding + cellSize.Y / 2 + i * (cellSize.Y + gap)
+      updated[idx] = { ...child, position: { X: snapVal(cx), Y: snapVal(cy) } }
+    })
+  } else if (el.layout === 'grid') {
+    const usableW = el.size.X - padding * 2
+    const cols = Math.max(1, Math.floor(usableW / (cellSize.X + gap)))
+    childIds.forEach((cid, i) => {
+      const idx = updated.findIndex(e => e.id === cid)
+      if (idx < 0) return
+      const child = updated[idx]
+      const col = i % cols
+      const row = Math.floor(i / cols)
+      const cx = el.position.X - el.size.X / 2 + padding + cellSize.X / 2 + col * (cellSize.X + gap)
+      const cy = el.position.Y - el.size.Y / 2 + padding + cellSize.Y / 2 + row * (cellSize.Y + gap)
+      updated[idx] = { ...child, position: { X: snapVal(cx), Y: snapVal(cy) } }
+    })
+  }
+  return updated
+}
+
+function snapVal(v: number): number { return Math.round(v * 1000) / 1000 }
 
 // ─── Lua Generator ───────────────────────────────────────────
 function genVarName(el: UIEl, parent?: UIEl): string {
@@ -115,11 +171,9 @@ function genLua(elements: UIEl[]): string {
     lines.push(`${'  '.repeat(depth)}local ${v} = Instance.new("${el.type}")`)
     lines.push(`${'  '.repeat(depth)}${v}.Name = "${el.name}"`)
 
-    // Position & Size
     lines.push(`${'  '.repeat(depth)}${v}.Position = UDim2.new(${el.position.X}, 0, ${el.position.Y}, 0)`)
     lines.push(`${'  '.repeat(depth)}${v}.Size = UDim2.new(${el.size.X}, 0, ${el.size.Y}, 0)`)
 
-    // Properties that differ from defaults
     for (const [k, val] of Object.entries(el.props)) {
       if (k === 'Position' || k === 'Size') continue
       if (!differsFromDefault(k, val)) continue
@@ -201,6 +255,76 @@ function genRbxmx(elements: UIEl[]): string {
   return xml
 }
 
+// ─── Component Templates ─────────────────────────────────────
+type TemplateFn = () => Array<{ action: string; name?: string; elementType?: string; parent?: string; position?: { X: number; Y: number }; size?: { X: number; Y: number }; properties?: Record<string, any> }>
+
+const COMPONENT_TEMPLATES: { name: string; icon: string; desc: string; fn: TemplateFn }[] = [
+  {
+    name: 'Button', icon: '☐', desc: 'TextButton',
+    fn: () => [
+      { action: 'add', name: 'BtnFrame', elementType: 'Frame', size: { X: 0.18, Y: 0.08 }, properties: { BackgroundColor3: '#10b981', BackgroundTransparency: 0, CornerRadius: 8 } },
+      { action: 'add', name: 'ClickMe', elementType: 'TextButton', parent: 'BtnFrame', position: { X: 0.5, Y: 0.5 }, size: { X: 1, Y: 1 }, properties: { BackgroundTransparency: 1, Text: 'Click Me', TextColor3: '#ffffff', Font: 'GothamBold', TextScaled: true } },
+    ],
+  },
+  {
+    name: 'Card', icon: '▬', desc: 'Dark card',
+    fn: () => [
+      { action: 'add', name: 'CardFrame', elementType: 'Frame', size: { X: 0.3, Y: 0.35 }, properties: { BackgroundColor3: '#1e293b', BackgroundTransparency: 0, CornerRadius: 12 } },
+      { action: 'add', name: 'CardImage', elementType: 'ImageLabel', parent: 'CardFrame', position: { X: 0.5, Y: 0.3 }, size: { X: 0.9, Y: 0.4 }, properties: { BackgroundColor3: '#334155', BackgroundTransparency: 0, CornerRadius: 8 } },
+      { action: 'add', name: 'CardTitle', elementType: 'TextLabel', parent: 'CardFrame', position: { X: 0.5, Y: 0.7 }, size: { X: 0.9, Y: 0.12 }, properties: { BackgroundTransparency: 1, Text: 'Title', TextColor3: '#f1f5f9', Font: 'GothamBold', TextScaled: true, TextXAlignment: 'Left' } },
+      { action: 'add', name: 'CardDesc', elementType: 'TextLabel', parent: 'CardFrame', position: { X: 0.5, Y: 0.85 }, size: { X: 0.9, Y: 0.12 }, properties: { BackgroundTransparency: 1, Text: 'Description text here', TextColor3: '#94a3b8', Font: 'Gotham', TextScaled: true, TextXAlignment: 'Left' } },
+    ],
+  },
+  {
+    name: 'Input', icon: '□', desc: 'Input field',
+    fn: () => [
+      { action: 'add', name: 'InputFrame', elementType: 'Frame', size: { X: 0.25, Y: 0.06 }, properties: { BackgroundColor3: '#161b22', BackgroundTransparency: 0, CornerRadius: 6, BorderSizePixel: 1, BorderColor3: '#334155' } },
+      { action: 'add', name: 'InputBox', elementType: 'TextBox', parent: 'InputFrame', position: { X: 0.5, Y: 0.5 }, size: { X: 0.95, Y: 0.9 }, properties: { BackgroundTransparency: 1, Text: '', PlaceholderText: 'Enter text...', PlaceholderColor3: '#64748b', TextColor3: '#f1f5f9', Font: 'Gotham', TextSize: 14, TextXAlignment: 'Left' } },
+    ],
+  },
+  {
+    name: 'NavBar', icon: '▬', desc: 'Navigation bar',
+    fn: () => [
+      { action: 'add', name: 'NavBarFrame', elementType: 'Frame', size: { X: 0.4, Y: 0.07 }, properties: { BackgroundColor3: '#0d1117', BackgroundTransparency: 0, CornerRadius: 10 } },
+      { action: 'add', name: 'NavHome', elementType: 'TextButton', parent: 'NavBarFrame', position: { X: 0.17, Y: 0.5 }, size: { X: 0.3, Y: 0.8 }, properties: { BackgroundTransparency: 1, Text: 'Home', TextColor3: '#3b82f6', Font: 'GothamBold', TextScaled: true } },
+      { action: 'add', name: 'NavSearch', elementType: 'TextButton', parent: 'NavBarFrame', position: { X: 0.5, Y: 0.5 }, size: { X: 0.3, Y: 0.8 }, properties: { BackgroundTransparency: 1, Text: 'Search', TextColor3: '#f1f5f9', Font: 'GothamBold', TextScaled: true } },
+      { action: 'add', name: 'NavProfile', elementType: 'TextButton', parent: 'NavBarFrame', position: { X: 0.83, Y: 0.5 }, size: { X: 0.3, Y: 0.8 }, properties: { BackgroundTransparency: 1, Text: 'Profile', TextColor3: '#f1f5f9', Font: 'GothamBold', TextScaled: true } },
+    ],
+  },
+  {
+    name: 'Modal', icon: '▬', desc: 'Dialog popup',
+    fn: () => [
+      { action: 'add', name: 'ModalOverlay', elementType: 'Frame', size: { X: 1, Y: 1 }, properties: { BackgroundColor3: '#000000', BackgroundTransparency: 0.5 } },
+      { action: 'add', name: 'ModalCenter', elementType: 'Frame', parent: 'ModalOverlay', position: { X: 0.5, Y: 0.5 }, size: { X: 0.35, Y: 0.4 }, properties: { BackgroundColor3: '#1e293b', BackgroundTransparency: 0, CornerRadius: 16 } },
+      { action: 'add', name: 'ModalTitle', elementType: 'TextLabel', parent: 'ModalCenter', position: { X: 0.5, Y: 0.15 }, size: { X: 0.8, Y: 0.15 }, properties: { BackgroundTransparency: 1, Text: 'Modal Title', TextColor3: '#f1f5f9', Font: 'GothamBold', TextScaled: true } },
+      { action: 'add', name: 'ModalClose', elementType: 'TextButton', parent: 'ModalCenter', position: { X: 0.9, Y: 0.1 }, size: { X: 0.08, Y: 0.08 }, properties: { BackgroundColor3: '#ef4444', Text: 'X', TextColor3: '#ffffff', Font: 'GothamBold', TextScaled: true, CornerRadius: 50 } },
+      { action: 'add', name: 'ModalContent', elementType: 'Frame', parent: 'ModalCenter', position: { X: 0.5, Y: 0.6 }, size: { X: 0.8, Y: 0.5 }, properties: { BackgroundColor3: '#161b22', BackgroundTransparency: 0, CornerRadius: 8 } },
+    ],
+  },
+  {
+    name: 'Tooltip', icon: '▬', desc: 'Info tooltip',
+    fn: () => [
+      { action: 'add', name: 'TooltipFrame', elementType: 'Frame', size: { X: 0.14, Y: 0.05 }, properties: { BackgroundColor3: '#334155', BackgroundTransparency: 0, CornerRadius: 6 } },
+      { action: 'add', name: 'TooltipText', elementType: 'TextLabel', parent: 'TooltipFrame', position: { X: 0.5, Y: 0.5 }, size: { X: 0.9, Y: 0.85 }, properties: { BackgroundTransparency: 1, Text: 'Tooltip info', TextColor3: '#f1f5f9', Font: 'Gotham', TextScaled: true } },
+    ],
+  },
+  {
+    name: 'ProgressBar', icon: '▬', desc: 'Progress bar',
+    fn: () => [
+      { action: 'add', name: 'ProgressBg', elementType: 'Frame', size: { X: 0.3, Y: 0.04 }, properties: { BackgroundColor3: '#1e293b', BackgroundTransparency: 0, CornerRadius: 50 } },
+      { action: 'add', name: 'ProgressFill', elementType: 'Frame', parent: 'ProgressBg', position: { X: 0.35, Y: 0.5 }, size: { X: 0.7, Y: 0.85 }, properties: { BackgroundColor3: '#3b82f6', BackgroundTransparency: 0, CornerRadius: 50 } },
+      { action: 'add', name: 'ProgressLabel', elementType: 'TextLabel', parent: 'ProgressBg', position: { X: 0.5, Y: 0.5 }, size: { X: 0.3, Y: 0.9 }, properties: { BackgroundTransparency: 1, Text: '70%', TextColor3: '#ffffff', Font: 'GothamBold', TextScaled: true } },
+    ],
+  },
+  {
+    name: 'Avatar', icon: '🖼', desc: 'Avatar circle',
+    fn: () => [
+      { action: 'add', name: 'AvatarFrame', elementType: 'Frame', size: { X: 0.08, Y: 0.14 }, properties: { BackgroundColor3: '#334155', BackgroundTransparency: 0, CornerRadius: 50 } },
+      { action: 'add', name: 'AvatarImg', elementType: 'ImageLabel', parent: 'AvatarFrame', position: { X: 0.5, Y: 0.5 }, size: { X: 0.85, Y: 0.85 }, properties: { BackgroundTransparency: 1, Image: 'https://www.roblox.com/headshot-thumbnail/image?userId=1&width=150&height=150&format=png', CornerRadius: 50, ImageColor3: '#ffffff' } },
+    ],
+  },
+]
+
 // ─── Main Component ──────────────────────────────────────────
 export default function UIGenerator() {
   const [elements, setElements] = useState<UIEl[]>([])
@@ -226,6 +350,10 @@ export default function UIGenerator() {
   const [showLayers, setShowLayers] = useState(true)
   const [showProps, setShowProps] = useState(true)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['Data', 'Appearance', 'Layout']))
+  const [rightTab, setRightTab] = useState<'ai' | 'templates'>('ai')
+
+  // Layers tree
+  const [collapsedNodes, setCollapsedNodes] = useState<Set<string>>(new Set())
 
   // Export
   const [showExport, setShowExport] = useState(false)
@@ -247,11 +375,8 @@ export default function UIGenerator() {
   const selected = useMemo(() => elements.find(e => e.id === selectedId) || null, [elements, selectedId])
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
-
-  // Sync instant build to localStorage
   useEffect(() => { localStorage.setItem('ui-instant-build', String(instantBuild)) }, [instantBuild])
 
-  // History helpers
   const pushHist = useCallback((els: UIEl[]) => {
     setHist(h => [...h.slice(0, histIdx + 1), els])
     setHistIdx(i => i + 1)
@@ -259,7 +384,6 @@ export default function UIGenerator() {
   const undo = useCallback(() => { if (histIdx > 0) { setHistIdx(histIdx - 1); setElements(hist[histIdx - 1]); setSelectedId(null) } }, [histIdx, hist])
   const redo = useCallback(() => { if (histIdx < hist.length - 1) { setHistIdx(histIdx + 1); setElements(hist[histIdx + 1]); setSelectedId(null) } }, [histIdx, hist])
 
-  // Snap helper
   const snap = (v: number) => snapToGrid ? Math.round(v * 1000) / 1000 : v
 
   // ─── Element CRUD ───
@@ -312,6 +436,25 @@ export default function UIGenerator() {
   const buildingRef = useRef(false)
   const elementCountRef = useRef(0)
 
+  // ─── Layout change handler ───
+  const changeLayout = useCallback((elId: string, layoutType: 'none' | 'grid' | 'list' | 'page') => {
+    const newEls = elements.map(e => e.id === elId ? { ...e, layout: layoutType } : e)
+    const updated = applyLayout(newEls.find(e => e.id === elId)!, newEls)
+    setElements(updated); pushHist(updated)
+  }, [elements, pushHist])
+
+  const updateLayoutProps = useCallback((elId: string, patch: Partial<NonNullable<UIEl['layoutProps']>>) => {
+    const newEls = elements.map(e => e.id === elId ? { ...e, layoutProps: { ...e.layoutProps, ...patch } } : e)
+    const updated = applyLayout(newEls.find(e => e.id === elId)!, newEls)
+    setElements(updated); pushHist(updated)
+  }, [elements, pushHist])
+
+  // ─── Apply template ───
+  const applyTemplate = useCallback((template: typeof COMPONENT_TEMPLATES[0]) => {
+    const cmds = template.fn()
+    applyCmds(cmds)
+  }, [])
+
   // ─── AI Commands (synchronized, one by one) ───
   const applyCmds = useCallback(async (cmds: any[]) => {
     if (buildingRef.current) return
@@ -319,7 +462,6 @@ export default function UIGenerator() {
     setBuilding(true)
     setBuildingMsg('Building...')
 
-    // Sort: root adds first, then children, then modifies
     const sorted = [...cmds].sort((a: any, b: any) => {
       if (a.action === 'add' && !a.parent) return -1
       if (b.action === 'add' && !b.parent) return 1
@@ -332,7 +474,6 @@ export default function UIGenerator() {
     const nameToId = new Map<string, string>()
     let zCounter = elementCountRef.current
 
-    // Check if instant mode
     const instantMode = localStorage.getItem('ui-instant-build') === 'true'
     const delay = instantMode ? 0 : 120
 
@@ -399,11 +540,9 @@ export default function UIGenerator() {
       })
       const d = await r.json()
 
-      // Check for errors
       if (!r.ok || d.error) {
         setIsLoading(false)
         setMessages(p => [...p, { role: 'assistant', content: `Error: ${d.error || d.message || 'Request failed'}. Using template instead.` }])
-        // Still try template fallback
         const tmplResp = await fetch(CHAT_API, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ messages: [{ role: 'user', content: msg }], canvas_state: cs, force_template: true }),
@@ -521,7 +660,7 @@ export default function UIGenerator() {
   ]
 
   // ─── Element Style ───
-  function elStyle(el: UIEl): React.CSSProperties {
+  function elStyle(el: UIEl, isHoveredContainer = false): React.CSSProperties {
     const p = el.props
     return {
       position: 'absolute', left: `${el.position.X * 100}%`, top: `${el.position.Y * 100}%`,
@@ -549,8 +688,188 @@ export default function UIGenerator() {
     }
   }
 
+  // ─── Layers Tree ───
+  const toggleCollapse = (id: string) => {
+    setCollapsedNodes(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  const renderLayerTree = (parentId: string | null, depth: number): React.ReactNode => {
+    const children = elements.filter(e => e.parentId === parentId)
+    if (children.length === 0) return null
+    return children.map(el => {
+      const isContainer = CONTAINER_TYPES.includes(el.type)
+      const isCollapsed = collapsedNodes.has(el.id)
+      const childCount = el.children.length
+      return (
+        <div key={el.id}>
+          <div
+            className={cn('flex items-center gap-1.5 px-2 py-1 cursor-pointer transition-all group',
+              selectedId === el.id ? 'bg-accent-blue/10 text-accent-blue' : 'text-text-secondary hover:bg-bg-elevated')}
+            onClick={() => setSelectedId(el.id)}
+            style={{ paddingLeft: `${12 + depth * 12}px` }}>
+            {isContainer && childCount > 0 ? (
+              <button onClick={(e) => { e.stopPropagation(); toggleCollapse(el.id) }}
+                className="p-0.5 shrink-0">
+                {isCollapsed ? <ChevronRight size={9} className="text-text-dim" /> : <ChevronDown size={9} className="text-text-dim" />}
+              </button>
+            ) : (
+              <span className="w-[15px] shrink-0" />
+            )}
+            <span className="text-[10px] text-text-dim w-4 shrink-0 text-center">
+              {ELEMENT_TYPE_ICONS[el.type] || '□'}
+            </span>
+            <span className="flex-1 text-[10px] truncate font-medium">{el.name}</span>
+            {isContainer && childCount > 0 && (
+              <span className="px-1 py-0 rounded text-[8px] font-mono bg-bg-secondary text-text-dim border border-border-primary">{childCount}</span>
+            )}
+            <button onClick={(e) => { e.stopPropagation(); updateEl(el.id, { visible: !el.visible }) }} className="opacity-0 group-hover:opacity-100 p-0.5 transition-opacity">
+              {el.visible ? <Eye size={9} className="text-text-dim" /> : <EyeOff size={9} className="text-red-400" />}
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); updateEl(el.id, { locked: !el.locked }) }} className="opacity-0 group-hover:opacity-100 p-0.5 transition-opacity">
+              {el.locked ? <Lock size={9} className="text-yellow-400" /> : <Unlock size={9} className="text-text-dim" />}
+            </button>
+          </div>
+          {isContainer && !isCollapsed && renderLayerTree(el.id, depth + 1)}
+        </div>
+      )
+    })
+  }
+
+  // ─── Specialized property controls ───
+  const renderPropControl = (key: string, val: any) => {
+    if (!selected) return null
+
+    // Font dropdown
+    if (key === 'Font') {
+      return (
+        <select value={String(val || 'Legacy')}
+          onChange={e => updateProps(selected.id, { [key]: e.target.value })}
+          className="flex-1 px-1.5 py-0.5 rounded bg-bg-secondary border border-border-primary text-[9px] text-text-primary focus:outline-none focus:border-accent-blue/50">
+          {FONT_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
+        </select>
+      )
+    }
+
+    // TextXAlignment dropdown
+    if (key === 'TextXAlignment') {
+      return (
+        <select value={String(val || 'Center')}
+          onChange={e => updateProps(selected.id, { [key]: e.target.value })}
+          className="flex-1 px-1.5 py-0.5 rounded bg-bg-secondary border border-border-primary text-[9px] text-text-primary focus:outline-none focus:border-accent-blue/50">
+          {TEXT_X_ALIGN_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+        </select>
+      )
+    }
+
+    // TextYAlignment dropdown
+    if (key === 'TextYAlignment') {
+      return (
+        <select value={String(val || 'Center')}
+          onChange={e => updateProps(selected.id, { [key]: e.target.value })}
+          className="flex-1 px-1.5 py-0.5 rounded bg-bg-secondary border border-border-primary text-[9px] text-text-primary focus:outline-none focus:border-accent-blue/50">
+          {TEXT_Y_ALIGN_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+        </select>
+      )
+    }
+
+    // AutomaticCanvasSize dropdown
+    if (key === 'AutomaticCanvasSize') {
+      return (
+        <select value={String(val || 'None')}
+          onChange={e => updateProps(selected.id, { [key]: e.target.value })}
+          className="flex-1 px-1.5 py-0.5 rounded bg-bg-secondary border border-border-primary text-[9px] text-text-primary focus:outline-none focus:border-accent-blue/50">
+          {AUTOMATIC_CANVAS_SIZE_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+        </select>
+      )
+    }
+
+    // Range sliders for transparency props
+    if (key === 'BackgroundTransparency' || key === 'ImageTransparency' || key === 'TextTransparency') {
+      const numVal = typeof val === 'number' ? val : 0
+      return (
+        <div className="flex items-center gap-1.5 flex-1">
+          <input type="range" min="0" max="1" step="0.01" value={numVal}
+            onChange={e => updateProps(selected.id, { [key]: parseFloat(e.target.value) })}
+            className="flex-1 h-1 accent-accent-blue cursor-pointer" />
+          <span className="text-[8px] text-text-dim font-mono w-7 text-right">{numVal.toFixed(2)}</span>
+        </div>
+      )
+    }
+
+    // CornerRadius range slider
+    if (key === 'CornerRadius') {
+      const numVal = typeof val === 'number' ? val : 0
+      return (
+        <div className="flex items-center gap-1.5 flex-1">
+          <input type="range" min="0" max="50" step="1" value={numVal}
+            onChange={e => updateProps(selected.id, { [key]: parseInt(e.target.value) })}
+            className="flex-1 h-1 accent-accent-blue cursor-pointer" />
+          <span className="text-[8px] text-text-dim font-mono w-7 text-right">{numVal}</span>
+        </div>
+      )
+    }
+
+    // Toggle buttons for boolean props
+    if (key === 'TextScaled' || key === 'RichText' || key === 'TextWrapped') {
+      return (
+        <button onClick={() => updateProps(selected.id, { [key]: !val })}
+          className={cn('px-2 py-0.5 rounded text-[9px] font-medium transition-all',
+            val ? 'bg-green-500/15 text-green-400 border border-green-500/20' : 'bg-bg-secondary text-text-dim border border-border-primary')}>
+          {val ? 'On' : 'Off'}
+        </button>
+      )
+    }
+
+    // Is color?
+    const isColor = k => (k.toLowerCase().includes('color') || k === 'BackgroundColor3' || k === 'TextColor3' || k === 'BorderColor3' || k === 'ImageColor3' || k === 'ScrollBarImageColor3')
+    if (isColor(key)) {
+      return (
+        <div className="flex items-center gap-1 flex-1">
+          <input type="color" value={parseColor(val)} onChange={e => updateProps(selected.id, { [key]: e.target.value })}
+            className="w-5 h-5 rounded border border-border-primary cursor-pointer shrink-0" />
+          <input value={parseColor(val)} onChange={e => updateProps(selected.id, { [key]: e.target.value })}
+            className="flex-1 px-1.5 py-0.5 rounded bg-bg-secondary border border-border-primary text-[9px] text-text-primary font-mono focus:outline-none focus:border-accent-blue/50" />
+        </div>
+      )
+    }
+
+    // Default: boolean toggle
+    if (typeof val === 'boolean') {
+      return (
+        <button onClick={() => updateProps(selected.id, { [key]: !val })}
+          className={cn('px-2 py-0.5 rounded text-[9px] font-medium transition-all', val ? 'bg-green-500/15 text-green-400' : 'bg-bg-secondary text-text-dim')}>
+          {val ? 'True' : 'False'}
+        </button>
+      )
+    }
+
+    // Number
+    if (typeof val === 'number') {
+      return (
+        <input type="number" step="1" value={val}
+          onChange={e => updateProps(selected.id, { [key]: parseFloat(e.target.value) || 0 })}
+          className="flex-1 px-1.5 py-0.5 rounded bg-bg-secondary border border-border-primary text-[9px] text-text-primary font-mono focus:outline-none focus:border-accent-blue/50" />
+      )
+    }
+
+    // String fallback
+    return (
+      <input value={String(val ?? '')}
+        onChange={e => updateProps(selected.id, { [key]: e.target.value })}
+        className="flex-1 px-1.5 py-0.5 rounded bg-bg-secondary border border-border-primary text-[9px] text-text-primary font-mono focus:outline-none focus:border-accent-blue/50" />
+    )
+  }
+
+  const isColorProp = (k: string) => (k.toLowerCase().includes('color') || k === 'BackgroundColor3' || k === 'TextColor3' || k === 'BorderColor3' || k === 'ImageColor3' || k === 'ScrollBarImageColor3')
+
   // ─── Render ───
   const roots = elements.filter(e => !e.parentId)
+  const isContainerSelected = selected && CONTAINER_TYPES.includes(selected.type)
+  const selectedLayout = selected?.layout || 'none'
 
   return (
     <div className="flex flex-col rounded-2xl bg-bg-secondary border border-border-primary overflow-hidden" style={{ height: '75vh', minHeight: 650 }}>
@@ -593,6 +912,61 @@ export default function UIGenerator() {
           <Zap size={11} /> Instant
         </button>
 
+        {/* Layout mode selector - only visible when container is selected */}
+        {isContainerSelected && (
+          <>
+            <div className="h-4 w-px bg-border-primary" />
+            <div className="flex items-center gap-1">
+              <span className="text-[9px] text-text-dim font-medium">Layout:</span>
+              <div className="flex items-center gap-0.5 p-0.5 bg-bg-secondary rounded border border-border-primary">
+                {(['none', 'grid', 'list'] as const).map(lt => (
+                  <button key={lt} onClick={() => changeLayout(selected!.id, lt)}
+                    className={cn('px-1.5 py-0.5 rounded text-[9px] font-medium transition-all capitalize',
+                      selectedLayout === lt ? 'bg-accent-blue/15 text-accent-blue' : 'text-text-dim hover:text-text-muted')}>
+                    {lt}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {selectedLayout !== 'none' && (
+              <>
+                <div className="flex items-center gap-1">
+                  <span className="text-[8px] text-text-dim">Gap:</span>
+                  <input type="number" step="0.001" min="0" max="0.1"
+                    value={selected?.layoutProps?.gap ?? 0.005}
+                    onChange={e => selected && updateLayoutProps(selected.id, { gap: parseFloat(e.target.value) || 0 })}
+                    className="w-12 px-1 py-0.5 rounded bg-bg-secondary border border-border-primary text-[9px] text-text-primary font-mono focus:outline-none focus:border-accent-blue/50" />
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-[8px] text-text-dim">Pad:</span>
+                  <input type="number" step="0.001" min="0" max="0.1"
+                    value={selected?.layoutProps?.padding ?? 0.01}
+                    onChange={e => selected && updateLayoutProps(selected.id, { padding: parseFloat(e.target.value) || 0 })}
+                    className="w-12 px-1 py-0.5 rounded bg-bg-secondary border border-border-primary text-[9px] text-text-primary font-mono focus:outline-none focus:border-accent-blue/50" />
+                </div>
+                {selectedLayout === 'grid' && (
+                  <>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[8px] text-text-dim">CellX:</span>
+                      <input type="number" step="0.01" min="0.01" max="1"
+                        value={selected?.layoutProps?.cellSize?.X ?? 0.2}
+                        onChange={e => selected && updateLayoutProps(selected.id, { cellSize: { X: parseFloat(e.target.value) || 0.2, Y: selected.layoutProps?.cellSize?.Y ?? 0.15 } })}
+                        className="w-12 px-1 py-0.5 rounded bg-bg-secondary border border-border-primary text-[9px] text-text-primary font-mono focus:outline-none focus:border-accent-blue/50" />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[8px] text-text-dim">CellY:</span>
+                      <input type="number" step="0.01" min="0.01" max="1"
+                        value={selected?.layoutProps?.cellSize?.Y ?? 0.15}
+                        onChange={e => selected && updateLayoutProps(selected.id, { cellSize: { X: selected.layoutProps?.cellSize?.X ?? 0.2, Y: parseFloat(e.target.value) || 0.15 } })}
+                        className="w-12 px-1 py-0.5 rounded bg-bg-secondary border border-border-primary text-[9px] text-text-primary font-mono focus:outline-none focus:border-accent-blue/50" />
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+          </>
+        )}
+
         <div className="h-4 w-px bg-border-primary" />
 
         {/* Zoom */}
@@ -631,22 +1005,7 @@ export default function UIGenerator() {
             </div>
             <div className="flex-1 overflow-y-auto py-1">
               {elements.length === 0 && <p className="px-3 py-4 text-[10px] text-text-dim text-center">No elements yet</p>}
-              {[...elements].reverse().map(el => (
-                <div key={el.id}
-                  className={cn('flex items-center gap-1.5 px-2 py-1 cursor-pointer transition-all group',
-                    selectedId === el.id ? 'bg-accent-blue/10 text-accent-blue' : 'text-text-secondary hover:bg-bg-elevated')}
-                  onClick={() => setSelectedId(el.id)}
-                  style={{ paddingLeft: `${12 + (el.parentId ? 16 : 0)}px` }}>
-                  <span className="text-[10px] text-text-dim w-3">{el.type === 'Frame' ? '▬' : el.type === 'TextLabel' ? 'Aa' : el.type === 'TextButton' ? '☐' : el.type === 'ImageLabel' ? '🖼' : el.type === 'ScrollingFrame' ? '☰' : '□'}</span>
-                  <span className="flex-1 text-[10px] truncate font-medium">{el.name}</span>
-                  <button onClick={(e) => { e.stopPropagation(); updateEl(el.id, { visible: !el.visible }) }} className="opacity-0 group-hover:opacity-100 p-0.5 transition-opacity">
-                    {el.visible ? <Eye size={9} className="text-text-dim" /> : <EyeOff size={9} className="text-red-400" />}
-                  </button>
-                  <button onClick={(e) => { e.stopPropagation(); updateEl(el.id, { locked: !el.locked }) }} className="opacity-0 group-hover:opacity-100 p-0.5 transition-opacity">
-                    {el.locked ? <Lock size={9} className="text-yellow-400" /> : <Unlock size={9} className="text-text-dim" />}
-                  </button>
-                </div>
-              ))}
+              {renderLayerTree(null, 0)}
             </div>
           </div>
         )}
@@ -675,12 +1034,58 @@ export default function UIGenerator() {
                   if (!el.visible) return null
                   const childEls = el.children.map(cid => elements.find(e => e.id === cid)).filter(Boolean) as UIEl[]
                   const isBuilding = buildingId === el.id
+                  const isContainer = CONTAINER_TYPES.includes(el.type)
+                  const isSelectedContainer = selectedId === el.id && isContainer
+
+                  const style = isChild ? childStyle(el) : elStyle(el)
+
+                  // Add dashed border on hover for containers
+                  const containerBorderClass = isContainer && !isSelectedContainer ? 'hover:border-2 hover:border-dashed hover:border-white/20' : ''
+                  // Grid layout grid lines overlay
+                  const showLayoutGrid = isSelectedContainer && el.layout === 'grid' && el.layoutProps
+                  const gridGap = el.layoutProps?.gap ?? 0.005
+                  const gridPad = el.layoutProps?.padding ?? 0.01
+                  const cellW = el.layoutProps?.cellSize?.X ?? 0.2
+                  const cellH = el.layoutProps?.cellSize?.Y ?? 0.15
+
                   return (
-                    <div key={el.id} style={isChild ? childStyle(el) : elStyle(el)}
-                      className={cn('cursor-pointer select-none', isBuilding && 'el-building')}
+                    <div key={el.id}
+                      style={{
+                        ...style,
+                        borderStyle: isContainer ? 'dashed' : style.borderStyle,
+                      }}
+                      className={cn('cursor-pointer select-none', isBuilding && 'el-building', isContainer && 'hover:ring-1 hover:ring-white/10')}
                       onClick={(e) => { e.stopPropagation(); setSelectedId(el.id) }}
                       onMouseDown={(e) => { e.stopPropagation(); if (buildMode && !el.locked) { setSelectedId(el.id); handleCanvasDown(e) } }}>
                       {childEls.map(child => renderEl(child, true))}
+                      {/* Layout grid lines */}
+                      {showLayoutGrid && childEls.length === 0 && (
+                        <div className="absolute inset-0 pointer-events-none">
+                          {(() => {
+                            const lines: React.ReactNode[] = []
+                            const usableW = 100 - gridPad * 200
+                            const cols = Math.max(1, Math.floor(usableW / ((cellW * 100) + gridGap * 100)))
+                            for (let i = 0; i <= cols; i++) {
+                              const x = gridPad * 100 + i * (cellW * 100 + gridGap * 100)
+                              lines.push(<div key={`vl${i}`} className="absolute top-0 bottom-0 border-l border-dashed border-white/10" style={{ left: `${x}%` }} />)
+                            }
+                            for (let r = 0; r < 20; r++) {
+                              const y = gridPad * 100 + r * (cellH * 100 + gridGap * 100)
+                              if (y > 100) break
+                              lines.push(<div key={`hl${r}`} className="absolute left-0 right-0 border-t border-dashed border-white/10" style={{ top: `${y}%` }} />)
+                            }
+                            return lines
+                          })()}
+                        </div>
+                      )}
+                      {/* Drop zone indicator for containers when dragging */}
+                      {isContainer && dragging && selectedId !== el.id && (
+                        <div className="absolute inset-1 rounded-lg border-2 border-dashed border-accent-blue/30 flex items-center justify-center pointer-events-none">
+                          <div className="bg-accent-blue/10 rounded-full p-1">
+                            <Plus size={12} className="text-accent-blue/50" />
+                          </div>
+                        </div>
+                      )}
                       {(el.type === 'TextLabel' || el.type === 'TextButton' || el.type === 'TextBox') && childEls.length === 0 && (
                         <span style={{ color: parseColor(el.props.TextColor3), fontSize: el.props.TextScaled ? undefined : (el.props.TextSize || 14), textAlign: el.props.TextXAlignment === 'Left' ? 'left' : el.props.TextXAlignment === 'Right' ? 'right' : 'center' }} className="px-2 font-bold truncate w-full block">{el.props.Text || (el.type === 'TextBox' ? 'Input...' : 'Text')}</span>
                       )}
@@ -729,7 +1134,7 @@ export default function UIGenerator() {
           </div>
         </div>
 
-        {/* ─── Right Panel: Properties + Chat ─── */}
+        {/* ─── Right Panel: Properties + Chat/Templates ─── */}
         <div className="w-[320px] border-l border-border-primary flex flex-col bg-bg-primary/30">
           {/* Properties */}
           {selected && showProps && (
@@ -800,106 +1205,163 @@ export default function UIGenerator() {
                     </button>
                     {expanded && relevant.map(k => {
                       const val = selected.props[k]
-                      const isColor = k.toLowerCase().includes('color') || k === 'BackgroundColor3' || k === 'TextColor3' || k === 'BorderColor3' || k === 'ImageColor3' || k === 'ScrollBarImageColor3'
                       return (
                         <div key={k} className="flex items-center gap-2 px-3 py-1">
                           <label className="text-[9px] text-text-dim w-20 shrink-0 truncate">{k}</label>
-                          {isColor ? (
-                            <div className="flex items-center gap-1 flex-1">
-                              <input type="color" value={parseColor(val)} onChange={e => updateProps(selected.id, { [k]: e.target.value })}
-                                className="w-5 h-5 rounded border border-border-primary cursor-pointer" />
-                              <input value={parseColor(val)} onChange={e => updateProps(selected.id, { [k]: e.target.value })}
-                                className="flex-1 px-1.5 py-0.5 rounded bg-bg-secondary border border-border-primary text-[9px] text-text-primary font-mono focus:outline-none focus:border-accent-blue/50" />
-                            </div>
-                          ) : typeof val === 'boolean' ? (
-                            <button onClick={() => updateProps(selected.id, { [k]: !val })}
-                              className={cn('px-2 py-0.5 rounded text-[9px] font-medium transition-all', val ? 'bg-green-500/15 text-green-400' : 'bg-bg-secondary text-text-dim')}>
-                              {val ? 'True' : 'False'}
-                            </button>
-                          ) : typeof val === 'number' ? (
-                            <input type="number" step="1" value={val}
-                              onChange={e => updateProps(selected.id, { [k]: parseFloat(e.target.value) || 0 })}
-                              className="flex-1 px-1.5 py-0.5 rounded bg-bg-secondary border border-border-primary text-[9px] text-text-primary font-mono focus:outline-none focus:border-accent-blue/50" />
-                          ) : (
-                            <input value={String(val ?? '')}
-                              onChange={e => updateProps(selected.id, { [k]: e.target.value })}
-                              className="flex-1 px-1.5 py-0.5 rounded bg-bg-secondary border border-border-primary text-[9px] text-text-primary font-mono focus:outline-none focus:border-accent-blue/50" />
+                          {renderPropControl(k, val)}
+                          {/* Color presets row */}
+                          {isColorProp(k) && expanded && (
+                            <div />
                           )}
                         </div>
                       )
                     })}
+                    {/* Color presets row for color groups */}
+                    {expanded && group === 'Appearance' && (
+                      <div className="px-3 py-1.5 flex flex-wrap gap-1">
+                        {COLOR_PRESETS.map((c, i) => (
+                          <button key={i} onClick={() => {
+                            const colorKeys = ['BackgroundColor3', 'BorderColor3', 'ImageColor3']
+                            const targetKey = colorKeys.find(ck => relevant.includes(ck)) || 'BackgroundColor3'
+                            updateProps(selected.id, { [targetKey]: c })
+                          }}
+                            className="w-4 h-4 rounded border border-white/10 hover:ring-1 hover:ring-white/30 transition-all"
+                            style={{ backgroundColor: c }} title={c} />
+                        ))}
+                      </div>
+                    )}
+                    {expanded && group === 'Text' && (
+                      <div className="px-3 py-1.5 flex flex-wrap gap-1">
+                        {COLOR_PRESETS.map((c, i) => (
+                          <button key={i} onClick={() => updateProps(selected.id, { TextColor3: c })}
+                            className="w-4 h-4 rounded border border-white/10 hover:ring-1 hover:ring-white/30 transition-all"
+                            style={{ backgroundColor: c }} title={c} />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )
               })}
-            </div>
-          )}
-
-          {/* AI Chat */}
-          <div className={cn('flex-1 flex flex-col min-h-0', !selected && 'h-full')}>
-            <div className="flex items-center justify-between px-3 py-2 border-b border-border-primary">
-              <div className="flex items-center gap-2">
-                <div className="w-5 h-5 rounded bg-gradient-to-br from-accent-purple to-accent-pink flex items-center justify-center"><Sparkles size={10} className="text-white" /></div>
-                <span className="text-[10px] font-bold text-text-muted">AI Assistant</span>
-              </div>
-              {messages.length > 0 && (
-                <button onClick={() => setMessages([])} className="text-[9px] text-text-dim hover:text-text-muted transition-all">Clear</button>
-              )}
-            </div>
-            <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2">
-              {messages.length === 0 && (
-                <div className="flex flex-col items-center justify-center h-full text-center px-2">
-                  <Sparkles size={20} className="text-accent-purple/30 mb-2" />
-                  <p className="text-[10px] text-text-dim mb-3">Describe your UI and AI builds it on the canvas</p>
-                  <div className="grid grid-cols-3 gap-1.5 mb-3 w-full">
-                    {quickPresets.map((p, i) => (
-                      <button key={i} onClick={() => sendMsg(p.prompt)}
-                        className="flex flex-col items-center gap-0.5 px-2 py-2 rounded-lg text-[10px] text-text-dim bg-bg-elevated border border-border-primary hover:border-accent-purple/40 hover:text-accent-purple hover:bg-accent-purple/5 transition-all">
-                        <span className="text-base">{p.emoji}</span>
-                        <span className="font-medium">{p.label}</span>
+              {/* Add to container button */}
+              {isContainerSelected && (
+                <div className="px-3 py-2 border-b border-border-primary/50">
+                  <div className="flex flex-wrap gap-1">
+                    {ELEMENT_TYPES.map(et => (
+                      <button key={et.type} onClick={() => addEl(et.type, selected!.id)}
+                        className="px-1.5 py-0.5 rounded text-[8px] text-text-dim hover:text-text-primary bg-bg-secondary border border-border-primary hover:border-accent-blue/30 transition-all">
+                        + {et.desc}
                       </button>
                     ))}
                   </div>
-                  <div className="flex flex-wrap gap-1 justify-center">
-                    {suggestedPrompts.slice(0, 4).map((p, i) => (
-                      <button key={i} onClick={() => sendMsg(p)} className="px-2 py-1 rounded-md text-[9px] text-text-dim bg-bg-elevated border border-border-primary hover:border-accent-purple/30 hover:text-accent-purple transition-all">{p}</button>
-                    ))}
-                  </div>
                 </div>
               )}
-              {messages.map((msg, i) => (
-                <div key={i} className={cn('flex', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
-                  <div className={cn('max-w-[90%] px-2.5 py-1.5 rounded-lg text-[10px] leading-relaxed',
-                    msg.role === 'user' ? 'bg-accent-blue text-white rounded-br-sm' : 'bg-bg-elevated text-text-primary rounded-bl-sm border border-border-primary')}>
-                    <p className="whitespace-pre-wrap break-words">{msg.content}</p>
-                    {msg.commands?.length ? (
-                      <div className="mt-1 flex flex-wrap gap-0.5">
-                        {msg.commands.map((c: any, j: number) => (
-                          <span key={j} className={cn('px-1 py-0.5 rounded text-[8px] font-mono', c.action === 'add' && 'bg-green-500/10 text-green-400', c.action === 'modify' && 'bg-yellow-500/10 text-yellow-400', c.action === 'remove' && 'bg-red-500/10 text-red-400')}>
-                            {c.action} {c.name || c.target || c.elementType}
-                          </span>
+            </div>
+          )}
+
+          {/* Right panel tabs: AI Assistant + Templates */}
+          <div className="flex-1 flex flex-col min-h-0">
+            {/* Tab bar */}
+            <div className="flex border-b border-border-primary">
+              <button onClick={() => setRightTab('ai')}
+                className={cn('flex-1 flex items-center justify-center gap-1.5 px-2 py-2 text-[10px] font-bold transition-all',
+                  rightTab === 'ai' ? 'text-accent-purple border-b-2 border-accent-purple bg-accent-purple/5' : 'text-text-dim hover:text-text-muted')}>
+                <Sparkles size={10} /> AI Assistant
+              </button>
+              <button onClick={() => setRightTab('templates')}
+                className={cn('flex-1 flex items-center justify-center gap-1.5 px-2 py-2 text-[10px] font-bold transition-all',
+                  rightTab === 'templates' ? 'text-accent-blue border-b-2 border-accent-blue bg-accent-blue/5' : 'text-text-dim hover:text-text-muted')}>
+                <Layers size={10} /> Templates
+              </button>
+            </div>
+
+            {/* AI Chat Tab */}
+            {rightTab === 'ai' && (
+              <>
+                <div className="flex items-center justify-between px-3 py-2 border-b border-border-primary">
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 rounded bg-gradient-to-br from-accent-purple to-accent-pink flex items-center justify-center"><Sparkles size={10} className="text-white" /></div>
+                    <span className="text-[10px] font-bold text-text-muted">AI Assistant</span>
+                  </div>
+                  {messages.length > 0 && (
+                    <button onClick={() => setMessages([])} className="text-[9px] text-text-dim hover:text-text-muted transition-all">Clear</button>
+                  )}
+                </div>
+                <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2">
+                  {messages.length === 0 && (
+                    <div className="flex flex-col items-center justify-center h-full text-center px-2">
+                      <Sparkles size={20} className="text-accent-purple/30 mb-2" />
+                      <p className="text-[10px] text-text-dim mb-3">Describe your UI and AI builds it on the canvas</p>
+                      <div className="grid grid-cols-3 gap-1.5 mb-3 w-full">
+                        {quickPresets.map((p, i) => (
+                          <button key={i} onClick={() => sendMsg(p.prompt)}
+                            className="flex flex-col items-center gap-0.5 px-2 py-2 rounded-lg text-[10px] text-text-dim bg-bg-elevated border border-border-primary hover:border-accent-purple/40 hover:text-accent-purple hover:bg-accent-purple/5 transition-all">
+                            <span className="text-base">{p.emoji}</span>
+                            <span className="font-medium">{p.label}</span>
+                          </button>
                         ))}
                       </div>
-                    ) : null}
+                      <div className="flex flex-wrap gap-1 justify-center">
+                        {suggestedPrompts.slice(0, 4).map((p, i) => (
+                          <button key={i} onClick={() => sendMsg(p)} className="px-2 py-1 rounded-md text-[9px] text-text-dim bg-bg-elevated border border-border-primary hover:border-accent-purple/30 hover:text-accent-purple transition-all">{p}</button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {messages.map((msg, i) => (
+                    <div key={i} className={cn('flex', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
+                      <div className={cn('max-w-[90%] px-2.5 py-1.5 rounded-lg text-[10px] leading-relaxed',
+                        msg.role === 'user' ? 'bg-accent-blue text-white rounded-br-sm' : 'bg-bg-elevated text-text-primary rounded-bl-sm border border-border-primary')}>
+                        <p className="whitespace-pre-wrap break-words">{msg.content}</p>
+                        {msg.commands?.length ? (
+                          <div className="mt-1 flex flex-wrap gap-0.5">
+                            {msg.commands.map((c: any, j: number) => (
+                              <span key={j} className={cn('px-1 py-0.5 rounded text-[8px] font-mono', c.action === 'add' && 'bg-green-500/10 text-green-400', c.action === 'modify' && 'bg-yellow-500/10 text-yellow-400', c.action === 'remove' && 'bg-red-500/10 text-red-400')}>
+                                {c.action} {c.name || c.target || c.elementType}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
+                  {isLoading && (
+                    <div className="flex justify-start"><div className="bg-bg-elevated border border-border-primary rounded-lg px-3 py-1.5"><div className="flex gap-1"><span className="w-1 h-1 rounded-full bg-accent-purple animate-bounce" /><span className="w-1 h-1 rounded-full bg-accent-purple animate-bounce" style={{ animationDelay: '150ms' }} /><span className="w-1 h-1 rounded-full bg-accent-purple animate-bounce" style={{ animationDelay: '300ms' }} /></div></div></div>
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
+                <div className="px-3 pb-2 pt-1 border-t border-border-primary">
+                  <div className="flex items-end gap-1.5 bg-bg-elevated rounded-lg px-2.5 py-1.5 border border-border-primary focus-within:border-accent-purple/50 transition-colors">
+                    <textarea value={input} onChange={e => setInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg() } }}
+                      placeholder="Describe your UI..." rows={1}
+                      className="flex-1 bg-transparent text-text-primary text-[10px] resize-none focus:outline-none placeholder:text-text-dim max-h-16" />
+                    <button onClick={() => sendMsg()} disabled={!input.trim() || isLoading || building}
+                      className={cn('h-6 w-6 rounded-md flex-shrink-0 flex items-center justify-center transition-all', input.trim() && !isLoading && !building ? 'bg-accent-purple text-white' : 'bg-bg-tertiary text-text-dim')}>
+                      {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+                    </button>
                   </div>
                 </div>
-              ))}
-              {isLoading && (
-                <div className="flex justify-start"><div className="bg-bg-elevated border border-border-primary rounded-lg px-3 py-1.5"><div className="flex gap-1"><span className="w-1 h-1 rounded-full bg-accent-purple animate-bounce" /><span className="w-1 h-1 rounded-full bg-accent-purple animate-bounce" style={{ animationDelay: '150ms' }} /><span className="w-1 h-1 rounded-full bg-accent-purple animate-bounce" style={{ animationDelay: '300ms' }} /></div></div></div>
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-            <div className="px-3 pb-2 pt-1 border-t border-border-primary">
-              <div className="flex items-end gap-1.5 bg-bg-elevated rounded-lg px-2.5 py-1.5 border border-border-primary focus-within:border-accent-purple/50 transition-colors">
-                <textarea value={input} onChange={e => setInput(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg() } }}
-                  placeholder="Describe your UI..." rows={1}
-                  className="flex-1 bg-transparent text-text-primary text-[10px] resize-none focus:outline-none placeholder:text-text-dim max-h-16" />
-                <button onClick={() => sendMsg()} disabled={!input.trim() || isLoading || building}
-                  className={cn('h-6 w-6 rounded-md flex-shrink-0 flex items-center justify-center transition-all', input.trim() && !isLoading && !building ? 'bg-accent-purple text-white' : 'bg-bg-tertiary text-text-dim')}>
-                  {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
-                </button>
-              </div>
-            </div>
+              </>
+            )}
+
+            {/* Templates Tab */}
+            {rightTab === 'templates' && (
+              <>
+                <div className="px-3 py-2 border-b border-border-primary">
+                  <p className="text-[10px] text-text-dim">Click a template to add it to the canvas.</p>
+                </div>
+                <div className="flex-1 overflow-y-auto p-3 grid grid-cols-2 gap-2 auto-rows-min">
+                  {COMPONENT_TEMPLATES.map((t, i) => (
+                    <button key={i} onClick={() => applyTemplate(t)}
+                      className="flex flex-col items-center gap-1 px-2 py-3 rounded-xl bg-bg-elevated border border-border-primary hover:border-accent-blue/40 hover:bg-accent-blue/5 transition-all group">
+                      <span className="text-xl mb-0.5 group-hover:scale-110 transition-transform">{t.icon}</span>
+                      <span className="text-[10px] font-bold text-text-primary">{t.name}</span>
+                      <span className="text-[8px] text-text-dim">{t.desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>

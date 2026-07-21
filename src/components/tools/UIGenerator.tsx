@@ -303,24 +303,40 @@ export default function UIGenerator() {
 
   // ─── AI Commands ───
   const applyCmds = useCallback((cmds: any[]) => {
+    // Sort: adds without parents first, then adds with parents, then modifies, then removes
+    const sorted = [...cmds].sort((a: any, b: any) => {
+      if (a.action === 'add' && !a.parent) return -1
+      if (b.action === 'add' && !b.parent) return 1
+      if (a.action === 'add' && b.action === 'add') return 0
+      if (a.action === 'modify') return 1
+      if (a.action === 'remove') return 2
+      return 0
+    })
+    
     const newEls = [...elements]
-    for (const cmd of cmds) {
+    const nameToId = new Map<string, string>()
+    // Index existing elements by name
+    newEls.forEach(e => nameToId.set(e.name, e.id))
+    
+    for (const cmd of sorted) {
       if (cmd.action === 'add') {
         const id = uid()
+        const resolvedParent = cmd.parent ? (nameToId.get(cmd.parent) || newEls.find(e => e.name.toLowerCase() === cmd.parent.toLowerCase())?.id || null) : null
         const el: UIEl = {
           id, type: cmd.elementType || 'Frame', name: cmd.name || `${cmd.elementType}${newEls.length + 1}`,
-          parentId: cmd.parent ? newEls.find(e => e.name.toLowerCase() === cmd.parent.toLowerCase())?.id || null : null,
+          parentId: resolvedParent,
           position: cmd.position || { X: 0.5, Y: 0.5 }, size: cmd.size || { X: 0.3, Y: 0.2 },
           props: { BackgroundColor3: '#1a1a2e', TextColor3: '#ffffff', Text: '', Font: 'GothamBold', TextScaled: true, TextSize: 14, ...cmd.properties },
           children: [], zIndex: newEls.length + 1, locked: false, visible: true,
         }
+        nameToId.set(el.name, id)
         newEls.push(el)
         if (el.parentId) { const p = newEls.find(e => e.id === el.parentId); if (p) p.children = [...p.children, id] }
       } else if (cmd.action === 'modify') {
-        const t = newEls.find(e => e.name.toLowerCase() === (cmd.target || '').toLowerCase())
+        const t = newEls.find(e => e.name.toLowerCase() === (cmd.target || '').toLowerCase() || e.id === cmd.target)
         if (t) t.props = { ...t.props, ...cmd.properties }
       } else if (cmd.action === 'remove') {
-        const idx = newEls.findIndex(e => e.name.toLowerCase() === (cmd.target || '').toLowerCase())
+        const idx = newEls.findIndex(e => e.name.toLowerCase() === (cmd.target || '').toLowerCase() || e.id === cmd.target)
         if (idx >= 0) { const rid = newEls[idx].id; newEls.splice(idx, 1); newEls.forEach(e => { e.children = e.children.filter(c => c !== rid) }) }
       }
     }
@@ -332,16 +348,21 @@ export default function UIGenerator() {
     const um: ChatMsg = { role: 'user', content: msg }
     setMessages(p => [...p, um]); setInput(''); setIsLoading(true)
     try {
-      const cs = elements.map(e => ({ name: e.name, type: e.type, pos: e.position, size: e.size, props: e.props }))
+      const cs = elements.map(e => ({ name: e.name, type: e.type, pos: e.position, size: e.size }))
       const r = await fetch(CHAT_API, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: [...messages, um].map(m => ({ role: m.role, content: m.content })), canvas_state: cs }),
+        body: JSON.stringify({ messages: [{ role: 'user', content: msg }], canvas_state: cs }),
       })
       const d = await r.json()
       const am: ChatMsg = { role: 'assistant', content: d.message || d.content || 'Done', commands: d.commands || [] }
       setMessages(p => [...p, am])
-      if (d.commands?.length) applyCmds(d.commands)
-    } catch { setMessages(p => [...p, { role: 'assistant', content: 'Connection error. Try again.' }]) }
+      if (d.commands?.length) {
+        setTimeout(() => applyCmds(d.commands), 50)
+      }
+    } catch (e) {
+      console.error('UI Builder error:', e)
+      setMessages(p => [...p, { role: 'assistant', content: 'Connection error. Try again.' }])
+    }
     setIsLoading(false)
   }
 
@@ -570,39 +591,33 @@ export default function UIGenerator() {
             )}
             {/* Screen */}
             <div className="absolute inset-0 bg-[#1a1a2e] rounded-lg border border-white/5 shadow-2xl overflow-hidden">
-              {/* Elements */}
-              {roots.map(el => (
-                <div key={el.id} style={elStyle(el)}
-                  className="cursor-pointer select-none"
-                  onMouseDown={(e) => { e.stopPropagation(); if (buildMode && !el.locked) { setSelectedId(el.id); handleCanvasDown(e) } }}
-                  onClick={(e) => e.stopPropagation()}>
-                  {/* Render children inline */}
-                  {el.children.map(cid => {
-                    const child = elements.find(e => e.id === cid)
-                    if (!child || !child.visible) return null
-                    return (
-                      <div key={cid} style={childStyle(child)}
-                        className="cursor-pointer select-none"
-                        onClick={(e) => { e.stopPropagation(); setSelectedId(cid) }}
-                        onMouseDown={(e) => { e.stopPropagation(); if (buildMode && !child.locked) { setSelectedId(cid); handleCanvasDown(e) } }}>
-                        {(child.type === 'TextLabel' || child.type === 'TextButton' || child.type === 'TextBox') && (
-                          <span style={{ color: parseColor(child.props.TextColor3), fontSize: child.props.TextScaled ? undefined : child.props.TextSize || 14 }} className="px-1 text-center font-bold truncate w-full block">{child.props.Text || (child.type === 'TextBox' ? 'Input...' : 'Text')}</span>
-                        )}
-                        {child.type === 'ImageLabel' && child.props.Image && (
-                          <img src={child.props.Image} alt="" className="w-full h-full object-cover" style={{ opacity: 1 - (child.props.ImageTransparency || 0) }} />
-                        )}
-                      </div>
-                    )
-                  })}
-                  {/* Root element content */}
-                  {(el.type === 'TextLabel' || el.type === 'TextButton' || el.type === 'TextBox') && el.children.length === 0 && (
-                    <span style={{ color: parseColor(el.props.TextColor3), fontSize: el.props.TextScaled ? undefined : el.props.TextSize || 14 }} className="px-1 text-center font-bold truncate w-full block">{el.props.Text || (el.type === 'TextBox' ? 'Input...' : 'Text')}</span>
-                  )}
-                  {el.type === 'ImageLabel' && el.props.Image && el.children.length === 0 && (
-                    <img src={el.props.Image} alt="" className="w-full h-full object-cover" style={{ opacity: 1 - (el.props.ImageTransparency || 0) }} />
-                  )}
-                </div>
-              ))}
+              {/* Recursive element renderer */}
+              {(() => {
+                const renderEl = (el: UIEl, isChild = false): React.ReactNode => {
+                  if (!el.visible) return null
+                  const childEls = el.children.map(cid => elements.find(e => e.id === cid)).filter(Boolean) as UIEl[]
+                  return (
+                    <div key={el.id} style={isChild ? childStyle(el) : elStyle(el)}
+                      className="cursor-pointer select-none"
+                      onClick={(e) => { e.stopPropagation(); setSelectedId(el.id) }}
+                      onMouseDown={(e) => { e.stopPropagation(); if (buildMode && !el.locked) { setSelectedId(el.id); handleCanvasDown(e) } }}>
+                      {/* Render all children recursively */}
+                      {childEls.map(child => renderEl(child, true))}
+                      {/* Content for text/image elements */}
+                      {(el.type === 'TextLabel' || el.type === 'TextButton' || el.type === 'TextBox') && childEls.length === 0 && (
+                        <span style={{ color: parseColor(el.props.TextColor3), fontSize: el.props.TextScaled ? undefined : (el.props.TextSize || 14), textAlign: el.props.TextXAlignment === 'Left' ? 'left' : el.props.TextXAlignment === 'Right' ? 'right' : 'center' }} className="px-2 font-bold truncate w-full block">{el.props.Text || (el.type === 'TextBox' ? 'Input...' : 'Text')}</span>
+                      )}
+                      {el.type === 'ImageLabel' && el.props.Image && childEls.length === 0 && (
+                        <img src={el.props.Image} alt="" className="w-full h-full object-cover" style={{ opacity: 1 - (el.props.ImageTransparency || 0) }} />
+                      )}
+                      {el.type === 'ScrollingFrame' && childEls.length === 0 && (
+                        <div className="absolute inset-0 flex items-center justify-center text-white/10 text-[9px]">Scroll Area</div>
+                      )}
+                    </div>
+                  )
+                }
+                return roots.map(el => renderEl(el, false))
+              })()}
               {elements.length === 0 && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-white/15 pointer-events-none">
                   <Layers size={36} className="mb-2 opacity-30" />

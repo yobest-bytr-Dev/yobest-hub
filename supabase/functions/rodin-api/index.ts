@@ -130,67 +130,29 @@ Rules:
     if (action === "ui-generate") {
       const body = await req.json();
       const { messages, canvas_state } = body;
-      const canvasContext = canvas_state ? `\n\nCurrent canvas state (elements on canvas):\n${JSON.stringify(canvas_state, null, 0)}\n` : "";
-      const SYSTEM_PROMPT = `You are an expert Roblox UI Designer for Yobest UI Builder. You build professional game UIs visually by issuing element commands. You do NOT write Lua code. You create and modify a visual canvas.
+      const canvasContext = canvas_state && canvas_state.length > 0 ? `\nCurrent canvas has ${canvas_state.length} elements: ${canvas_state.map((e: any) => e.name).join(", ")}` : "\nCanvas is empty.";
+      const SYSTEM_PROMPT = `OUTPUT ONLY VALID JSON. NO TEXT BEFORE OR AFTER. NO THINKING. NO EXPLANATION.
 
-You MUST respond with valid JSON only. No text before or after the JSON.
+You are a Roblox UI builder. You create UI elements by returning JSON commands.
 
-Response format:
-{
-  "message": "What you did, e.g. 'Added a dark inventory frame with a title bar'",
-  "commands": [
-    {
-      "action": "add",
-      "elementType": "Frame|TextLabel|TextButton|ImageLabel|ScrollingFrame|TextBox",
-      "name": "DescriptiveName",
-      "parent": "ParentName or null for root",
-      "position": {"X": 0.5, "Y": 0.5},
-      "size": {"X": 0.3, "Y": 0.2},
-      "properties": {
-        "BackgroundColor3": "#1e1e2e",
-        "BackgroundTransparency": 0,
-        "BorderSizePixel": 0,
-        "CornerRadius": 12,
-        "TextColor3": "#ffffff",
-        "TextScaled": true,
-        "Font": "GothamBold",
-        "Text": "Title",
-        "Image": "",
-        "ImageTransparency": 0,
-        "Rotation": 0,
-        "ZIndex": 1
-      }
-    },
-    {
-      "action": "modify",
-      "target": "ElementName",
-      "properties": {"BackgroundColor3": "#ff0000"}
-    },
-    {
-      "action": "remove",
-      "target": "ElementName"
-    }
-  ]
-}
+RESPONSE FORMAT (copy this structure exactly):
+{"message":"short description","commands":[{"action":"add","elementType":"Frame","name":"MyFrame","parent":null,"position":{"X":0.5,"Y":0.5},"size":{"X":0.4,"Y":0.5},"properties":{"BackgroundColor3":"#1e1e2e","BackgroundTransparency":0,"BorderSizePixel":0,"CornerRadius":12,"ZIndex":1}},{"action":"add","elementType":"TextLabel","name":"Title1","parent":"MyFrame","position":{"X":0.5,"Y":0.08},"size":{"X":0.8,"Y":0.1},"properties":{"Text":"Shop","TextColor3":"#ffffff","TextScaled":true,"Font":"GothamBold","BackgroundTransparency":1}},{"action":"modify","target":"MyFrame","properties":{"BackgroundColor3":"#ff0000"}},{"action":"remove","target":"SomeName"}]}
 
-Roblox UI Design Rules:
-- Frame: dark semi-transparent backgrounds (#1a1a2e, #2a2a3e, #0d1117), CornerRadius 8-16 for modern look
-- TextLabel/TextButton: white text (#ffffff) on dark backgrounds, GothamBold font, TextScaled true
-- Use parent/child nesting: Frame contains TextLabels, ImageLabels, etc.
-- Position and size are scale 0-1 (50% = 0.5 means centered)
-- Colors are hex strings like "#1e1e2e"
-- CornerRadius is number in pixels (8-16 for rounded, 0 for sharp)
-- Images: use direct URLs from unsplash (https://images.unsplash.com/photo-xxxxx?w=400)
-- Describe every change clearly in the message
-- Ask questions by returning {"message": "your question", "ask": true, "commands": []}
-- Do NOT generate Lua scripts, only JSON commands
-- Do NOT use markdown, only raw JSON
-- Keep responses concise
-- When adding images, use real image URLs that work
-- Create complete, professional UI layouts with multiple nested elements
-- Think like a Roblox game designer: inventory, HUD, shop, menu, etc.
-- Use dark themes with accent colors for buttons and highlights
-- Add proper spacing and padding between elements${canvasContext}`;
+RULES:
+- "message": 1 sentence describing what you did
+- "commands": array of add/modify/remove actions
+- add: elementType, name, parent (null=root or parent name), position {X,Y} scale 0-1, size {X,Y} scale 0-1, properties object
+- modify: target=name, properties=changed props
+- remove: target=name
+- Colors: hex strings "#rrggbb"
+- CornerRadius: number (8-16 typical)
+- Text: string, TextScaled: boolean, Font: "GothamBold" or "SourceSans"
+- BackgroundTransparency: 0=opaque, 1=invisible
+- Position 0.5,0.5 = center of parent
+- Nest elements: parent name must match an existing or planned element name
+- Dark themes: backgrounds #1a1a2e #2a2a3e #0d1117, text #ffffff, accents #4ecca3 #ff6b6b #ffd93d
+- Generate complete layouts with 5-15 elements for complex UIs
+- For questions: {"message":"your question?","ask":true,"commands":[]}${canvasContext}`;
 
       const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
@@ -202,21 +164,42 @@ Roblox UI Design Rules:
         },
         body: JSON.stringify({
           model: "openrouter/free",
-          messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
-          temperature: 0.7,
-          max_tokens: 2000,
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            { role: "user", content: messages.length > 0 ? messages[messages.length - 1].content : "Create a shop UI" }
+          ],
+          temperature: 0.3,
+          max_tokens: 3000,
         }),
       });
       const data = await resp.json();
       const content = data.choices?.[0]?.message?.content || "";
       
-      // Try to parse as JSON, fallback to text
+      // Robust JSON extraction: find JSON object in possibly messy text
       let parsed;
       try {
         parsed = JSON.parse(content);
       } catch {
-        parsed = { message: content, commands: [] };
+        // Try to extract JSON from text that may contain thinking/explanation
+        const jsonMatch = content.match(/\{[\s\S]*"message"[\s\S]*"commands"[\s\S]*\}/);
+        if (jsonMatch) {
+          try { parsed = JSON.parse(jsonMatch[0]); } catch { parsed = null; }
+        }
+        if (!parsed) {
+          // Last resort: find any { ... } block
+          const braceMatch = content.match(/\{[\s\S]*\}/);
+          if (braceMatch) {
+            try { parsed = JSON.parse(braceMatch[0]); } catch { parsed = null; }
+          }
+        }
+        if (!parsed) {
+          parsed = { message: content.slice(0, 200), commands: [] };
+        }
       }
+      
+      // Ensure commands is an array
+      if (!Array.isArray(parsed.commands)) parsed.commands = [];
+      if (!parsed.message) parsed.message = "Done";
       
       return new Response(JSON.stringify(parsed), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

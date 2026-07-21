@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Download, ArrowLeft, Upload, Settings, Wand2, Send, X, Loader2, ImagePlus } from 'lucide-react'
+import { Download, ArrowLeft, Upload, Settings, Wand2, Send, X, Loader2, ImagePlus, Box, RotateCcw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { supabaseUrl } from '@/config/supabase'
 import ModelViewer from './ModelViewer'
@@ -7,6 +7,14 @@ import ModelControls from './ModelControls'
 import StatusIndicator from './StatusIndicator'
 import OptionsDialog from './OptionsDialog'
 import type { ModelStats, AnimationInfo, DetectedMesh, MeshAssignment } from './ModelComponent'
+
+const SAMPLE_MODELS = [
+  { name: 'Basic PBR', file: '/models/base_basic_pbr.glb', desc: 'Standard PBR material model' },
+  { name: 'PBR Variant A', file: '/models/base_basic_pbr%20(3).glb', desc: 'PBR material variant' },
+  { name: 'PBR Variant B', file: '/models/base_basic_pbr%20(6).glb', desc: 'PBR material variant' },
+  { name: 'PBR Variant C', file: '/models/base_basic_pbr%20(9).glb', desc: 'PBR material variant' },
+  { name: 'Cyber Car', file: '/models/floating_futuristic_cyber_car_jfg.glb', desc: 'Futuristic floating cyber car' },
+]
 
 const RODIN_API = `${supabaseUrl}/functions/v1/rodin-api`
 
@@ -231,7 +239,19 @@ export default function ThreeDGenerator() {
         {showPrompt && (
           <div className="absolute bottom-0 left-0 right-0 pointer-events-auto">
             <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
-            <div className="relative px-4 pb-4 max-w-3xl mx-auto">
+            <div className="relative px-4 pb-4 max-w-4xl mx-auto">
+              <div className="mb-3 flex gap-2 overflow-x-auto pb-2 scrollbar-none">
+                {SAMPLE_MODELS.map((m, i) => (
+                  <button key={i} onClick={() => { setModelUrl(m.file); setShowPrompt(false); setIsLoading(false); setStage(null); setError(null) }}
+                    className="shrink-0 w-40 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 hover:border-white/25 p-3 text-left transition-all hover:bg-white/10 group">
+                    <div className="w-10 h-10 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                      <Box size={18} className="text-white/40" />
+                    </div>
+                    <p className="text-xs font-medium text-white/80 truncate">{m.name}</p>
+                    <p className="text-[10px] text-white/30 truncate">{m.desc}</p>
+                  </button>
+                ))}
+              </div>
               <form onSubmit={handleSubmit}
                 className="relative rounded-2xl overflow-hidden bg-black/50 backdrop-blur-xl border border-white/10">
                 {previewImages.length > 0 && (

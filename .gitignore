@@ -26,3 +26,6 @@ npm-debug.log*
 # OS
 .DS_Store
 Thumbs.db
+
+# 3D model files (too large for git)
+public/models/

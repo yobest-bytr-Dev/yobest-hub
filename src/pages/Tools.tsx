@@ -221,7 +221,7 @@ export default function Tools() {
                 <div className="w-12 h-12 rounded-xl bg-accent-blue/20 flex items-center justify-center shrink-0"><Box size={24} className="text-accent-blue" /></div>
                 <div>
                   <h2 className="text-lg font-bold text-text-primary mb-1">3D Model Generator</h2>
-                  <p className="text-sm text-text-muted leading-relaxed">Generate 3D models from text descriptions using Hyper3D Rodin AI. Describe your model, choose quality settings, and generate in seconds. Download as GLB for Blender, Roblox Studio, or other 3D software.</p>
+                  <p className="text-sm text-text-muted leading-relaxed">Generate 3D models from text descriptions using Yobest3D AI. Describe your model, choose quality settings, and generate in seconds. Download as GLB for Blender, Roblox Studio, or other 3D software.</p>
                 </div>
               </div>
             </div>

@@ -129,19 +129,69 @@ Rules:
 
     if (action === "ui-generate") {
       const body = await req.json();
-      const { messages } = body;
-      const SYSTEM_PROMPT = `You are a Roblox UI Code Generator assistant for Yobest Bytr.
+      const { messages, canvas_state } = body;
+      const canvasContext = canvas_state ? `\n\nCurrent canvas state:\n${JSON.stringify(canvas_state, null, 0)}\n` : "";
+      const SYSTEM_PROMPT = `You are a Roblox UI Builder for Yobest Bytr. You visually build UIs by issuing commands. You do NOT write Lua code. You modify a visual canvas in real time.
 
-Your job is to help users create Roblox UI layouts. When the user describes a UI, you generate the corresponding Roblox Lua code or detailed description.
+You MUST respond with valid JSON only. No text before or after the JSON.
+
+Response format:
+{
+  "message": "Natural language description of what you did or your question",
+  "commands": [
+    {
+      "action": "add",
+      "elementType": "Frame|TextLabel|TextButton|ImageLabel|ScrollingFrame|UICorner|UIStroke|UIGradient",
+      "name": "UniqueName",
+      "parent": "ParentName or null for root",
+      "position": {"X": 0.5, "Y": 0.5},
+      "size": {"X": 0.3, "Y": 0.2},
+      "properties": {
+        "BackgroundColor3": "#1a1a2e",
+        "BackgroundTransparency": 0,
+        "BorderSizePixel": 0,
+        "CornerRadius": 8,
+        "TextColor3": "#ffffff",
+        "TextScaled": true,
+        "Font": "GothamBold",
+        "Text": "Hello",
+        "Image": "",
+        "ImageTransparency": 0,
+        "Rotation": 0,
+        "ZIndex": 1,
+        "AnchorPoint": {"X": 0.5, "Y": 0.5}
+      }
+    },
+    {
+      "action": "modify",
+      "target": "ElementName",
+      "properties": {"BackgroundColor3": "#ff0000"}
+    },
+    {
+      "action": "remove",
+      "target": "ElementName"
+    }
+  ]
+}
 
 Rules:
-- Generate clean Roblox Studio Lua code for ScreenGui elements
-- Include Frame, TextLabel, TextButton, ImageLabel, UICorner, UIStroke, UIGradient etc.
-- Use modern UI design patterns (rounded corners, gradients, shadows)
-- Provide working code that can be pasted into Roblox Studio
-- Be concise and helpful
-- Do NOT use markdown code blocks, just output the raw Lua code
-- If the user is just chatting, respond briefly and help them describe what UI they want`;
+- Always respond with valid JSON only
+- Use "add" to create elements, "modify" to change them, "remove" to delete
+- Position and size are scale 0-1 (percentage of parent)
+- Colors are hex strings like "#ff0000"
+- When adding UICorner, set CornerRadius in properties (number in pixels)
+- Images use direct URLs (lh3.googleusercontent.com or i.imgur.com preferred)
+- Describe every change in the message field clearly
+- Ask questions by setting "ask": true in the response: {"message": "your question", "ask": true, "commands": []}
+- For images, you can search for free images on Unsplash: https://source.unsplash.com/featured/?{keywords}
+- Do NOT generate Lua scripts, only JSON commands
+- Do NOT use markdown code blocks
+- Keep responses concise and friendly
+- When the user asks to add an image, use a direct image URL from unsplash or similar
+
+Image search: When user wants images, use URLs like https://source.unsplash.com/400x300/?{search-term}
+For transparent PNGs, use https://png.pngtree.com/png-clipart/{id}.png or similar
+For Roblox assets, use Roblox CDN URLs when available${canvasContext}`;
 
       const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
@@ -149,7 +199,7 @@ Rules:
           Authorization: `Bearer ${OPENROUTER_KEY}`,
           "Content-Type": "application/json",
           "HTTP-Referer": "https://yobest-bytr.vercel.app",
-          "X-Title": "Yobest UI Generator",
+          "X-Title": "Yobest UI Builder",
         },
         body: JSON.stringify({
           model: "openrouter/free",
@@ -160,7 +210,16 @@ Rules:
       });
       const data = await resp.json();
       const content = data.choices?.[0]?.message?.content || "";
-      return new Response(JSON.stringify({ content }), {
+      
+      // Try to parse as JSON, fallback to text
+      let parsed;
+      try {
+        parsed = JSON.parse(content);
+      } catch {
+        parsed = { message: content, commands: [] };
+      }
+      
+      return new Response(JSON.stringify(parsed), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

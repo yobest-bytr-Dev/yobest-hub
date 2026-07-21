@@ -329,7 +329,8 @@ const COMPONENT_TEMPLATES: { name: string; icon: string; desc: string; fn: Templ
 export default function UIGenerator() {
   const [elements, setElements] = useState<UIEl[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [showPreview, setShowPreview] = useState(false)
+  const [buildMode, setBuildMode] = useState(true)
+  const [planeMode, setPlaneMode] = useState(false)
   const [dragThreshold, setDragThreshold] = useState(false)
   const [device, setDevice] = useState(0)
   const [zoom, setZoom] = useState(0.55)
@@ -566,11 +567,20 @@ export default function UIGenerator() {
     const msg = (text || input).trim(); if (!msg || isLoading || building) return
     const um: ChatMsg = { role: 'user', content: msg }
     setMessages(p => [...p, um]); setInput(''); setIsLoading(true)
+
+    // Detect if this is an edit request (canvas has elements and user wants changes)
+    const editKeywords = ['change', 'make', 'edit', 'update', 'modify', 'alter', 'adjust', 'tweak', 'better', 'improve', 'fix', 'remove', 'delete', 'add', 'move', 'resize', 'recolor', 'replace', 'swap']
+    const lowerMsg = msg.toLowerCase()
+    const isEditRequest = elements.length > 0 && editKeywords.some(k => lowerMsg.includes(k))
+
     try {
       const cs = elements.map(e => ({ name: e.name, type: e.type, parent: e.parentId ? elements.find(p => p.id === e.parentId)?.name || null : null, position: e.position, size: e.size, props: e.props }))
+      const body: any = { messages: [{ role: 'user', content: msg }], canvas_state: cs }
+      if (isEditRequest) body.edit_mode = true
+
       const r = await fetch(CHAT_API, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: [{ role: 'user', content: msg }], canvas_state: cs }),
+        body: JSON.stringify(body),
       })
       const d = await r.json()
 
@@ -614,7 +624,7 @@ export default function UIGenerator() {
     if (e.button === 1 || (e.button === 0 && e.altKey)) {
       setIsPanning(true); setPanStart({ x: e.clientX, y: e.clientY, px: pan.x, py: pan.y }); return
     }
-    if (e.button === 0 && selectedId && canvasRef.current) {
+    if (buildMode && e.button === 0 && selectedId && canvasRef.current) {
       const el = elements.find(x => x.id === selectedId); if (!el || el.locked) return
       const rect = canvasRef.current.getBoundingClientRect()
       const sx = (e.clientX - rect.left) / rect.width
@@ -622,7 +632,7 @@ export default function UIGenerator() {
       setDragData({ sx, sy, ox: el.position.X, oy: el.position.Y, startX: e.clientX, startY: e.clientY })
       setDragThreshold(false)
     }
-  }, [selectedId, elements, pan])
+  }, [buildMode, selectedId, elements, pan])
 
   const handleCanvasMove = useCallback((e: React.MouseEvent) => {
     if (isPanning) {
@@ -671,7 +681,7 @@ export default function UIGenerator() {
       if (e.ctrlKey && e.key === 'y') { e.preventDefault(); redo() }
       if (e.ctrlKey && e.key === 'd') { e.preventDefault(); if (selectedId) duplicateEl(selectedId) }
       if (e.key === 'Escape') setSelectedId(null)
-      if (selectedId && !building) {
+      if (selectedId && buildMode && !building) {
         const nudge = e.shiftKey ? 0.01 : 0.005
         const el = elements.find(x => x.id === selectedId); if (!el) return
         if (e.key === 'ArrowLeft') { e.preventDefault(); updateEl(selectedId, { position: { X: Math.max(0, el.position.X - nudge), Y: el.position.Y } }) }
@@ -681,7 +691,7 @@ export default function UIGenerator() {
       }
     }
     window.addEventListener('keydown', handler); return () => window.removeEventListener('keydown', handler)
-  }, [selectedId, building, elements, removeEl, updateEl, undo, redo, duplicateEl])
+  }, [selectedId, buildMode, building, elements, removeEl, updateEl, undo, redo, duplicateEl])
 
   const suggestedPrompts = [
     'Shop with 4 items, prices, and buy buttons',
@@ -946,8 +956,11 @@ export default function UIGenerator() {
         <div className="h-4 w-px bg-border-primary" />
 
         {/* Tools */}
-        <button onClick={() => setShowPreview(!showPreview)} className={cn('flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all', showPreview ? 'bg-accent-purple/10 text-accent-purple border border-accent-purple/20' : 'text-text-dim hover:text-text-muted border border-transparent')}>
-          <Eye size={11} /> Preview
+        <button onClick={() => setBuildMode(!buildMode)} className={cn('flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all', buildMode ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'text-text-dim hover:text-text-muted border border-transparent')} title="Toggle select/drag/resize mode">
+          <MousePointer2 size={11} /> Build
+        </button>
+        <button onClick={() => setPlaneMode(!planeMode)} className={cn('flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all', planeMode ? 'bg-accent-purple/10 text-accent-purple border border-accent-purple/20' : 'text-text-dim hover:text-text-muted border border-transparent')} title="Preview UI without editor chrome">
+          <Eye size={11} /> Plane
         </button>
         <button onClick={() => setShowGrid(!showGrid)} className={cn('flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all', showGrid ? 'bg-accent-purple/10 text-accent-purple border border-accent-purple/20' : 'text-text-dim hover:text-text-muted border border-transparent')}>
           <Grid3X3 size={11} /> Grid
@@ -1105,7 +1118,7 @@ export default function UIGenerator() {
                       }}
                       className={cn('cursor-pointer select-none group', isBuilding && 'el-building', isContainer && 'hover:ring-1 hover:ring-white/10')}
                       onClick={(e) => { e.stopPropagation(); setSelectedId(el.id) }}
-                      onMouseDown={(e) => { e.stopPropagation(); if (!el.locked) { setSelectedId(el.id); handleCanvasDown(e) } }}>
+                      onMouseDown={(e) => { e.stopPropagation(); if (buildMode && !el.locked) { setSelectedId(el.id); handleCanvasDown(e) } }}>
                       {childEls.map(child => renderEl(child, true))}
                       {/* Hover label */}
                       {selectedId !== el.id && (
@@ -1164,7 +1177,7 @@ export default function UIGenerator() {
               )}
             </div>
             {/* Resize handles */}
-            {selected && !selected.locked && !showPreview && (
+            {selected && buildMode && !selected.locked && !planeMode && (
               <>
                 {['nw', 'ne', 'sw', 'se'].map(c => (
                   <div key={c} className={cn('absolute w-3 h-3 bg-white border-2 border-accent-blue rounded-full z-50 shadow-lg',
@@ -1336,6 +1349,9 @@ export default function UIGenerator() {
                   <div className="flex items-center gap-2">
                     <div className="w-5 h-5 rounded bg-gradient-to-br from-accent-purple to-accent-pink flex items-center justify-center"><Sparkles size={10} className="text-white" /></div>
                     <span className="text-[10px] font-bold text-text-muted">AI Assistant</span>
+                    {elements.length > 0 && (
+                      <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-accent-blue/10 text-accent-blue border border-accent-blue/20">EDIT MODE</span>
+                    )}
                   </div>
                   {messages.length > 0 && (
                     <button onClick={() => setMessages([])} className="text-[9px] text-text-dim hover:text-text-muted transition-all">Clear</button>
@@ -1368,7 +1384,7 @@ export default function UIGenerator() {
                       )}
                       {elements.length > 0 && (
                         <div className="flex flex-wrap gap-1 justify-center">
-                          {['Change all backgrounds to blue', 'Make the title bigger', 'Add a close button', 'Remove the last element'].map((p, i) => (
+                          {['Make the title bigger and gold', 'Change all backgrounds to #1e293b', 'Add a close button at top-right', 'Make this look like a professional game menu', 'Change the font to GothamBold everywhere', 'Add rounded corners to everything'].map((p, i) => (
                             <button key={i} onClick={() => sendMsg(p)} className="px-2 py-1 rounded-md text-[9px] text-text-dim bg-bg-elevated border border-border-primary hover:border-accent-purple/30 hover:text-accent-purple transition-all">{p}</button>
                           ))}
                         </div>
@@ -1435,7 +1451,7 @@ export default function UIGenerator() {
       </div>
 
       {/* ─── Preview Mode ─── */}
-      {showPreview && (
+      {planeMode && (
         <div className="fixed inset-0 z-[60] bg-[#08080c] flex items-center justify-center">
           <div className="relative" style={{ width: cw, height: ch }}>
             <div className="absolute inset-0 bg-[#1a1a2e] rounded-lg shadow-2xl overflow-hidden">

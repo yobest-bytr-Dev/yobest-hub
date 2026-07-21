@@ -321,24 +321,57 @@ Rules:
 
     if (action === "ui-generate") {
       const body = await req.json();
-      const { messages, canvas_state, force_template } = body;
+      const { messages, canvas_state, force_template, edit_mode } = body;
       const userMsg = messages?.length > 0 ? messages[messages.length - 1].content : "Create a shop UI";
+      const hasElements = canvas_state && Array.isArray(canvas_state) && canvas_state.length > 0;
+      const isEdit = edit_mode || false;
 
-      // Build rich canvas context for AI — includes ALL element details
+      // Also detect edit-like messages on server side as backup
+      const editWords = ['change', 'make', 'edit', 'update', 'modify', 'adjust', 'tweak', 'better', 'improve', 'fix', 'remove', 'delete', 'move', 'resize', 'recolor', 'replace', 'swap', 'bigger', 'smaller', 'darker', 'lighter', 'brighter', 'add a', 'add new'];
+      const lowerMsg = userMsg.toLowerCase();
+      const isEditFromMsg = hasElements && editWords.some(w => lowerMsg.includes(w));
+      const forceEdit = isEdit || isEditFromMsg;
+
+      // Build rich canvas context for AI — includes ALL element details with hierarchy
       let canvasContext = "";
       if (canvas_state && Array.isArray(canvas_state) && canvas_state.length > 0) {
-        canvasContext = "\n\n=== CURRENT CANVAS STATE (" + canvas_state.length + " elements) ===\nYou can MODIFY these existing elements or ADD new ones.\n\n" + canvas_state.map((e: any, i: number) => {
-          const props = e.props || {};
-          const propsStr = Object.entries(props).map(([k, v]) => {
-            if (v === undefined || v === null || v === '' || v === false) return null;
-            if (typeof v === 'object') return `${k}:${JSON.stringify(v)}`;
-            return `${k}:${v}`;
-          }).filter(Boolean).join(', ');
-          return `[${i+1}] ${e.name} (${e.type}) parent:${e.parent || 'none'} pos:(${e.position?.X?.toFixed(3)},${e.position?.Y?.toFixed(3)}) size:(${e.size?.X?.toFixed(3)},${e.size?.Y?.toFixed(3)}) {${propsStr}}`;
-        }).join("\n") + "\n\nTo EDIT existing elements, use their EXACT name from the list above with action:modify.";
+        // Build hierarchy-aware display
+        const buildTree = (parentName: string | null, depth: number): string[] => {
+          return canvas_state
+            .filter((e: any) => (parentName === null ? !e.parent : e.parent === parentName))
+            .map((e: any, i: number) => {
+              const idx = canvas_state.indexOf(e) + 1;
+              const indent = "  ".repeat(depth);
+              const props = e.props || {};
+              const keyProps: string[] = [];
+              if (props.Text) keyProps.push(`Text:"${props.Text}"`);
+              if (props.BackgroundColor3) keyProps.push(`BG:${props.BackgroundColor3}`);
+              if (props.TextColor3 && props.TextColor3 !== '#000000') keyProps.push(`FG:${props.TextColor3}`);
+              if (props.Font && props.Font !== 'Legacy') keyProps.push(`Font:${props.Font}`);
+              if (props.CornerRadius) keyProps.push(`R:${props.CornerRadius}`);
+              if (props.Image) keyProps.push(`Img:${props.Image.substring(0, 40)}`);
+              if (props.BackgroundTransparency > 0) keyProps.push(`BGa:${props.BackgroundTransparency}`);
+              if (props.TextScaled) keyProps.push("Scaled");
+              const line = `${indent}[${idx}] ${e.name} (${e.type}) pos:(${e.position?.X?.toFixed(2)},${e.position?.Y?.toFixed(2)}) sz:(${e.size?.X?.toFixed(2)},${e.size?.Y?.toFixed(2)})${keyProps.length ? ' {' + keyProps.join(', ') + '}' : ''}`;
+              const children = buildTree(e.name, depth + 1);
+              return [line, ...children];
+            });
+        };
+        const tree = buildTree(null, 0).join("\n");
+        canvasContext = "\n\n=== CURRENT CANVAS (" + canvas_state.length + " elements) ===\n" + tree + "\n\nUse EXACT element names above for modify/remove commands.";
       }
 
-      const SYSTEM_PROMPT = `You are a Roblox UI generator and EDITOR. You can CREATE new UIs or MODIFY existing ones. Output ONLY a JSON object.
+      const EDIT_INSTRUCTION = forceEdit && hasElements ? `\n\n=== IMPORTANT: EDIT MODE ACTIVE ===\nThere are ${canvas_state.length} existing elements on the canvas. The user wants to MODIFY the existing UI, NOT create a new one.\nYou MUST use action:"modify" and action:"remove" commands to change existing elements.\nOnly use action:"add" if the user explicitly asks to ADD something new.\nDO NOT create a completely new UI. Work with what exists.\nUse the EXACT element names from the canvas state above.` : '';
+
+      const SYSTEM_PROMPT = `You are a world-class Roblox UI designer and engineer. You create BEAUTIFUL, PROFESSIONAL interfaces. Output ONLY a JSON object.
+
+DESIGN PRINCIPLES:
+- Use consistent spacing (8px grid), aligned elements, balanced layouts
+- Color harmony: max 3-4 colors per UI. Use dark backgrounds with vibrant accents
+- Typography hierarchy: large bold titles, medium body text, small captions
+- Visual depth: use subtle shadows, rounded corners (8-16px), layered backgrounds
+- Every UI should feel like a shipped game interface, not a wireframe
+- Add hover states, transitions, visual feedback where possible
 
 COMMANDS — "commands" MUST be an array:
 
@@ -346,30 +379,32 @@ COMMANDS — "commands" MUST be an array:
 {"action":"add","elementType":"Frame|TextLabel|TextButton|ImageLabel|ScrollingFrame|TextBox","name":"PascalCase","parent":null|"ParentName","position":{"X":0.5,"Y":0.5},"size":{"X":0.4,"Y":0.5},"properties":{"BackgroundColor3":"#hex","CornerRadius":12,"Text":"string","TextColor3":"#hex","TextScaled":true,"Font":"GothamBold","Image":"url","BackgroundTransparency":0-1,"BorderSizePixel":0,"ZIndex":number}}
 
 2) MODIFY — change existing element properties (use EXACT name from canvas state):
-{"action":"modify","target":"ExactElementName","properties":{"BackgroundColor3":"#hex","Text":"new text","TextColor3":"#hex","TextScaled":true,"CornerRadius":8,"BackgroundTransparency":0.5,"Font":"GothamBold","TextSize":18}}
+{"action":"modify","target":"ExactElementName","properties":{"BackgroundColor3":"#hex","Text":"new text","TextColor3":"#hex","TextScaled":true,"CornerRadius":8,"BackgroundTransparency":0.5,"Font":"GothamBold","TextSize":18,"Position":{"X":0.5,"Y":0.5},"Size":{"X":0.3,"Y":0.2}}}
 
 3) REMOVE — delete element and its children:
 {"action":"remove","target":"ExactElementName"}
 
 RESPONSE: {"message":"what you did","commands":[...]}
 
-EDITING RULES (when canvas has existing elements):
+EDITING RULES (when edit_mode is active or canvas has elements):
 - ALWAYS check the Current canvas elements list first
-- When user says "change X to Y" → use modify command with target="X" and properties with the change
-- When user says "make X bigger/smaller" → modify with new size
-- When user says "change color of X" → modify BackgroundColor3 or TextColor3
-- When user says "remove/delete X" → use remove command with target="X"
-- When user says "add a button" → use add command
+- When user says "change X to Y" → modify command with target="X"
+- When user says "make X bigger" → modify with new Size
+- When user says "change color" → modify BackgroundColor3 or TextColor3
+- When user says "remove/delete X" → remove command
+- When user says "add a button" → add command (only if explicitly adding)
 - You can combine add+modify+remove in one response
-- ALWAYS use EXACT element names from the canvas list for modify/remove
+- ALWAYS use EXACT element names from the canvas list
 
 CREATION RULES (when building new UI):
 - Put root elements first (parent: null), then children
-- Build complete UIs with 10-30 elements
-- Dark theme: #0d1117, #161b22, #1e293b, #334155, #f1f5f9, #94a3b8, #64748b
-- 0.5, 0.5 = center. Include title bars, content, buttons, labels, images.
+- Build complete UIs with 15-30 elements minimum
+- Professional dark theme: #0d1117, #161b22, #1e293b, #334155, #f1f5f9, #94a3b8, #64748b
+- Accent colors: #3b82f6 (blue), #8b5cf6 (purple), #10b981 (green), #ef4444 (red), #f59e0b (gold)
+- Include title bars, content areas, buttons with proper spacing, images, icons
+- Add visual polish: proper spacing, padding, alignment, hover-friendly layouts
 
-Output ONLY the JSON object. No markdown, no explanation, no \`\`\`json blocks.`;
+Output ONLY the JSON object. No markdown, no explanation, no \`\`\`json blocks.` + EDIT_INSTRUCTION;
 
       let parsed = null;
 

@@ -3,7 +3,7 @@ import {
   Send, Loader2, Sparkles, Plus, Trash2, Download, FileCode2, FileJson, Grid3X3,
   ZoomIn, ZoomOut, RotateCcw, Upload, Image as ImageIcon, X, ChevronDown, ChevronRight,
   Monitor, Tablet, Smartphone, MousePointer2, Move, Maximize2, Copy, Layers, Settings,
-  Eye, EyeOff, Lock, Unlock, Wand2, ChevronUp, PanelLeft, PanelRight
+  Eye, EyeOff, Lock, Unlock, Wand2, ChevronUp, PanelLeft, PanelRight, Zap
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { supabaseUrl } from '@/config/supabase'
@@ -231,6 +231,7 @@ export default function UIGenerator() {
   const [showExport, setShowExport] = useState(false)
   const [showImageSearch, setShowImageSearch] = useState(false)
   const [imageUrl, setImageUrl] = useState('')
+  const [instantBuild, setInstantBuild] = useState(() => localStorage.getItem('ui-instant-build') === 'true')
 
   // Drag & Resize
   const [dragging, setDragging] = useState(false)
@@ -246,6 +247,9 @@ export default function UIGenerator() {
   const selected = useMemo(() => elements.find(e => e.id === selectedId) || null, [elements, selectedId])
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
+
+  // Sync instant build to localStorage
+  useEffect(() => { localStorage.setItem('ui-instant-build', String(instantBuild)) }, [instantBuild])
 
   // History helpers
   const pushHist = useCallback((els: UIEl[]) => {
@@ -306,10 +310,11 @@ export default function UIGenerator() {
   const [buildingId, setBuildingId] = useState<string | null>(null)
   const [buildingMsg, setBuildingMsg] = useState('')
   const buildingRef = useRef(false)
+  const elementCountRef = useRef(0)
 
   // ─── AI Commands (synchronized, one by one) ───
   const applyCmds = useCallback(async (cmds: any[]) => {
-    if (buildingRef.current) return // already building
+    if (buildingRef.current) return
     buildingRef.current = true
     setBuilding(true)
     setBuildingMsg('Building...')
@@ -325,32 +330,46 @@ export default function UIGenerator() {
     })
 
     const nameToId = new Map<string, string>()
+    let zCounter = elementCountRef.current
+
+    // Check if instant mode
+    const instantMode = localStorage.getItem('ui-instant-build') === 'true'
+    const delay = instantMode ? 0 : 120
 
     for (let i = 0; i < sorted.length; i++) {
       const cmd = sorted[i]
       if (cmd.action === 'add') {
         const id = uid()
-        const resolvedParent = cmd.parent ? (nameToId.get(cmd.parent) || elements.find(e => e.name.toLowerCase() === cmd.parent.toLowerCase())?.id || null) : null
+        zCounter++
+        const resolvedParent = cmd.parent ? (nameToId.get(cmd.parent) || null) : null
         const el: UIEl = {
-          id, type: cmd.elementType || 'Frame', name: cmd.name || `${cmd.elementType}${elements.length + 1}`,
+          id, type: cmd.elementType || 'Frame', name: cmd.name || `Element${zCounter}`,
           parentId: resolvedParent,
           position: cmd.position || { X: 0.5, Y: 0.5 }, size: cmd.size || { X: 0.3, Y: 0.2 },
           props: { BackgroundColor3: '#1a1a2e', TextColor3: '#ffffff', Text: '', Font: 'GothamBold', TextScaled: true, TextSize: 14, ...cmd.properties },
-          children: [], zIndex: elements.length + 1, locked: false, visible: true,
+          children: [], zIndex: zCounter, locked: false, visible: true,
         }
         nameToId.set(el.name, id)
         setBuildingId(id)
         setBuildingMsg(`Adding ${el.name}...`)
         setElements(prev => {
-          const newEls = [...prev, el]
-          if (el.parentId) { const p = newEls.find(e => e.id === el.parentId); if (p) p.children = [...p.children, id] }
+          const newEls = [...prev.map(e => ({ ...e })), el]
+          if (el.parentId) {
+            const p = newEls.find(e => e.id === el.parentId)
+            if (p) {
+              const updatedParent = { ...p, children: [...p.children, id] }
+              const idx = newEls.findIndex(e => e.id === el.parentId)
+              newEls[idx] = updatedParent
+            }
+          }
+          elementCountRef.current = zCounter
           return newEls
         })
-        await new Promise(r => setTimeout(r, 350)) // delay between elements
+        if (delay > 0) await new Promise(r => setTimeout(r, delay))
       } else if (cmd.action === 'modify') {
         setBuildingMsg(`Modifying ${cmd.target}...`)
         setElements(prev => prev.map(e => e.name.toLowerCase() === (cmd.target || '').toLowerCase() ? { ...e, props: { ...e.props, ...cmd.properties } } : e))
-        await new Promise(r => setTimeout(r, 200))
+        if (delay > 0) await new Promise(r => setTimeout(r, 60))
       } else if (cmd.action === 'remove') {
         setBuildingMsg(`Removing ${cmd.target}...`)
         setElements(prev => {
@@ -358,7 +377,7 @@ export default function UIGenerator() {
           if (idx >= 0) { const rid = prev[idx].id; return prev.filter(e => e.id !== rid).map(e => ({ ...e, children: e.children.filter(c => c !== rid) })) }
           return prev
         })
-        await new Promise(r => setTimeout(r, 200))
+        if (delay > 0) await new Promise(r => setTimeout(r, 60))
       }
     }
 
@@ -366,8 +385,7 @@ export default function UIGenerator() {
     setBuildingMsg('')
     setBuilding(false)
     buildingRef.current = false
-    pushHist(elements)
-  }, [elements, pushHist])
+  }, [])
 
   const sendMsg = async (text?: string) => {
     const msg = (text || input).trim(); if (!msg || isLoading || building) return
@@ -380,12 +398,34 @@ export default function UIGenerator() {
         body: JSON.stringify({ messages: [{ role: 'user', content: msg }], canvas_state: cs }),
       })
       const d = await r.json()
-      setIsLoading(false)
+
+      // Check for errors
+      if (!r.ok || d.error) {
+        setIsLoading(false)
+        setMessages(p => [...p, { role: 'assistant', content: `Error: ${d.error || d.message || 'Request failed'}. Using template instead.` }])
+        // Still try template fallback
+        const tmplResp = await fetch(CHAT_API, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages: [{ role: 'user', content: msg }], canvas_state: cs, force_template: true }),
+        })
+        const tmpl = await tmplResp.json()
+        if (tmpl.commands?.length) {
+          const am: ChatMsg = { role: 'assistant', content: tmpl.message || 'Built from template', commands: tmpl.commands }
+          setMessages(p => [...p, am])
+          await applyCmds(tmpl.commands)
+        }
+        return
+      }
+
       const am: ChatMsg = { role: 'assistant', content: d.message || d.content || 'Done', commands: d.commands || [] }
       setMessages(p => [...p, am])
-      if (d.commands?.length) {
-        await applyCmds(d.commands)
+
+      if (am.commands?.length) {
+        await applyCmds(am.commands)
+      } else {
+        setMessages(p => [...p, { role: 'assistant', content: 'No UI elements generated. Try describing what you want, like "shop with 4 items" or "health bar HUD".' }])
       }
+      setIsLoading(false)
     } catch (e) {
       console.error('UI Builder error:', e)
       setIsLoading(false)
@@ -461,14 +501,23 @@ export default function UIGenerator() {
   }, [selectedId, buildMode, elements, removeEl, updateEl, undo, redo, duplicateEl])
 
   const suggestedPrompts = [
-    'Dark inventory frame with rounded corners and a title bar',
-    'Health and mana bar with gradient fills',
-    'Shop GUI with item grid and buy buttons',
-    'Main menu with play, settings, and credits buttons',
-    'Minimap frame in the top-right corner',
-    'Chat box at the bottom of the screen',
-    'Quest tracker with progress bars on the right side',
-    'Player stats panel with avatar and name',
+    'Shop with 4 items, prices, and buy buttons',
+    'Main menu with play, settings, credits buttons',
+    'Health and mana bar HUD at bottom of screen',
+    'Inventory grid with 12 item slots',
+    'Character stats panel with avatar and level',
+    'Chat box with messages and input field',
+    'Quest tracker on the right side with progress bars',
+    'Settings panel with toggles and sliders',
+  ]
+
+  const quickPresets = [
+    { label: 'Shop', emoji: '🛒', prompt: 'Shop with 4 items, prices, and buy buttons' },
+    { label: 'Menu', emoji: '🎮', prompt: 'Main menu with play, settings, credits buttons' },
+    { label: 'HUD', emoji: '❤️', prompt: 'Health and mana bar HUD at bottom of screen' },
+    { label: 'Inventory', emoji: '🎒', prompt: 'Inventory grid with 12 item slots' },
+    { label: 'Stats', emoji: '⚔️', prompt: 'Character stats panel with avatar and level' },
+    { label: 'Chat', emoji: '💬', prompt: 'Chat box with messages and input field' },
   ]
 
   // ─── Element Style ───
@@ -539,6 +588,9 @@ export default function UIGenerator() {
         </button>
         <button onClick={() => setSnapToGrid(!snapToGrid)} className={cn('flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all', snapToGrid ? 'bg-accent-orange/10 text-accent-orange border border-accent-orange/20' : 'text-text-dim hover:text-text-muted border border-transparent')}>
           Snap
+        </button>
+        <button onClick={() => setInstantBuild(!instantBuild)} className={cn('flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all', instantBuild ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'text-text-dim hover:text-text-muted border border-transparent')} title="Skip animation, build instantly">
+          <Zap size={11} /> Instant
         </button>
 
         <div className="h-4 w-px bg-border-primary" />
@@ -798,6 +850,15 @@ export default function UIGenerator() {
                 <div className="flex flex-col items-center justify-center h-full text-center px-2">
                   <Sparkles size={20} className="text-accent-purple/30 mb-2" />
                   <p className="text-[10px] text-text-dim mb-3">Describe your UI and AI builds it on the canvas</p>
+                  <div className="grid grid-cols-3 gap-1.5 mb-3 w-full">
+                    {quickPresets.map((p, i) => (
+                      <button key={i} onClick={() => sendMsg(p.prompt)}
+                        className="flex flex-col items-center gap-0.5 px-2 py-2 rounded-lg text-[10px] text-text-dim bg-bg-elevated border border-border-primary hover:border-accent-purple/40 hover:text-accent-purple hover:bg-accent-purple/5 transition-all">
+                        <span className="text-base">{p.emoji}</span>
+                        <span className="font-medium">{p.label}</span>
+                      </button>
+                    ))}
+                  </div>
                   <div className="flex flex-wrap gap-1 justify-center">
                     {suggestedPrompts.slice(0, 4).map((p, i) => (
                       <button key={i} onClick={() => sendMsg(p)} className="px-2 py-1 rounded-md text-[9px] text-text-dim bg-bg-elevated border border-border-primary hover:border-accent-purple/30 hover:text-accent-purple transition-all">{p}</button>
@@ -833,8 +894,8 @@ export default function UIGenerator() {
                   onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg() } }}
                   placeholder="Describe your UI..." rows={1}
                   className="flex-1 bg-transparent text-text-primary text-[10px] resize-none focus:outline-none placeholder:text-text-dim max-h-16" />
-                <button onClick={() => sendMsg()} disabled={!input.trim() || isLoading}
-                  className={cn('h-6 w-6 rounded-md flex-shrink-0 flex items-center justify-center transition-all', input.trim() && !isLoading ? 'bg-accent-purple text-white' : 'bg-bg-tertiary text-text-dim')}>
+                <button onClick={() => sendMsg()} disabled={!input.trim() || isLoading || building}
+                  className={cn('h-6 w-6 rounded-md flex-shrink-0 flex items-center justify-center transition-all', input.trim() && !isLoading && !building ? 'bg-accent-purple text-white' : 'bg-bg-tertiary text-text-dim')}>
                   {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
                 </button>
               </div>

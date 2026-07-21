@@ -129,6 +129,67 @@ function generateFromTemplate(prompt: string): { message: string; commands: any[
     ]};
   }
 
+  if (lower.includes("settings") || lower.includes("options") || lower.includes("config") || lower.includes("preferences")) {
+    return { message: "Built a settings panel with toggles", commands: [
+      { action: "add", elementType: "Frame", name: "SettingsFrame", parent: null, position: { X: 0.5, Y: 0.5 }, size: { X: 0.35, Y: 0.6 }, properties: { BackgroundColor3: "#0d1117", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 16, ZIndex: 1 }},
+      { action: "add", elementType: "TextLabel", name: "SettingsTitle", parent: "SettingsFrame", position: { X: 0.5, Y: 0.06 }, size: { X: 0.85, Y: 0.08 }, properties: { Text: "SETTINGS", TextColor3: "#f1f5f9", TextScaled: true, Font: "GothamBold", BackgroundTransparency: 1, ZIndex: 2 }},
+      { action: "add", elementType: "Frame", name: "Setting1", parent: "SettingsFrame", position: { X: 0.5, Y: 0.2 }, size: { X: 0.88, Y: 0.1 }, properties: { BackgroundColor3: "#161b22", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 8, ZIndex: 2 }},
+      { action: "add", elementType: "TextLabel", name: "Setting1Label", parent: "Setting1", position: { X: 0.3, Y: 0.5 }, size: { X: 0.55, Y: 0.7 }, properties: { Text: "Sound Effects", TextColor3: "#f1f5f9", TextScaled: true, Font: "GothamBold", BackgroundTransparency: 1, TextXAlignment: "Left", ZIndex: 3 }},
+      { action: "add", elementType: "TextButton", name: "Setting1Toggle", parent: "Setting1", position: { X: 0.9, Y: 0.5 }, size: { X: 0.12, Y: 0.6 }, properties: { Text: "", BackgroundColor3: "#10b981", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 12, ZIndex: 3 }},
+      { action: "add", elementType: "Frame", name: "Setting2", parent: "SettingsFrame", position: { X: 0.5, Y: 0.33 }, size: { X: 0.88, Y: 0.1 }, properties: { BackgroundColor3: "#161b22", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 8, ZIndex: 2 }},
+      { action: "add", elementType: "TextLabel", name: "Setting2Label", parent: "Setting2", position: { X: 0.3, Y: 0.5 }, size: { X: 0.55, Y: 0.7 }, properties: { Text: "Music", TextColor3: "#f1f5f9", TextScaled: true, Font: "GothamBold", BackgroundTransparency: 1, TextXAlignment: "Left", ZIndex: 3 }},
+      { action: "add", elementType: "TextButton", name: "Setting2Toggle", parent: "Setting2", position: { X: 0.9, Y: 0.5 }, size: { X: 0.12, Y: 0.6 }, properties: { Text: "", BackgroundColor3: "#10b981", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 12, ZIndex: 3 }},
+      { action: "add", elementType: "Frame", name: "Setting3", parent: "SettingsFrame", position: { X: 0.5, Y: 0.46 }, size: { X: 0.88, Y: 0.1 }, properties: { BackgroundColor3: "#161b22", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 8, ZIndex: 2 }},
+      { action: "add", elementType: "TextLabel", name: "Setting3Label", parent: "Setting3", position: { X: 0.3, Y: 0.5 }, size: { X: 0.55, Y: 0.7 }, properties: { Text: "Show Names", TextColor3: "#f1f5f9", TextScaled: true, Font: "GothamBold", BackgroundTransparency: 1, TextXAlignment: "Left", ZIndex: 3 }},
+      { action: "add", elementType: "TextButton", name: "Setting3Toggle", parent: "Setting3", position: { X: 0.9, Y: 0.5 }, size: { X: 0.12, Y: 0.6 }, properties: { Text: "", BackgroundColor3: "#334155", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 12, ZIndex: 3 }},
+      { action: "add", elementType: "Frame", name: "Setting4", parent: "SettingsFrame", position: { X: 0.5, Y: 0.59 }, size: { X: 0.88, Y: 0.1 }, properties: { BackgroundColor3: "#161b22", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 8, ZIndex: 2 }},
+      { action: "add", elementType: "TextLabel", name: "Setting4Label", parent: "Setting4", position: { X: 0.3, Y: 0.5 }, size: { X: 0.55, Y: 0.7 }, properties: { Text: "Vibration", TextColor3: "#f1f5f9", TextScaled: true, Font: "GothamBold", BackgroundTransparency: 1, TextXAlignment: "Left", ZIndex: 3 }},
+      { action: "add", elementType: "TextButton", name: "Setting4Toggle", parent: "Setting4", position: { X: 0.9, Y: 0.5 }, size: { X: 0.12, Y: 0.6 }, properties: { Text: "", BackgroundColor3: "#10b981", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 12, ZIndex: 3 }},
+      { action: "add", elementType: "TextButton", name: "ApplyBtn", parent: "SettingsFrame", position: { X: 0.5, Y: 0.92 }, size: { X: 0.5, Y: 0.08 }, properties: { Text: "APPLY", TextColor3: "#ffffff", TextScaled: true, Font: "GothamBold", BackgroundColor3: "#3b82f6", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 8, ZIndex: 2 }},
+    ]};
+  }
+
+  if (lower.includes("quest") || lower.includes("tracker") || lower.includes("mission") || lower.includes("objective")) {
+    return { message: "Built a quest tracker with progress bars", commands: [
+      { action: "add", elementType: "Frame", name: "QuestFrame", parent: null, position: { X: 0.88, Y: 0.4 }, size: { X: 0.2, Y: 0.5 }, properties: { BackgroundColor3: "#0d1117", BackgroundTransparency: 0.1, BorderSizePixel: 0, CornerRadius: 12, ZIndex: 1 }},
+      { action: "add", elementType: "TextLabel", name: "QuestTitle", parent: "QuestFrame", position: { X: 0.5, Y: 0.06 }, size: { X: 0.9, Y: 0.08 }, properties: { Text: "ACTIVE QUESTS", TextColor3: "#f59e0b", TextScaled: true, Font: "GothamBold", BackgroundTransparency: 1, ZIndex: 2 }},
+      { action: "add", elementType: "Frame", name: "Quest1", parent: "QuestFrame", position: { X: 0.5, Y: 0.2 }, size: { X: 0.9, Y: 0.22 }, properties: { BackgroundColor3: "#161b22", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 8, ZIndex: 2 }},
+      { action: "add", elementType: "TextLabel", name: "Quest1Name", parent: "Quest1", position: { X: 0.5, Y: 0.2 }, size: { X: 0.9, Y: 0.3 }, properties: { Text: "Defeat the Dragon", TextColor3: "#f1f5f9", TextScaled: true, Font: "GothamBold", BackgroundTransparency: 1, TextXAlignment: "Left", ZIndex: 3 }},
+      { action: "add", elementType: "TextLabel", name: "Quest1Desc", parent: "Quest1", position: { X: 0.5, Y: 0.5 }, size: { X: 0.9, Y: 0.25 }, properties: { Text: "Slay the fire dragon in the volcano", TextColor3: "#64748b", TextScaled: true, Font: "SourceSans", BackgroundTransparency: 1, TextXAlignment: "Left", ZIndex: 3 }},
+      { action: "add", elementType: "Frame", name: "Quest1Bar", parent: "Quest1", position: { X: 0.5, Y: 0.82 }, size: { X: 0.9, Y: 0.15 }, properties: { BackgroundColor3: "#1e293b", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 3, ZIndex: 3 }},
+      { action: "add", elementType: "Frame", name: "Quest1Fill", parent: "Quest1Bar", position: { X: 0.35, Y: 0.5 }, size: { X: 0.65, Y: 0.9 }, properties: { BackgroundColor3: "#ef4444", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 3, ZIndex: 4 }},
+      { action: "add", elementType: "Frame", name: "Quest2", parent: "QuestFrame", position: { X: 0.5, Y: 0.5 }, size: { X: 0.9, Y: 0.22 }, properties: { BackgroundColor3: "#161b22", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 8, ZIndex: 2 }},
+      { action: "add", elementType: "TextLabel", name: "Quest2Name", parent: "Quest2", position: { X: 0.5, Y: 0.2 }, size: { X: 0.9, Y: 0.3 }, properties: { Text: "Collect 10 Gems", TextColor3: "#f1f5f9", TextScaled: true, Font: "GothamBold", BackgroundTransparency: 1, TextXAlignment: "Left", ZIndex: 3 }},
+      { action: "add", elementType: "TextLabel", name: "Quest2Desc", parent: "Quest2", position: { X: 0.5, Y: 0.5 }, size: { X: 0.9, Y: 0.25 }, properties: { Text: "7/10 gems collected", TextColor3: "#64748b", TextScaled: true, Font: "SourceSans", BackgroundTransparency: 1, TextXAlignment: "Left", ZIndex: 3 }},
+      { action: "add", elementType: "Frame", name: "Quest2Bar", parent: "Quest2", position: { X: 0.5, Y: 0.82 }, size: { X: 0.9, Y: 0.15 }, properties: { BackgroundColor3: "#1e293b", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 3, ZIndex: 3 }},
+      { action: "add", elementType: "Frame", name: "Quest2Fill", parent: "Quest2Bar", position: { X: 0.7, Y: 0.5 }, size: { X: 0.85, Y: 0.9 }, properties: { BackgroundColor3: "#3b82f6", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 3, ZIndex: 4 }},
+    ]};
+  }
+
+  if (lower.includes("leaderboard") || lower.includes("ranking") || lower.includes("score") || lower.includes("top")) {
+    const names = ["DragonSlayer99", "NinjaPro42", "StarGazer", "PixelMaster", "BladeRunner"];
+    const scores = ["10000", "8500", "7200", "5800", "4000"];
+    const cmds: any[] = [
+      { action: "add", elementType: "Frame", name: "LbFrame", parent: null, position: { X: 0.5, Y: 0.5 }, size: { X: 0.3, Y: 0.55 }, properties: { BackgroundColor3: "#0d1117", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 16, ZIndex: 1 }},
+      { action: "add", elementType: "TextLabel", name: "LbTitle", parent: "LbFrame", position: { X: 0.5, Y: 0.06 }, size: { X: 0.85, Y: 0.08 }, properties: { Text: "LEADERBOARD", TextColor3: "#f59e0b", TextScaled: true, Font: "GothamBold", BackgroundTransparency: 1, ZIndex: 2 }},
+    ];
+    for (let i = 0; i < 5; i++) {
+      cmds.push({ action: "add", elementType: "Frame", name: `LbRow${i+1}`, parent: "LbFrame", position: { X: 0.5, Y: 0.15 + i * 0.16 }, size: { X: 0.9, Y: 0.12 }, properties: { BackgroundColor3: i === 0 ? "#1e293b" : "#161b22", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 8, ZIndex: 2 }});
+      cmds.push({ action: "add", elementType: "TextLabel", name: `LbRank${i+1}`, parent: `LbRow${i+1}`, position: { X: 0.1, Y: 0.5 }, size: { X: 0.15, Y: 0.6 }, properties: { Text: `#${i+1}`, TextColor3: i === 0 ? "#f59e0b" : "#64748b", TextScaled: true, Font: "GothamBold", BackgroundTransparency: 1, ZIndex: 3 }});
+      cmds.push({ action: "add", elementType: "TextLabel", name: `LbName${i+1}`, parent: `LbRow${i+1}`, position: { X: 0.45, Y: 0.5 }, size: { X: 0.55, Y: 0.6 }, properties: { Text: names[i], TextColor3: "#f1f5f9", TextScaled: true, Font: "GothamBold", BackgroundTransparency: 1, TextXAlignment: "Left", ZIndex: 3 }});
+      cmds.push({ action: "add", elementType: "TextLabel", name: `LbScore${i+1}`, parent: `LbRow${i+1}`, position: { X: 0.85, Y: 0.5 }, size: { X: 0.25, Y: 0.6 }, properties: { Text: scores[i], TextColor3: "#3b82f6", TextScaled: true, Font: "GothamBold", BackgroundTransparency: 1, TextXAlignment: "Right", ZIndex: 3 }});
+    }
+    return { message: "Built a leaderboard panel with player rankings", commands: cmds };
+  }
+
+  if (lower.includes("minimap") || lower.includes("map") || lower.includes("radar")) {
+    return { message: "Built a minimap frame in the corner", commands: [
+      { action: "add", elementType: "Frame", name: "MinimapFrame", parent: null, position: { X: 0.92, Y: 0.12 }, size: { X: 0.15, Y: 0.2 }, properties: { BackgroundColor3: "#0d1117", BackgroundTransparency: 0.15, BorderSizePixel: 2, BorderColor3: "#334155", CornerRadius: 50, ZIndex: 1 }},
+      { action: "add", elementType: "ImageLabel", name: "MapImage", parent: "MinimapFrame", position: { X: 0.5, Y: 0.5 }, size: { X: 0.85, Y: 0.85 }, properties: { Image: "https://picsum.photos/seed/minimap/200/200", BackgroundTransparency: 1, CornerRadius: 50, ZIndex: 2 }},
+      { action: "add", elementType: "Frame", name: "PlayerDot", parent: "MinimapFrame", position: { X: 0.5, Y: 0.5 }, size: { X: 0.06, Y: 0.06 }, properties: { BackgroundColor3: "#3b82f6", BackgroundTransparency: 0, BorderSizePixel: 1, BorderColor3: "#ffffff", CornerRadius: 50, ZIndex: 3 }},
+    ]};
+  }
+
   // Default: generic UI panel
   return { message: "Built a generic UI panel", commands: [
     { action: "add", elementType: "Frame", name: "PanelFrame", parent: null, position: { X: 0.5, Y: 0.5 }, size: { X: 0.35, Y: 0.55 }, properties: { BackgroundColor3: "#0d1117", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 16, ZIndex: 1 }},
@@ -260,26 +321,49 @@ Rules:
 
     if (action === "ui-generate") {
       const body = await req.json();
-      const { messages, canvas_state } = body;
+      const { messages, canvas_state, force_template } = body;
       const userMsg = messages?.length > 0 ? messages[messages.length - 1].content : "Create a shop UI";
 
-      const SYSTEM_PROMPT = `You are a Roblox UI generator. Output ONLY a JSON object. No explanation, no markdown, no thinking.
+      // Build canvas context for AI
+      let canvasContext = "";
+      if (canvas_state && Array.isArray(canvas_state) && canvas_state.length > 0) {
+        canvasContext = "\n\nCurrent canvas elements:\n" + canvas_state.map((e: any) =>
+          `- ${e.name} (${e.type}) at pos(${e.pos?.X?.toFixed(2)},${e.pos?.Y?.toFixed(2)}) size(${e.size?.X?.toFixed(2)},${e.size?.Y?.toFixed(2)})`
+        ).join("\n");
+      }
 
-{"message":"what you built","commands":[{"action":"add","elementType":"Frame","name":"Name","parent":null,"position":{"X":0.5,"Y":0.5},"size":{"X":0.4,"Y":0.5},"properties":{"BackgroundColor3":"#0d1117","CornerRadius":12}}]}
+      const SYSTEM_PROMPT = `You are a Roblox UI generator. Output ONLY a JSON object with this exact structure:
 
-Rules:
-- message: one short sentence
-- commands: array of add commands
-- add fields: action="add", elementType (Frame/TextLabel/TextButton/ImageLabel/ScrollingFrame), name (unique), parent (null or parent name), position {X:0-1,Y:0-1}, size {X:0-1,Y:0-1}, properties
-- Properties: BackgroundColor3 (hex), BackgroundTransparency (0-1), BorderSizePixel, CornerRadius (px), Text, TextColor3, TextScaled (bool), Font ("GothamBold"), Image (URL), ZIndex
-- Nest by setting parent to a previous element's name
-- 0.5,0.5 = center. Dark theme colors only.
-- Output raw JSON only.`;
+{"message":"what you built in one sentence","commands":[{"action":"add","elementType":"Frame","name":"UniqueName","parent":null,"position":{"X":0.5,"Y":0.5},"size":{"X":0.4,"Y":0.5},"properties":{"BackgroundColor3":"#0d1117","CornerRadius":12}}]}
+
+COMMAND FORMAT (each command MUST be an object with these exact fields):
+- action: always "add"
+- elementType: "Frame" | "TextLabel" | "TextButton" | "ImageLabel" | "ScrollingFrame" | "TextBox"
+- name: unique PascalCase name (no spaces, no duplicates)
+- parent: null for root, or exact name of a parent element defined earlier in commands array
+- position: {"X": number 0-1, "Y": number 0-1} — center of element as fraction of parent (0.5, 0.5 = center)
+- size: {"X": number 0-1, "Y": number 0-1} — fraction of parent
+- properties: {"BackgroundColor3":"#hex", "CornerRadius":number, "Text":"string", "TextColor3":"#hex", "TextScaled":true, "Font":"GothamBold", "Image":"url", "BackgroundTransparency":number 0-1, "BorderSizePixel":number, "ZIndex":number}
+
+RULES:
+1. "commands" MUST be an ARRAY of objects. Never a string, never an object.
+2. Put root elements first (parent: null), then children after their parent.
+3. Use dark theme colors: #0d1117, #161b22, #1e293b, #334155, #f1f5f9, #94a3b8, #64748b
+4. 0.5, 0.5 = center of screen. Build complete, professional UIs with 10-30 elements.
+5. Include title bars, content areas, buttons, labels, images where appropriate.
+6. Output ONLY the JSON object. No markdown, no explanation, no \`\`\`json blocks.`;
 
       let parsed = null;
 
-      // Try AI model
+      // If force_template, skip AI entirely
+      if (force_template) {
+        console.log("Force template mode for:", userMsg);
+        parsed = generateFromTemplate(userMsg);
+      } else {
+      // Try AI model with timeout
       try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 25000);
         const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
           method: "POST",
           headers: {
@@ -291,26 +375,38 @@ Rules:
           body: JSON.stringify({
             model: "google/gemini-2.0-flash-001:free",
             messages: [
-              { role: "system", content: SYSTEM_PROMPT },
+              { role: "system", content: SYSTEM_PROMPT + canvasContext },
               { role: "user", content: userMsg }
             ],
             temperature: 0.2,
-            max_tokens: 2000,
-            response_format: { type: "json_object" },
+            max_tokens: 3000,
           }),
+          signal: controller.signal,
         });
+        clearTimeout(timeout);
         const data = await resp.json();
         const content = data.choices?.[0]?.message?.content || "";
 
-        // Try parse
+        // Try parse — extract JSON from response
         try { parsed = JSON.parse(content); } catch {
           const m = content.match(/\{[\s\S]*\}/);
           if (m) try { parsed = JSON.parse(m[0]); } catch {}
         }
-      } catch {}
+      } catch (e) {
+        console.log("AI generation failed:", e instanceof Error ? e.message : e);
+      }
+      } // end else (AI attempt)
+
+      // Validate: commands MUST be an array with items
+      const isValid = parsed
+        && typeof parsed === "object"
+        && Array.isArray(parsed.commands)
+        && parsed.commands.length > 0
+        && parsed.commands.every((c: any) => c && typeof c === "object" && c.action === "add");
 
       // Fallback: template-based generation
-      if (!parsed || !parsed.commands || parsed.commands.length === 0) {
+      if (!isValid) {
+        console.log("AI returned invalid commands, using template fallback for:", userMsg);
         parsed = generateFromTemplate(userMsg);
       }
 

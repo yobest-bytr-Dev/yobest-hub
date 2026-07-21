@@ -1450,7 +1450,7 @@ export default function UIGenerator() {
         </div>
       </div>
 
-      {/* ─── Preview Mode ─── */}
+      {/* ─── Plane Mode ─── */}
       {planeMode && (
         <div className="fixed inset-0 z-[60] bg-[#08080c] flex items-center justify-center">
           <div className="relative" style={{ width: cw, height: ch }}>
@@ -1483,12 +1483,12 @@ export default function UIGenerator() {
               })()}
             </div>
           </div>
-          <button onClick={() => setShowPreview(false)}
+          <button onClick={() => setPlaneMode(false)}
             className="fixed top-4 right-4 flex items-center gap-2 px-4 py-2 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 text-white text-xs font-medium hover:bg-black/80 transition-all z-50">
-            <X size={14} /> Exit Preview
+            <X size={14} /> Exit Plane
           </button>
           <div className="fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 text-white/50 text-[10px] z-50">
-            Preview Mode — {elements.length} elements — {dev.w}×{dev.h}
+            Plane Mode — {elements.length} elements — {dev.w}×{dev.h}
           </div>
         </div>
       )}

@@ -17,12 +17,12 @@ function generateFromTemplate(prompt: string): { message: string; commands: any[
     return { message: "Built a shop UI with item grid and buy buttons", commands: [
       { action: "add", elementType: "Frame", name: "ShopFrame", parent: null, position: { X: 0.5, Y: 0.5 }, size: { X: 0.42, Y: 0.65 }, properties: { BackgroundColor3: "#0d1117", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 16, ZIndex: 1 }},
       { action: "add", elementType: "Frame", name: "TitleBar", parent: "ShopFrame", position: { X: 0.5, Y: 0.06 }, size: { X: 0.92, Y: 0.08 }, properties: { BackgroundColor3: "#161b22", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 10, ZIndex: 2 }},
-      { action: "add", elementType: "TextLabel", name: "ShopTitle", parent: "TitleBar", position: { X: 0.5, Y: 0.5 }, size: { X: 0.8, Y: 0.8 }, properties: { Text: "ITEM SHOP", TextColor3: "#f1f5f9", TextScaled: true, Font: "GothamBold", BackgroundTransparency: 1, ZIndex: 3 }},
+      { action: "add", elementType: "TextLabel", name: "ShopTitle", parent: "TitleBar", position: { X: 0.5, Y: 0.5 }, size: { X: 0.8, Y: 0.8 }, properties: { Text: "🛒 ITEM SHOP", TextColor3: "#f59e0b", TextScaled: true, Font: "GothamBold", BackgroundTransparency: 1, ZIndex: 3 }},
       { action: "add", elementType: "ScrollingFrame", name: "ItemGrid", parent: "ShopFrame", position: { X: 0.5, Y: 0.55 }, size: { X: 0.92, Y: 0.82 }, properties: { BackgroundColor3: "#161b22", BackgroundTransparency: 0.3, BorderSizePixel: 0, CornerRadius: 8, ZIndex: 2, ScrollBarThickness: 6 }},
       // Item 1
       { action: "add", elementType: "Frame", name: "Item1", parent: "ItemGrid", position: { X: 0.25, Y: 0.15 }, size: { X: 0.45, Y: 0.25 }, properties: { BackgroundColor3: "#1e293b", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 10, ZIndex: 3 }},
       { action: "add", elementType: "ImageLabel", name: "ItemIcon1", parent: "Item1", position: { X: 0.2, Y: 0.45 }, size: { X: 0.3, Y: 0.65 }, properties: { BackgroundColor3: "#334155", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 8, Image: "https://picsum.photos/seed/sword/200/200", ZIndex: 4 }},
-      { action: "add", elementType: "TextLabel", name: "ItemName1", parent: "Item1", position: { X: 0.62, Y: 0.25 }, size: { X: 0.7, Y: 0.3 }, properties: { Text: "Iron Sword", TextColor3: "#f1f5f9", TextScaled: true, Font: "GothamBold", BackgroundTransparency: 1, TextXAlignment: "Left", ZIndex: 4 }},
+      { action: "add", elementType: "TextLabel", name: "ItemName1", parent: "Item1", position: { X: 0.62, Y: 0.25 }, size: { X: 0.7, Y: 0.3 }, properties: { Text: "⚔️ Iron Sword", TextColor3: "#f1f5f9", TextScaled: true, Font: "GothamBold", BackgroundTransparency: 1, TextXAlignment: "Left", ZIndex: 4 }},
       { action: "add", elementType: "TextLabel", name: "ItemPrice1", parent: "Item1", position: { X: 0.62, Y: 0.55 }, size: { X: 0.4, Y: 0.25 }, properties: { Text: "500 Gold", TextColor3: "#f59e0b", TextScaled: true, Font: "GothamBold", BackgroundTransparency: 1, TextXAlignment: "Left", ZIndex: 4 }},
       { action: "add", elementType: "TextButton", name: "BuyBtn1", parent: "Item1", position: { X: 0.82, Y: 0.75 }, size: { X: 0.25, Y: 0.35 }, properties: { Text: "BUY", TextColor3: "#ffffff", TextScaled: true, Font: "GothamBold", BackgroundColor3: "#10b981", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 6, ZIndex: 4 }},
       // Item 2
@@ -324,87 +324,89 @@ Rules:
       const { messages, canvas_state, force_template, edit_mode } = body;
       const userMsg = messages?.length > 0 ? messages[messages.length - 1].content : "Create a shop UI";
       const hasElements = canvas_state && Array.isArray(canvas_state) && canvas_state.length > 0;
-      const isEdit = edit_mode || false;
 
-      // Also detect edit-like messages on server side as backup
-      const editWords = ['change', 'make', 'edit', 'update', 'modify', 'adjust', 'tweak', 'better', 'improve', 'fix', 'remove', 'delete', 'move', 'resize', 'recolor', 'replace', 'swap', 'bigger', 'smaller', 'darker', 'lighter', 'brighter', 'add a', 'add new'];
+      // Detect edit-like messages on server side
+      const editWords = ['change', 'make', 'edit', 'update', 'modify', 'adjust', 'tweak', 'better', 'improve', 'fix', 'remove', 'delete', 'move', 'resize', 'recolor', 'replace', 'swap', 'bigger', 'smaller', 'darker', 'lighter', 'brighter', 'add a', 'add new', 'turn', 'set', 'put'];
       const lowerMsg = userMsg.toLowerCase();
-      const isEditFromMsg = hasElements && editWords.some(w => lowerMsg.includes(w));
-      const forceEdit = isEdit || isEditFromMsg;
+      const forceEdit = (edit_mode || false) || (hasElements && editWords.some(w => lowerMsg.includes(w)));
 
-      // Build rich canvas context for AI — includes ALL element details with hierarchy
+      // Build hierarchy-aware canvas context
       let canvasContext = "";
-      if (canvas_state && Array.isArray(canvas_state) && canvas_state.length > 0) {
-        // Build hierarchy-aware display
+      if (hasElements) {
         const buildTree = (parentName: string | null, depth: number): string[] => {
           return canvas_state
             .filter((e: any) => (parentName === null ? !e.parent : e.parent === parentName))
-            .map((e: any, i: number) => {
+            .map((e: any) => {
               const idx = canvas_state.indexOf(e) + 1;
               const indent = "  ".repeat(depth);
               const props = e.props || {};
-              const keyProps: string[] = [];
-              if (props.Text) keyProps.push(`Text:"${props.Text}"`);
-              if (props.BackgroundColor3) keyProps.push(`BG:${props.BackgroundColor3}`);
-              if (props.TextColor3 && props.TextColor3 !== '#000000') keyProps.push(`FG:${props.TextColor3}`);
-              if (props.Font && props.Font !== 'Legacy') keyProps.push(`Font:${props.Font}`);
-              if (props.CornerRadius) keyProps.push(`R:${props.CornerRadius}`);
-              if (props.Image) keyProps.push(`Img:${props.Image.substring(0, 40)}`);
-              if (props.BackgroundTransparency > 0) keyProps.push(`BGa:${props.BackgroundTransparency}`);
-              if (props.TextScaled) keyProps.push("Scaled");
-              const line = `${indent}[${idx}] ${e.name} (${e.type}) pos:(${e.position?.X?.toFixed(2)},${e.position?.Y?.toFixed(2)}) sz:(${e.size?.X?.toFixed(2)},${e.size?.Y?.toFixed(2)})${keyProps.length ? ' {' + keyProps.join(', ') + '}' : ''}`;
+              const parts: string[] = [];
+              if (props.Text) parts.push(`Text="${props.Text}"`);
+              if (props.BackgroundColor3) parts.push(`BG=${props.BackgroundColor3}`);
+              if (props.TextColor3) parts.push(`FG=${props.TextColor3}`);
+              if (props.Font) parts.push(`Font=${props.Font}`);
+              if (props.CornerRadius) parts.push(`Corner=${props.CornerRadius}`);
+              if (props.Image) parts.push(`Image=${props.Image.substring(0, 50)}`);
+              if (props.BackgroundTransparency > 0) parts.push(`BGa=${props.BackgroundTransparency}`);
+              if (props.TextScaled) parts.push("Scaled=true");
+              if (props.TextSize) parts.push(`TextSize=${props.TextSize}`);
+              const line = `${indent}[${idx}] ${e.name} (${e.type}) pos=(${e.position?.X?.toFixed(3)},${e.position?.Y?.toFixed(3)}) sz=(${e.size?.X?.toFixed(3)},${e.size?.Y?.toFixed(3)}) ${parts.join(', ')}`;
               const children = buildTree(e.name, depth + 1);
               return [line, ...children];
             });
         };
         const tree = buildTree(null, 0).join("\n");
-        canvasContext = "\n\n=== CURRENT CANVAS (" + canvas_state.length + " elements) ===\n" + tree + "\n\nUse EXACT element names above for modify/remove commands.";
+        canvasContext = `\n\n=== EXISTING CANVAS (${canvas_state.length} elements) ===\n${tree}\n\nElement names listed above are EXACT. Use them for modify/remove.`;
       }
 
-      const EDIT_INSTRUCTION = forceEdit && hasElements ? `\n\n=== IMPORTANT: EDIT MODE ACTIVE ===\nThere are ${canvas_state.length} existing elements on the canvas. The user wants to MODIFY the existing UI, NOT create a new one.\nYou MUST use action:"modify" and action:"remove" commands to change existing elements.\nOnly use action:"add" if the user explicitly asks to ADD something new.\nDO NOT create a completely new UI. Work with what exists.\nUse the EXACT element names from the canvas state above.` : '';
+      // EDIT INSTRUCTION — extremely forceful
+      const EDIT_INSTRUCTION = forceEdit && hasElements ? `
+\n\n*** CRITICAL: EDIT MODE — DO NOT CREATE NEW UI ***
+The canvas already has ${canvas_state.length} elements. The user wants to CHANGE the existing UI.
+YOU MUST output ONLY "modify" and/or "remove" commands. 
+DO NOT output "add" commands unless the user EXPLICITLY says "add" or "create".
+DO NOT rebuild or recreate the UI. MODIFY what exists.
+Use the EXACT element names from the canvas list above.
+Example: if user says "make title bigger", output: {"action":"modify","target":"TitleName","properties":{"Size":{"X":0.8,"Y":0.15}}}
+Example: if user says "change color to red", output: {"action":"modify","target":"FrameName","properties":{"BackgroundColor3":"#ef4444"}}` : '';
 
-      const SYSTEM_PROMPT = `You are a world-class Roblox UI designer and engineer. You create BEAUTIFUL, PROFESSIONAL interfaces. Output ONLY a JSON object.
+      const SYSTEM_PROMPT = `You are a world-class Roblox UI designer. You create STUNNING, POLISHED game interfaces. Output ONLY a JSON object.
 
-DESIGN PRINCIPLES:
-- Use consistent spacing (8px grid), aligned elements, balanced layouts
-- Color harmony: max 3-4 colors per UI. Use dark backgrounds with vibrant accents
-- Typography hierarchy: large bold titles, medium body text, small captions
-- Visual depth: use subtle shadows, rounded corners (8-16px), layered backgrounds
-- Every UI should feel like a shipped game interface, not a wireframe
-- Add hover states, transitions, visual feedback where possible
+=== DESIGN RULES ===
+- PROFESSIONAL quality: every UI should look like a shipped Roblox game
+- Use EMOJIS in Text labels for visual appeal: 🎮 ⚔️ 🛡️ 💰 🔥 ✨ 🏆 🎯 ⭐ 💎 ❤️ 🗡️ 🏠 📦 🎪
+- Use ICON-style text characters: ★ ☆ ● ○ ▶ ◀ ▲ ▼ ♦ ◆ → ← ↑ ↓ ✕ ✓
+- Rich color palette: dark backgrounds (#0d1117, #161b22, #1e293b) with vibrant accents
+- Layered depth: multiple nested frames with different background transparencies
+- Rounded corners (8-16px), proper padding, balanced spacing
+- Typography: large bold titles with emojis, medium body, small captions
+- Image URLs: use picsum.photos for realistic images (https://picsum.photos/seed/keyword/200/200)
+- Build COMPLETE UIs with 15-30+ elements — not minimal wireframes
 
-COMMANDS — "commands" MUST be an array:
+=== COMMANDS — "commands" MUST be an array ===
 
-1) ADD — create new element:
-{"action":"add","elementType":"Frame|TextLabel|TextButton|ImageLabel|ScrollingFrame|TextBox","name":"PascalCase","parent":null|"ParentName","position":{"X":0.5,"Y":0.5},"size":{"X":0.4,"Y":0.5},"properties":{"BackgroundColor3":"#hex","CornerRadius":12,"Text":"string","TextColor3":"#hex","TextScaled":true,"Font":"GothamBold","Image":"url","BackgroundTransparency":0-1,"BorderSizePixel":0,"ZIndex":number}}
+ADD: {"action":"add","elementType":"Frame|TextLabel|TextButton|ImageLabel|ScrollingFrame|TextBox","name":"PascalCase","parent":null|"ParentName","position":{"X":0.5,"Y":0.5},"size":{"X":0.4,"Y":0.5},"properties":{"BackgroundColor3":"#hex","CornerRadius":12,"Text":"🎮 Game Title","TextColor3":"#f1f5f9","TextScaled":true,"Font":"GothamBold","Image":"https://picsum.photos/seed/xxx/200/200","BackgroundTransparency":0,"BorderSizePixel":0}}
 
-2) MODIFY — change existing element properties (use EXACT name from canvas state):
-{"action":"modify","target":"ExactElementName","properties":{"BackgroundColor3":"#hex","Text":"new text","TextColor3":"#hex","TextScaled":true,"CornerRadius":8,"BackgroundTransparency":0.5,"Font":"GothamBold","TextSize":18,"Position":{"X":0.5,"Y":0.5},"Size":{"X":0.3,"Y":0.2}}}
+MODIFY: {"action":"modify","target":"ExactName","properties":{"BackgroundColor3":"#hex","Text":"new text with emoji ✨","Size":{"X":0.5,"Y":0.3}}}
 
-3) REMOVE — delete element and its children:
-{"action":"remove","target":"ExactElementName"}
+REMOVE: {"action":"remove","target":"ExactName"}
 
-RESPONSE: {"message":"what you did","commands":[...]}
+RESPONSE: {"message":"description","commands":[...]}
 
-EDITING RULES (when edit_mode is active or canvas has elements):
-- ALWAYS check the Current canvas elements list first
-- When user says "change X to Y" → modify command with target="X"
-- When user says "make X bigger" → modify with new Size
-- When user says "change color" → modify BackgroundColor3 or TextColor3
-- When user says "remove/delete X" → remove command
-- When user says "add a button" → add command (only if explicitly adding)
-- You can combine add+modify+remove in one response
-- ALWAYS use EXACT element names from the canvas list
+=== EDITING RULES (when edit_mode active) ===
+- ONLY use modify/remove. NO add commands.
+- Match element names EXACTLY from canvas list
+- Change properties: colors, text, size, position, font, transparency, corners
 
-CREATION RULES (when building new UI):
-- Put root elements first (parent: null), then children
-- Build complete UIs with 15-30 elements minimum
-- Professional dark theme: #0d1117, #161b22, #1e293b, #334155, #f1f5f9, #94a3b8, #64748b
-- Accent colors: #3b82f6 (blue), #8b5cf6 (purple), #10b981 (green), #ef4444 (red), #f59e0b (gold)
-- Include title bars, content areas, buttons with proper spacing, images, icons
-- Add visual polish: proper spacing, padding, alignment, hover-friendly layouts
+=== CREATION RULES ===
+- Root elements first (parent: null), then children
+- 15-30+ elements minimum
+- EMOJIS in titles and buttons: "⚔️ BATTLE", "💰 SHOP", "🎮 PLAY", "⚙️ SETTINGS"
+- Image elements with picsum.photos URLs
+- Dark professional theme with accent colors
+- Complete, polished, game-ready UIs
 
-Output ONLY the JSON object. No markdown, no explanation, no \`\`\`json blocks.` + EDIT_INSTRUCTION;
+Output ONLY the JSON. No markdown, no explanation.` + EDIT_INSTRUCTION;
 
       let parsed = null;
 

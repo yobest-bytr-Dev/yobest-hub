@@ -1,717 +1,857 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { Send, Loader2, Sparkles, Box, Plus, Trash2, Move, MousePointer2, Download, FileCode2, FileJson, Grid3X3, ZoomIn, ZoomOut, RotateCcw, Upload, Image as ImageIcon, Wand2, X, ChevronDown, Search, Maximize2 } from 'lucide-react'
+import {
+  Send, Loader2, Sparkles, Plus, Trash2, Download, FileCode2, FileJson, Grid3X3,
+  ZoomIn, ZoomOut, RotateCcw, Upload, Image as ImageIcon, X, ChevronDown, ChevronRight,
+  Monitor, Tablet, Smartphone, MousePointer2, Move, Maximize2, Copy, Layers, Settings,
+  Eye, EyeOff, Lock, Unlock, Wand2, ChevronUp, PanelLeft, PanelRight
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { supabaseUrl } from '@/config/supabase'
 
 const CHAT_API = `${supabaseUrl}/functions/v1/rodin-api?action=ui-generate`
 
-const ELEMENT_TYPES = [
-  { type: 'Frame', icon: '▬', desc: 'Container frame' },
-  { type: 'TextLabel', icon: 'Aa', desc: 'Text display' },
-  { type: 'TextButton', icon: '[ ]', desc: 'Clickable button' },
-  { type: 'ImageLabel', icon: '🖼', desc: 'Image display' },
-  { type: 'ScrollingFrame', icon: '📋', desc: 'Scrollable container' },
-]
-
-interface UIElement {
-  id: string
-  type: string
-  name: string
-  parentId: string | null
-  position: { X: number; Y: number }
-  size: { X: number; Y: number }
-  properties: Record<string, any>
-  children: string[]
-  zIndex: number
+const ROBLOX_DEFAULTS: Record<string, any> = {
+  BackgroundColor3: '#c8c8c8', BackgroundTransparency: 0, BorderSizePixel: 1,
+  BorderColor3: '#000000', AnchorPoint: { X: 0, Y: 0 },
+  Rotation: 0, ZIndex: 1, LayoutOrder: 0,
+  TextColor3: '#000000', TextTransparency: 0, TextScaled: false,
+  Font: 'Legacy', TextSize: 14, TextWrapped: false, TextXAlignment: 'Center',
+  TextYAlignment: 'Center', RichText: false,
+  Image: '', ImageColor3: '#ffffff', ImageTransparency: 0,
+  ScrollBarThickness: 12, ScrollBarImageColor3: '#000000',
+  CanvasSize: { X: 0, Y: 200 }, AutomaticCanvasSize: 'None',
+  CornerRadius: 0, Padding: 0,
 }
 
-interface ChatMessage { role: 'user' | 'assistant'; content: string; commands?: any[] }
-interface ActionLogEntry { type: 'add' | 'modify' | 'remove' | 'info' | 'error'; message: string; time: number }
+const DEVICES = [
+  { name: 'Desktop', w: 1920, h: 1080, icon: Monitor },
+  { name: 'Tablet', w: 1024, h: 768, icon: Tablet },
+  { name: 'Mobile', w: 540, h: 960, icon: Smartphone },
+]
 
-let idCounter = 0
-const genId = () => `el_${++idCounter}_${Date.now()}`
+const ELEMENT_TYPES = [
+  { type: 'Frame', label: 'Frame', desc: 'Container' },
+  { type: 'TextLabel', label: 'TextLabel', desc: 'Text' },
+  { type: 'TextButton', label: 'TextButton', desc: 'Button' },
+  { type: 'ImageLabel', label: 'ImageLabel', desc: 'Image' },
+  { type: 'ScrollingFrame', label: 'ScrollFrame', desc: 'Scroll' },
+  { type: 'TextBox', label: 'TextBox', desc: 'Input' },
+]
 
-const CANVAS_W = 1280
-const CANVAS_H = 720
+const PROP_GROUPS: Record<string, string[]> = {
+  'Data': ['Name', 'LayoutOrder', 'Visible'],
+  'Appearance': ['BackgroundColor3', 'BackgroundTransparency', 'BorderColor3', 'BorderSizePixel', 'Image', 'ImageColor3', 'ImageTransparency'],
+  'Text': ['Text', 'TextColor3', 'TextTransparency', 'TextScaled', 'Font', 'TextSize', 'TextWrapped', 'TextXAlignment', 'TextYAlignment', 'RichText'],
+  'Layout': ['Position', 'Size', 'AnchorPoint', 'Rotation', 'ZIndex'],
+  'Corner': ['CornerRadius'],
+  'Scroll': ['ScrollBarThickness', 'ScrollBarImageColor3', 'CanvasSize', 'AutomaticCanvasSize'],
+}
+
+let _id = 0
+const uid = () => `e${++_id}`
 
 function parseColor(c: any): string {
-  if (!c) return '#3c3c3c'
+  if (!c || c === '#000000' && false) return '#c8c8c8'
   if (typeof c === 'string' && c.startsWith('#')) return c
-  if (typeof c === 'object' && c.R !== undefined) {
+  if (typeof c === 'object' && c !== null && 'R' in c) {
     const r = Math.round((c.R || 0) * 255)
     const g = Math.round((c.G || 0) * 255)
     const b = Math.round((c.B || 0) * 255)
-    return `rgb(${r},${g},${b})`
+    return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
   }
   return String(c)
 }
 
-function toLua(obj: any, indent = 0): string {
-  const pad = '  '.repeat(indent)
-  let lines: string[] = []
-  if (typeof obj === 'string') return `"${obj.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
-  if (typeof obj === 'number') return String(obj)
-  if (typeof obj === 'boolean') return obj ? 'true' : 'false'
-  if (obj && typeof obj === 'object') {
-    if (Array.isArray(obj)) {
-      lines.push('{')
-      obj.forEach((v, i) => { lines.push(`${pad}  ${toLua(v, indent + 1)}${i < obj.length - 1 ? ',' : ''}`) })
-      lines.push(`${pad}}`)
-    } else {
-      const keys = Object.keys(obj)
-      if (keys.length === 0) return '{}'
-      lines.push('{')
-      keys.forEach((k, i) => {
-        const val = toLua(obj[k], indent + 1)
-        lines.push(`${pad}  ${k} = ${val}${i < keys.length - 1 ? ',' : ''}`)
-      })
-      lines.push(`${pad}}`)
-    }
-    return lines.join('\n')
-  }
-  return String(obj)
+function colorToRoblox(hex: string): string {
+  const h = hex.replace('#', '')
+  if (h.length !== 6) return 'Color3.new(0.78, 0.78, 0.78)'
+  const r = (parseInt(h.slice(0, 2), 16) / 255).toFixed(2)
+  const g = (parseInt(h.slice(2, 4), 16) / 255).toFixed(2)
+  const b = (parseInt(h.slice(4, 6), 16) / 255).toFixed(2)
+  return `Color3.new(${r}, ${g}, ${b})`
 }
 
-function generateLua(elements: UIElement[]): string {
-  const lines: string[] = ['-- Generated by Yobest UI Builder', '-- Paste into Roblox Studio Command Bar or a LocalScript', '', 'local screenGui = Instance.new("ScreenGui")', 'screenGui.Name = "GeneratedUI"', 'screenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")', '']
-  const elMap = new Map(elements.map(e => [e.id, e]))
+function getDefaultProp(key: string): any {
+  return ROBLOX_DEFAULTS[key] ?? (typeof ROBLOX_DEFAULTS[key] === 'number' ? 0 : typeof ROBLOX_DEFAULTS[key] === 'boolean' ? false : '')
+}
 
-  function emit(el: UIElement, parentVar: string) {
-    const varName = el.name.replace(/[^a-zA-Z0-9_]/g, '_')
-    const className = el.type === 'UICorner' ? 'UICorner' : el.type === 'UIStroke' ? 'UIStroke' : el.type === 'UIGradient' ? 'UIGradient' : el.type
-    lines.push(`local ${varName} = Instance.new("${className}")`)
-    lines.push(`${varName}.Name = "${el.name}"`)
+function differsFromDefault(key: string, value: any): boolean {
+  const def = ROBLOX_DEFAULTS[key]
+  if (def === undefined) return true
+  if (typeof def === 'object' && typeof value === 'object') return JSON.stringify(def) !== JSON.stringify(value)
+  return def !== value
+}
 
-    const props = { ...el.properties }
-    props.Position = `UDim2.new(${el.position.X}, 0, ${el.position.Y}, 0)`
-    props.Size = `UDim2.new(${el.size.X}, 0, ${el.size.Y}, 0)`
+export interface UIEl {
+  id: string; type: string; name: string; parentId: string | null
+  position: { X: number; Y: number }; size: { X: number; Y: number }
+  props: Record<string, any>; children: string[]; zIndex: number; locked: boolean; visible: boolean
+}
 
-    for (const [k, v] of Object.entries(props)) {
+interface ChatMsg { role: 'user' | 'assistant'; content: string; commands?: any[] }
+
+// ─── Lua Generator ───────────────────────────────────────────
+function genVarName(el: UIEl, parent?: UIEl): string {
+  const base = el.name.replace(/[^a-zA-Z0-9]/g, '')
+  return base.charAt(0).toLowerCase() + base.slice(1)
+}
+
+function genLua(elements: UIEl[]): string {
+  const lines: string[] = [
+    '-- Generated by Yobest UI Builder',
+    '-- Paste into Roblox Studio Command Bar or a LocalScript',
+    '',
+    'local screenGui = Instance.new("ScreenGui")',
+    'screenGui.Name = "GeneratedUI"',
+    'screenGui.ResetOnSpawn = false',
+    'screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling',
+    'screenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")',
+    '',
+  ]
+  const map = new Map(elements.map(e => [e.id, e]))
+
+  function emit(el: UIEl, parentVar: string, depth: number) {
+    const v = genVarName(el)
+    lines.push(`${'  '.repeat(depth)}local ${v} = Instance.new("${el.type}")`)
+    lines.push(`${'  '.repeat(depth)}${v}.Name = "${el.name}"`)
+
+    // Position & Size
+    lines.push(`${'  '.repeat(depth)}${v}.Position = UDim2.new(${el.position.X}, 0, ${el.position.Y}, 0)`)
+    lines.push(`${'  '.repeat(depth)}${v}.Size = UDim2.new(${el.size.X}, 0, ${el.size.Y}, 0)`)
+
+    // Properties that differ from defaults
+    for (const [k, val] of Object.entries(el.props)) {
+      if (k === 'Position' || k === 'Size') continue
+      if (!differsFromDefault(k, val)) continue
+      if (val === undefined || val === null) continue
+
       if (k === 'BackgroundColor3' || k === 'TextColor3' || k === 'BorderColor3' || k === 'ImageColor3') {
-        const c = parseColor(v)
-        const m = c.match(/rgb\((\d+),(\d+),(\d+)\)/)
-        if (m) lines.push(`${varName}.${k} = Color3.new(${Math.round(+m[1]/255*100)/100}, ${Math.round(+m[2]/255*100)/100}, ${Math.round(+m[3]/255*100)/100})`)
-        else if (v && typeof v === 'string' && v.startsWith('#')) {
-          const hex = v.slice(1)
-          const r = parseInt(hex.slice(0, 2), 16) / 255
-          const g = parseInt(hex.slice(2, 4), 16) / 255
-          const b = parseInt(hex.slice(4, 6), 16) / 255
-          lines.push(`${varName}.${k} = Color3.new(${Math.round(r*100)/100}, ${Math.round(g*100)/100}, ${Math.round(b*100)/100})`)
-        }
+        lines.push(`${'  '.repeat(depth)}${v}.${k} = ${colorToRoblox(parseColor(val))}`)
       } else if (k === 'CornerRadius') {
-        lines.push(`${varName}.CornerRadius = UDim.new(0, ${v})`)
-      } else if (k === 'AnchorPoint' && typeof v === 'object') {
-        lines.push(`${varName}.AnchorPoint = Vector2.new(${v.X || 0}, ${v.Y || 0})`)
-      } else if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') {
-        lines.push(`${varName}.${k} = ${toLua(v)}`)
+        lines.push(`${'  '.repeat(depth)}${v}.CornerRadius = UDim.new(0, ${val})`)
+      } else if (k === 'AnchorPoint' && typeof val === 'object') {
+        lines.push(`${'  '.repeat(depth)}${v}.AnchorPoint = Vector2.new(${val.X}, ${val.Y})`)
+      } else if (k === 'CanvasSize' && typeof val === 'object') {
+        lines.push(`${'  '.repeat(depth)}${v}.CanvasSize = UDim2.new(${val.X}, 0, ${val.Y}, 0)`)
+      } else if (typeof val === 'string') {
+        lines.push(`${'  '.repeat(depth)}${v}.${k} = "${val}"`)
+      } else if (typeof val === 'boolean') {
+        lines.push(`${'  '.repeat(depth)}${v}.${k} = ${val ? 'true' : 'false'}`)
+      } else if (typeof val === 'number') {
+        lines.push(`${'  '.repeat(depth)}${v}.${k} = ${val}`)
       }
     }
-    lines.push(`${varName}.Parent = ${parentVar}`)
+    lines.push(`${'  '.repeat(depth)}${v}.Parent = ${parentVar}`)
     lines.push('')
 
     for (const cid of el.children) {
-      const child = elMap.get(cid)
-      if (child) emit(child, varName)
+      const child = map.get(cid)
+      if (child && child.visible) emit(child, v, depth + 1)
     }
   }
 
   const roots = elements.filter(e => !e.parentId)
-  for (const root of roots) emit(root, 'screenGui')
-
+  for (const root of roots) emit(root, 'screenGui', 0)
   lines.push('')
-  lines.push('print("UI Generated successfully!")')
+  lines.push('print("UI Generated by Yobest UI Builder!")')
   return lines.join('\n')
 }
 
-function generateRbxmx(elements: UIElement[]): string {
-  const elMap = new Map(elements.map(e => [e.id, e]))
-  let xml = '<?xml version="1.0" encoding="utf-8"?>\n<roblox version="4">\n'
-
-  function emitXml(el: UIElement, indent = 1) {
-    const pad = '  '.repeat(indent)
-    xml += `${pad}<Item class="${el.type}">\n`
-    xml += `${pad}  <Properties>\n`
-    xml += `${pad}    <string name="Name">${escapeXml(el.name)}</string>\n`
-    xml += `${pad}    <UDim2 name="Position">{${el.position.X}, 0},{${el.position.Y}, 0}</UDim2>\n`
-    xml += `${pad}    <UDim2 name="Size">{${el.size.X}, 0},{${el.size.Y}, 0}</UDim2>\n`
-
-    for (const [k, v] of Object.entries(el.properties)) {
-      if (k === 'CornerRadius') {
-        xml += `${pad}    <UDim name="CornerRadius">{0, ${v}}</UDim>\n`
-      } else if (k === 'BackgroundColor3' || k === 'TextColor3' || k === 'BorderColor3') {
-        const c = parseColor(v)
-        const m = c.match(/rgb\((\d+),(\d+),(\d+)\)/)
-        if (m) xml += `${pad}    <Color3 name="${k}">${+m[1]}, ${+m[2]}, ${+m[3]}</Color3>\n`
-        else if (typeof v === 'string' && v.startsWith('#')) {
-          const hex = v.slice(1)
-          xml += `${pad}    <Color3 name="${k}">${parseInt(hex.slice(0,2),16)}, ${parseInt(hex.slice(2,4),16)}, ${parseInt(hex.slice(4,6),16)}</Color3>\n`
-        }
-      } else if (k === 'AnchorPoint' && typeof v === 'object') {
-        xml += `${pad}    <Vector2 name="AnchorPoint">${v.X || 0}, ${v.Y || 0}</Vector2>\n`
-      } else if (typeof v === 'string') {
-        xml += `${pad}    <string name="${k}">${escapeXml(v)}</string>\n`
-      } else if (typeof v === 'number') {
-        xml += `${pad}    <float name="${k}">${v}</float>\n`
-      } else if (typeof v === 'boolean') {
-        xml += `${pad}    <bool name="${k}">${v}</bool>\n`
-      }
-    }
-    xml += `${pad}  </Properties>\n`
-
-    for (const cid of el.children) {
-      const child = elMap.get(cid)
-      if (child) emitXml(child, indent + 1)
-    }
-    xml += `${pad}</Item>\n`
-  }
-
-  const roots = elements.filter(e => !e.parentId)
-  for (const root of roots) emitXml(root, 1)
-  xml += '</roblox>'
-  return xml
+function genJSON(elements: UIEl[]): string {
+  return JSON.stringify(elements.map(e => ({
+    type: e.type, name: e.name, parentId: e.parentId,
+    position: e.position, size: e.size, props: e.props,
+    children: e.children, zIndex: e.zIndex,
+  })), null, 2)
 }
 
 function escapeXml(s: string) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;') }
 
+function genRbxmx(elements: UIEl[]): string {
+  const map = new Map(elements.map(e => [e.id, e]))
+  let xml = '<?xml version="1.0" encoding="utf-8"?>\n<roblox version="4">\n'
+  function emit(el: UIEl, ind = 1) {
+    const p = '  '.repeat(ind)
+    xml += `${p}<Item class="${el.type}">\n${p}  <Properties>\n${p}    <string name="Name">${escapeXml(el.name)}</string>\n`
+    xml += `${p}    <UDim2 name="Position">{${el.position.X}, 0},{${el.position.Y}, 0}</UDim2>\n`
+    xml += `${p}    <UDim2 name="Size">{${el.size.X}, 0},{${el.size.Y}, 0}</UDim2>\n`
+    for (const [k, v] of Object.entries(el.props)) {
+      if (['Position', 'Size', 'Name'].includes(k)) continue
+      if (k === 'BackgroundColor3' || k === 'TextColor3' || k === 'BorderColor3' || k === 'ImageColor3') {
+        const h = parseColor(v).replace('#', '')
+        if (h.length === 6) xml += `${p}    <Color3 name="${k}">${parseInt(h.slice(0, 2), 16)}, ${parseInt(h.slice(2, 4), 16)}, ${parseInt(h.slice(4, 6), 16)}</Color3>\n`
+      } else if (k === 'CornerRadius') {
+        xml += `${p}    <UDim name="CornerRadius">{0, ${v}}</UDim>\n`
+      } else if (k === 'AnchorPoint' && typeof v === 'object') {
+        xml += `${p}    <Vector2 name="AnchorPoint">${v.X}, ${v.Y}</Vector2>\n`
+      } else if (typeof v === 'string') {
+        xml += `${p}    <string name="${k}">${escapeXml(v)}</string>\n`
+      } else if (typeof v === 'number') {
+        xml += `${p}    <float name="${k}">${v}</float>\n`
+      } else if (typeof v === 'boolean') {
+        xml += `${p}    <bool name="${k}">${v}</bool>\n`
+      }
+    }
+    xml += `${p}  </Properties>\n`
+    for (const cid of el.children) { const c = map.get(cid); if (c) emit(c, ind + 1) }
+    xml += `${p}</Item>\n`
+  }
+  for (const root of elements.filter(e => !e.parentId)) emit(root)
+  xml += '</roblox>'
+  return xml
+}
+
+// ─── Main Component ──────────────────────────────────────────
 export default function UIGenerator() {
-  const [elements, setElements] = useState<UIElement[]>([])
+  const [elements, setElements] = useState<UIEl[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [buildMode, setBuildMode] = useState(false)
-  const [zoom, setZoom] = useState(1)
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [buildMode, setBuildMode] = useState(true)
+  const [device, setDevice] = useState(0)
+  const [zoom, setZoom] = useState(0.55)
+  const [pan, setPan] = useState({ x: 0, y: 0 })
+  const [isPanning, setIsPanning] = useState(false)
+  const [panStart, setPanStart] = useState({ x: 0, y: 0, px: 0, py: 0 })
+  const [showGrid, setShowGrid] = useState(true)
+  const [snapToGrid, setSnapToGrid] = useState(true)
+  const gridSize = 20
+
+  // Chat
+  const [messages, setMessages] = useState<ChatMsg[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [actionLog, setActionLog] = useState<ActionLogEntry[]>([])
+  const [showChat, setShowChat] = useState(true)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Panels
+  const [showLayers, setShowLayers] = useState(true)
+  const [showProps, setShowProps] = useState(true)
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['Data', 'Appearance', 'Layout']))
+
+  // Export
   const [showExport, setShowExport] = useState(false)
   const [showImageSearch, setShowImageSearch] = useState(false)
-  const [imageSearchQuery, setImageSearchQuery] = useState('')
-  const [showAddMenu, setShowAddMenu] = useState(false)
-  const [history, setHistory] = useState<UIElement[][]>([[]])
-  const [historyIdx, setHistoryIdx] = useState(0)
-  const [isDragging, setIsDragging] = useState(false)
-  const [dragStart, setDragStart] = useState<{ x: number; y: number; elX: number; elY: number } | null>(null)
-  const [isResizing, setIsResizing] = useState(false)
-  const [resizeStart, setResizeStart] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
-  const [resizeCorner, setResizeCorner] = useState<string>('')
+  const [imageUrl, setImageUrl] = useState('')
+
+  // Drag & Resize
+  const [dragging, setDragging] = useState(false)
+  const [dragData, setDragData] = useState<{ sx: number; sy: number; ox: number; oy: number } | null>(null)
+  const [resizing, setResizing] = useState(false)
+  const [resizeData, setResizeData] = useState<{ sx: number; sy: number; ow: number; oh: number; corner: string } | null>(null)
+
+  // History
+  const [hist, setHist] = useState<UIEl[][]>([[]])
+  const [histIdx, setHistIdx] = useState(0)
+
   const canvasRef = useRef<HTMLDivElement>(null)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-  const chatContainerRef = useRef<HTMLDivElement>(null)
+  const selected = useMemo(() => elements.find(e => e.id === selectedId) || null, [elements, selectedId])
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
 
-  const selectedEl = useMemo(() => elements.find(e => e.id === selectedId) || null, [elements, selectedId])
+  // History helpers
+  const pushHist = useCallback((els: UIEl[]) => {
+    setHist(h => [...h.slice(0, histIdx + 1), els])
+    setHistIdx(i => i + 1)
+  }, [histIdx])
+  const undo = useCallback(() => { if (histIdx > 0) { setHistIdx(histIdx - 1); setElements(hist[histIdx - 1]); setSelectedId(null) } }, [histIdx, hist])
+  const redo = useCallback(() => { if (histIdx < hist.length - 1) { setHistIdx(histIdx + 1); setElements(hist[histIdx + 1]); setSelectedId(null) } }, [histIdx, hist])
 
-  const pushHistory = useCallback((newEls: UIElement[]) => {
-    setHistory(prev => [...prev.slice(0, historyIdx + 1), newEls])
-    setHistoryIdx(prev => prev + 1)
-  }, [historyIdx])
+  // Snap helper
+  const snap = (v: number) => snapToGrid ? Math.round(v * 1000) / 1000 : v
 
-  const undo = useCallback(() => {
-    if (historyIdx > 0) { setHistoryIdx(historyIdx - 1); setElements(history[historyIdx - 1]); setSelectedId(null) }
-  }, [historyIdx, history])
-
-  const redo = useCallback(() => {
-    if (historyIdx < history.length - 1) { setHistoryIdx(historyIdx + 1); setElements(history[historyIdx + 1]); setSelectedId(null) }
-  }, [historyIdx, history])
-
-  const addElement = useCallback((type: string, parentId?: string | null, props?: Partial<UIElement>) => {
-    const id = genId()
-    const name = `${type}_${elements.filter(e => e.type === type).length + 1}`
-    const newEl: UIElement = {
-      id, type, name,
-      parentId: parentId ?? null,
-      position: { X: 0.25 + Math.random() * 0.1, Y: 0.25 + Math.random() * 0.1 },
-      size: { X: 0.3, Y: 0.2 },
-      properties: {
-        BackgroundColor3: type === 'TextLabel' || type === 'TextButton' ? '#2a2a3e' : '#1a1a2e',
-        BackgroundTransparency: 0,
-        BorderSizePixel: 0,
-        TextColor3: '#ffffff',
-        TextScaled: true,
-        Font: 'GothamBold',
-        Text: type.includes('Text') ? 'Text' : '',
-        Image: '',
-        AnchorPoint: { X: 0.5, Y: 0.5 },
-        ZIndex: elements.length + 1,
-        ...props,
+  // ─── Element CRUD ───
+  const addEl = useCallback((type: string, parentId?: string | null) => {
+    const id = uid()
+    const count = elements.filter(e => e.type === type).length + 1
+    const el: UIEl = {
+      id, type, name: `${type}${count}`, parentId: parentId ?? null,
+      position: { X: 0.5, Y: 0.5 }, size: { X: 0.3, Y: 0.2 },
+      props: {
+        BackgroundColor3: type === 'TextLabel' || type === 'TextButton' || type === 'TextBox' ? '#2a2a3e' : '#1a1a2e',
+        TextColor3: '#ffffff', Text: type.includes('Text') || type === 'TextBox' ? (type === 'TextBox' ? '' : 'Text') : '',
+        Font: 'GothamBold', TextScaled: true, TextSize: 14,
       },
-      children: [],
-      zIndex: elements.length + 1,
+      children: [], zIndex: elements.length + 1, locked: false, visible: true,
     }
-    if (type === 'UICorner') { newEl.properties.CornerRadius = 8; newEl.size = { X: 0, Y: 0 }; newEl.position = { X: 0, Y: 0 } }
-    const newEls = [...elements, newEl]
-    if (parentId) {
-      const parent = newEls.find(e => e.id === parentId)
-      if (parent) parent.children = [...parent.children, id]
-    }
-    setElements(newEls)
-    pushHistory(newEls)
-    return id
-  }, [elements, pushHistory])
+    if (type === 'ScrollingFrame') { el.props.ScrollBarThickness = 8; el.props.CanvasSize = { X: 0, Y: 2 } }
+    const newEls = [...elements, el]
+    if (parentId) { const p = newEls.find(e => e.id === parentId); if (p) p.children = [...p.children, id] }
+    setElements(newEls); pushHist(newEls); setSelectedId(id)
+  }, [elements, pushHist])
 
-  const modifyElement = useCallback((targetId: string, props: Record<string, any>) => {
-    const newEls = elements.map(e => {
-      if (e.id === targetId) return { ...e, properties: { ...e.properties, ...props } }
-      return e
-    })
-    setElements(newEls)
-    pushHistory(newEls)
-  }, [elements, pushHistory])
+  const updateEl = useCallback((id: string, patch: Partial<UIEl>) => {
+    const newEls = elements.map(e => e.id === id ? { ...e, ...patch } : e)
+    setElements(newEls); pushHist(newEls)
+  }, [elements, pushHist])
 
-  const removeElement = useCallback((targetId: string) => {
-    const newEls = elements.filter(e => e.id !== targetId).map(e => ({
-      ...e, children: e.children.filter(c => c !== targetId)
-    }))
-    setElements(newEls)
-    pushHistory(newEls)
-    if (selectedId === targetId) setSelectedId(null)
-  }, [elements, selectedId, pushHistory])
+  const updateProps = useCallback((id: string, props: Record<string, any>) => {
+    const newEls = elements.map(e => e.id === id ? { ...e, props: { ...e.props, ...props } } : e)
+    setElements(newEls); pushHist(newEls)
+  }, [elements, pushHist])
 
-  const addLog = useCallback((type: ActionLogEntry['type'], message: string) => {
-    setActionLog(prev => [...prev.slice(-50), { type, message, time: Date.now() }])
-  }, [])
+  const removeEl = useCallback((id: string) => {
+    const newEls = elements.filter(e => e.id !== id).map(e => ({ ...e, children: e.children.filter(c => c !== id) }))
+    setElements(newEls); pushHist(newEls); if (selectedId === id) setSelectedId(null)
+  }, [elements, selectedId, pushHist])
 
-  const applyCommands = useCallback((commands: any[]) => {
+  const duplicateEl = useCallback((id: string) => {
+    const el = elements.find(e => e.id === id); if (!el) return
+    const newId = uid()
+    const dup: UIEl = { ...el, id: newId, name: el.name + ' Copy', position: { X: el.position.X + 0.02, Y: el.position.Y + 0.02 }, children: [], props: { ...el.props } }
+    const newEls = [...elements, dup]
+    setElements(newEls); pushHist(newEls); setSelectedId(newId)
+  }, [elements, pushHist])
+
+  // ─── AI Commands ───
+  const applyCmds = useCallback((cmds: any[]) => {
     const newEls = [...elements]
-    for (const cmd of commands) {
+    for (const cmd of cmds) {
       if (cmd.action === 'add') {
-        const id = genId()
-        const el: UIElement = {
-          id, type: cmd.elementType || 'Frame', name: cmd.name || `${cmd.elementType}_${newEls.length + 1}`,
-          parentId: cmd.parent ? newEls.find(e => e.name === cmd.parent)?.id || null : null,
-          position: cmd.position || { X: 0.25, Y: 0.25 },
-          size: cmd.size || { X: 0.3, Y: 0.2 },
-          properties: { AnchorPoint: { X: 0.5, Y: 0.5 }, BackgroundTransparency: 0, BorderSizePixel: 0, TextScaled: true, Font: 'GothamBold', Text: '', Image: '', ZIndex: newEls.length + 1, ...cmd.properties },
-          children: [], zIndex: newEls.length + 1,
+        const id = uid()
+        const el: UIEl = {
+          id, type: cmd.elementType || 'Frame', name: cmd.name || `${cmd.elementType}${newEls.length + 1}`,
+          parentId: cmd.parent ? newEls.find(e => e.name.toLowerCase() === cmd.parent.toLowerCase())?.id || null : null,
+          position: cmd.position || { X: 0.5, Y: 0.5 }, size: cmd.size || { X: 0.3, Y: 0.2 },
+          props: { BackgroundColor3: '#1a1a2e', TextColor3: '#ffffff', Text: '', Font: 'GothamBold', TextScaled: true, TextSize: 14, ...cmd.properties },
+          children: [], zIndex: newEls.length + 1, locked: false, visible: true,
         }
         newEls.push(el)
         if (el.parentId) { const p = newEls.find(e => e.id === el.parentId); if (p) p.children = [...p.children, id] }
-        addLog('add', `Added ${el.type} "${el.name}"`)
       } else if (cmd.action === 'modify') {
-        const target = newEls.find(e => e.name === cmd.target || e.id === cmd.target)
-        if (target) { Object.assign(target.properties, cmd.properties); addLog('modify', `Modified "${target.name}"`) }
+        const t = newEls.find(e => e.name.toLowerCase() === (cmd.target || '').toLowerCase())
+        if (t) t.props = { ...t.props, ...cmd.properties }
       } else if (cmd.action === 'remove') {
-        const target = newEls.find(e => e.name === cmd.target || e.id === cmd.target)
-        if (target) {
-          newEls.splice(newEls.indexOf(target), 1)
-          newEls.forEach(e => { e.children = e.children.filter(c => c !== target.id) })
-          addLog('remove', `Removed "${target.name}"`)
-        }
+        const idx = newEls.findIndex(e => e.name.toLowerCase() === (cmd.target || '').toLowerCase())
+        if (idx >= 0) { const rid = newEls[idx].id; newEls.splice(idx, 1); newEls.forEach(e => { e.children = e.children.filter(c => c !== rid) }) }
       }
     }
-    setElements(newEls)
-    pushHistory(newEls)
-  }, [elements, pushHistory, addLog])
+    setElements(newEls); pushHist(newEls)
+  }, [elements, pushHist])
 
-  const sendMessage = async (text?: string) => {
-    const msg = (text || input).trim()
-    if (!msg || isLoading) return
-    const userMsg: ChatMessage = { role: 'user', content: msg }
-    setMessages(p => [...p, userMsg])
-    setInput(''); setIsLoading(true)
+  const sendMsg = async (text?: string) => {
+    const msg = (text || input).trim(); if (!msg || isLoading) return
+    const um: ChatMsg = { role: 'user', content: msg }
+    setMessages(p => [...p, um]); setInput(''); setIsLoading(true)
     try {
-      const canvasState = elements.map(e => ({ name: e.name, type: e.type, position: e.position, size: e.size, properties: e.properties }))
-      const resp = await fetch(CHAT_API, {
+      const cs = elements.map(e => ({ name: e.name, type: e.type, pos: e.position, size: e.size, props: e.props }))
+      const r = await fetch(CHAT_API, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: [...messages, userMsg].map(m => ({ role: m.role, content: m.content })), canvas_state: canvasState }),
+        body: JSON.stringify({ messages: [...messages, um].map(m => ({ role: m.role, content: m.content })), canvas_state: cs }),
       })
-      const data = await resp.json()
-      const assistantMsg: ChatMessage = { role: 'assistant', content: data.message || data.content || 'Done', commands: data.commands || [] }
-      setMessages(p => [...p, assistantMsg])
-      if (data.commands && data.commands.length > 0) applyCommands(data.commands)
-      if (data.ask) addLog('info', 'AI has a question for you')
-    } catch {
-      setMessages(p => [...p, { role: 'assistant', content: 'Error connecting to AI. Please try again.' }])
-      addLog('error', 'AI connection failed')
-    }
+      const d = await r.json()
+      const am: ChatMsg = { role: 'assistant', content: d.message || d.content || 'Done', commands: d.commands || [] }
+      setMessages(p => [...p, am])
+      if (d.commands?.length) applyCmds(d.commands)
+    } catch { setMessages(p => [...p, { role: 'assistant', content: 'Connection error. Try again.' }]) }
     setIsLoading(false)
   }
 
-  const handleCanvasMouseDown = useCallback((e: React.MouseEvent, elId: string) => {
-    if (!buildMode) return
-    e.stopPropagation()
-    setSelectedId(elId)
-    const el = elements.find(x => x.id === elId)
-    if (!el) return
-    const rect = canvasRef.current?.getBoundingClientRect()
-    if (!rect) return
-    setIsDragging(true)
-    setDragStart({ x: e.clientX, y: e.clientY, elX: el.position.X, elY: el.position.Y })
-  }, [buildMode, elements])
+  // ─── Canvas Interactions ───
+  const dev = DEVICES[device]
+  const cw = dev.w * zoom; const ch = dev.h * zoom
 
-  const handleCanvasMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!isDragging || !dragStart || !selectedId) return
-    const rect = canvasRef.current?.getBoundingClientRect()
-    if (!rect) return
-    const scaleX = CANVAS_W / (rect.width * zoom)
-    const scaleY = CANVAS_H / (rect.height * zoom)
-    const dx = (e.clientX - dragStart.x) * scaleX / CANVAS_W
-    const dy = (e.clientY - dragStart.y) * scaleY / CANVAS_H
-    const newX = Math.max(0, Math.min(1, dragStart.elX + dx))
-    const newY = Math.max(0, Math.min(1, dragStart.elY + dy))
-    const newEls = elements.map(el => el.id === selectedId ? { ...el, position: { X: newX, Y: newY } } : el)
-    setElements(newEls)
-  }, [isDragging, dragStart, selectedId, elements, zoom])
+  const handleCanvasDown = useCallback((e: React.MouseEvent) => {
+    if (e.button === 1 || (e.button === 0 && e.altKey)) {
+      setIsPanning(true); setPanStart({ x: e.clientX, y: e.clientY, px: pan.x, py: pan.y }); return
+    }
+    if (buildMode && selectedId && canvasRef.current) {
+      const el = elements.find(x => x.id === selectedId); if (!el || el.locked) return
+      const rect = canvasRef.current.getBoundingClientRect()
+      const sx = (e.clientX - rect.left) / rect.width
+      const sy = (e.clientY - rect.top) / rect.height
+      setDragging(true)
+      setDragData({ sx, sy, ox: el.position.X, oy: el.position.Y })
+    }
+  }, [buildMode, selectedId, elements, pan])
 
-  const handleCanvasMouseUp = useCallback(() => {
-    if (isDragging) { setIsDragging(false); setDragStart(null); pushHistory(elements) }
-    if (isResizing) { setIsResizing(false); setResizeStart(null); pushHistory(elements) }
-  }, [isDragging, isResizing, elements, pushHistory])
+  const handleCanvasMove = useCallback((e: React.MouseEvent) => {
+    if (isPanning) {
+      setPan({ x: panStart.px + (e.clientX - panStart.x), y: panStart.py + (e.clientY - panStart.y) }); return
+    }
+    if (dragging && dragData && selectedId && canvasRef.current) {
+      const rect = canvasRef.current.getBoundingClientRect()
+      const dx = ((e.clientX - rect.left) / rect.width - dragData.sx) / zoom
+      const dy = ((e.clientY - rect.top) / rect.height - dragData.sy) / zoom
+      const nx = Math.max(0, Math.min(1, snap(dragData.ox + dx)))
+      const ny = Math.max(0, Math.min(1, snap(dragData.oy + dy)))
+      setElements(prev => prev.map(el => el.id === selectedId ? { ...el, position: { X: nx, Y: ny } } : el))
+    }
+    if (resizing && resizeData && selectedId && canvasRef.current) {
+      const rect = canvasRef.current.getBoundingClientRect()
+      const dx = ((e.clientX - rect.left) / rect.width - (resizeData.sx - rect.left) / rect.width) / zoom
+      const dy = ((e.clientY - rect.top) / rect.height - (resizeData.sy - rect.top) / rect.height) / zoom
+      let nw = resizeData.ow, nh = resizeData.oh
+      if (resizeData.corner.includes('e')) nw = Math.max(0.01, resizeData.ow + dx)
+      if (resizeData.corner.includes('s')) nh = Math.max(0.01, resizeData.oh + dy)
+      setElements(prev => prev.map(el => el.id === selectedId ? { ...el, size: { X: snap(nw), Y: snap(nh) } } : el))
+    }
+  }, [isPanning, panStart, dragging, dragData, resizing, resizeData, selectedId, zoom, snap])
 
-  const handleResizeStart = useCallback((e: React.MouseEvent, corner: string) => {
-    e.stopPropagation()
-    if (!selectedEl) return
-    setIsResizing(true)
-    setResizeCorner(corner)
-    setResizeStart({ x: e.clientX, y: e.clientY, w: selectedEl.size.X, h: selectedEl.size.Y })
-  }, [selectedEl])
+  const handleCanvasUp = useCallback(() => {
+    if (dragging || resizing) pushHist(elements)
+    setIsPanning(false); setDragging(false); setResizing(false); setDragData(null); setResizeData(null)
+  }, [dragging, resizing, elements, pushHist])
 
-  const handleResizeMove = useCallback((e: React.MouseEvent) => {
-    if (!isResizing || !resizeStart || !selectedId) return
-    const rect = canvasRef.current?.getBoundingClientRect()
-    if (!rect) return
-    const scaleX = CANVAS_W / (rect.width * zoom)
-    const dx = (e.clientX - resizeStart.x) * scaleX / CANVAS_W
-    const dy = (e.clientY - resizeStart.y) * (CANVAS_H / (rect.height * zoom)) / CANVAS_H
-    let newW = resizeStart.w
-    let newH = resizeStart.h
-    if (resizeCorner.includes('e')) newW = Math.max(0.02, resizeStart.w + dx)
-    if (resizeCorner.includes('w')) newW = Math.max(0.02, resizeStart.w - dx)
-    if (resizeCorner.includes('s')) newH = Math.max(0.02, resizeStart.h + dy)
-    if (resizeCorner.includes('n')) newH = Math.max(0.02, resizeStart.h - dy)
-    const newEls = elements.map(el => el.id === selectedId ? { ...el, size: { X: newW, Y: newH } } : el)
-    setElements(newEls)
-  }, [isResizing, resizeStart, selectedId, elements, zoom, resizeCorner])
-
-  const addImageFromUrl = useCallback((url: string) => {
-    const id = addElement('ImageLabel', null, { Image: url, BackgroundTransparency: 1 })
-    addLog('info', `Added image from URL`)
-    setShowImageSearch(false)
-  }, [addElement, addLog])
-
-  const downloadFile = (content: string, filename: string, type: string) => {
-    const blob = new Blob([content], { type })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a'); a.href = url; a.download = filename; a.click()
-    URL.revokeObjectURL(url)
-  }
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).tagName === 'TEXTAREA') return
+      if (e.key === 'Delete' || e.key === 'Backspace') { if (selectedId) { e.preventDefault(); removeEl(selectedId) } }
+      if (e.ctrlKey && e.key === 'z') { e.preventDefault(); undo() }
+      if (e.ctrlKey && e.key === 'y') { e.preventDefault(); redo() }
+      if (e.ctrlKey && e.key === 'd') { e.preventDefault(); if (selectedId) duplicateEl(selectedId) }
+      if (e.key === 'Escape') setSelectedId(null)
+      if (selectedId && buildMode) {
+        const nudge = e.shiftKey ? 0.01 : 0.005
+        const el = elements.find(x => x.id === selectedId); if (!el) return
+        if (e.key === 'ArrowLeft') { e.preventDefault(); updateEl(selectedId, { position: { X: Math.max(0, el.position.X - nudge), Y: el.position.Y } }) }
+        if (e.key === 'ArrowRight') { e.preventDefault(); updateEl(selectedId, { position: { X: Math.min(1, el.position.X + nudge), Y: el.position.Y } }) }
+        if (e.key === 'ArrowUp') { e.preventDefault(); updateEl(selectedId, { position: { X: el.position.X, Y: Math.max(0, el.position.Y - nudge) } }) }
+        if (e.key === 'ArrowDown') { e.preventDefault(); updateEl(selectedId, { position: { X: el.position.X, Y: Math.min(1, el.position.Y + nudge) } }) }
+      }
+    }
+    window.addEventListener('keydown', handler); return () => window.removeEventListener('keydown', handler)
+  }, [selectedId, buildMode, elements, removeEl, updateEl, undo, redo, duplicateEl])
 
   const suggestedPrompts = [
-    'A dark inventory frame with rounded corners',
-    'A health bar with gradient fill',
-    'A shop GUI with item slots',
-    'A main menu with play and settings buttons',
-    'A minimap in the corner',
-    'A chat box at the bottom',
+    'Dark inventory frame with rounded corners and a title bar',
+    'Health and mana bar with gradient fills',
+    'Shop GUI with item grid and buy buttons',
+    'Main menu with play, settings, and credits buttons',
+    'Minimap frame in the top-right corner',
+    'Chat box at the bottom of the screen',
+    'Quest tracker with progress bars on the right side',
+    'Player stats panel with avatar and name',
   ]
 
-  const getElementStyle = (el: UIElement): React.CSSProperties => {
-    const p = el.properties
-    const radius = p.CornerRadius || 0
-    const bgColor = el.type === 'ImageLabel' || el.type === 'ImageButton' ? 'transparent' : parseColor(p.BackgroundColor3)
-    const bgTrans = p.BackgroundTransparency || 0
+  // ─── Element Style ───
+  function elStyle(el: UIEl): React.CSSProperties {
+    const p = el.props
+    const isContainer = ['Frame', 'ScrollingFrame'].includes(el.type)
     return {
-      position: 'absolute',
-      left: `${el.position.X * 100}%`,
-      top: `${el.position.Y * 100}%`,
-      width: `${el.size.X * 100}%`,
-      height: `${el.size.Y * 100}%`,
+      position: 'absolute', left: `${el.position.X * 100}%`, top: `${el.position.Y * 100}%`,
+      width: `${el.size.X * 100}%`, height: `${el.size.Y * 100}%`,
       transform: `translate(-50%, -50%)${p.Rotation ? ` rotate(${p.Rotation}deg)` : ''}`,
-      backgroundColor: bgTrans >= 1 ? 'transparent' : bgColor,
-      borderRadius: radius,
-      border: p.BorderSizePixel ? `${p.BorderSizePixel}px solid ${parseColor(p.BorderColor3 || '#000000')}` : undefined,
-      zIndex: el.zIndex || 1,
-      overflow: el.type === 'ScrollingFrame' ? 'auto' : 'hidden',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      boxShadow: p.Shadow ? `0 4px 12px rgba(0,0,0,0.3)` : undefined,
+      backgroundColor: (p.BackgroundTransparency ?? 0) >= 1 ? 'transparent' : parseColor(p.BackgroundColor3),
+      borderRadius: p.CornerRadius || 0,
+      border: p.BorderSizePixel > 0 ? `${p.BorderSizePixel}px solid ${parseColor(p.BorderColor3)}` : undefined,
+      zIndex: el.zIndex || 1, overflow: el.type === 'ScrollingFrame' ? 'auto' : 'hidden',
+      opacity: el.visible ? 1 : 0.3, outline: selectedId === el.id ? '2px solid #3b82f6' : undefined,
+      outlineOffset: '1px',
     }
   }
 
+  function childStyle(el: UIEl): React.CSSProperties {
+    const p = el.props
+    return {
+      position: 'absolute', left: `${el.position.X * 100}%`, top: `${el.position.Y * 100}%`,
+      width: `${el.size.X * 100}%`, height: `${el.size.Y * 100}%`,
+      transform: 'translate(-50%, -50%)',
+      backgroundColor: (p.BackgroundTransparency ?? 0) >= 1 ? 'transparent' : parseColor(p.BackgroundColor3),
+      borderRadius: p.CornerRadius || 0, zIndex: el.zIndex || 1, overflow: 'hidden',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      border: p.BorderSizePixel > 0 ? `${p.BorderSizePixel}px solid ${parseColor(p.BorderColor3)}` : undefined,
+    }
+  }
+
+  // ─── Render ───
+  const roots = elements.filter(e => !e.parentId)
+
   return (
-    <div className="flex flex-col lg:flex-row rounded-2xl bg-bg-secondary border border-border-primary overflow-hidden" style={{ height: '70vh', minHeight: 600 }}>
-      {/* Left: Canvas */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Canvas Toolbar */}
-        <div className="flex items-center gap-2 px-3 py-2 border-b border-border-primary bg-bg-elevated/50">
-          <div className="flex items-center gap-1">
-            <button onClick={() => setBuildMode(!buildMode)} className={cn('flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all', buildMode ? 'bg-accent-blue/15 text-accent-blue border border-accent-blue/25' : 'text-text-muted hover:text-text-primary border border-transparent hover:border-border-hover')}>
-              <Grid3X3 size={12} /> Build
-            </button>
-            <button onClick={() => setShowImageSearch(true)} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-text-muted hover:text-text-primary border border-transparent hover:border-border-hover transition-all">
-              <ImageIcon size={12} /> Image
-            </button>
-          </div>
-          <div className="h-4 w-px bg-border-primary" />
-          <div className="flex items-center gap-1">
-            <button onClick={undo} disabled={historyIdx <= 0} className="p-1.5 rounded-lg text-text-muted hover:text-text-primary disabled:opacity-30 transition-all"><RotateCcw size={12} /></button>
-            <button onClick={redo} disabled={historyIdx >= history.length - 1} className="p-1.5 rounded-lg text-text-muted hover:text-text-primary disabled:opacity-30 transition-all rotate-180"><RotateCcw size={12} /></button>
-          </div>
-          <div className="h-4 w-px bg-border-primary" />
-          <div className="flex items-center gap-1">
-            <button onClick={() => setZoom(z => Math.min(2, z + 0.1))} className="p-1.5 rounded-lg text-text-muted hover:text-text-primary transition-all"><ZoomIn size={12} /></button>
-            <span className="text-[10px] text-text-dim w-8 text-center">{Math.round(zoom * 100)}%</span>
-            <button onClick={() => setZoom(z => Math.max(0.3, z - 0.1))} className="p-1.5 rounded-lg text-text-muted hover:text-text-primary transition-all"><ZoomOut size={12} /></button>
-          </div>
-          <div className="flex-1" />
-          <div className="flex items-center gap-1">
-            <div className="relative">
-              <button onClick={() => setShowAddMenu(!showAddMenu)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-accent-blue/15 text-accent-blue border border-accent-blue/25 hover:bg-accent-blue/25 transition-all">
-                <Plus size={12} /> Add Element
+    <div className="flex flex-col rounded-2xl bg-bg-secondary border border-border-primary overflow-hidden" style={{ height: '75vh', minHeight: 650 }}>
+
+      {/* ─── Top Bar ─── */}
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-border-primary bg-bg-elevated/80">
+        <div className="flex items-center gap-1.5">
+          <Sparkles size={14} className="text-accent-purple" />
+          <span className="text-xs font-bold text-text-primary">UI Builder</span>
+        </div>
+        <div className="h-4 w-px bg-border-primary" />
+
+        {/* Device Preview */}
+        <div className="flex items-center gap-0.5 p-0.5 bg-bg-secondary rounded-lg border border-border-primary">
+          {DEVICES.map((d, i) => {
+            const Icon = d.icon
+            return (
+              <button key={i} onClick={() => setDevice(i)} title={d.name}
+                className={cn('p-1.5 rounded-md transition-all', device === i ? 'bg-accent-blue/15 text-accent-blue' : 'text-text-dim hover:text-text-muted')}>
+                <Icon size={13} />
               </button>
-              {showAddMenu && (
-                <div className="absolute top-full mt-1 right-0 z-50 bg-bg-elevated border border-border-primary rounded-xl shadow-2xl p-1 min-w-[160px]">
-                  {ELEMENT_TYPES.map(et => (
-                    <button key={et.type} onClick={() => { addElement(et.type, selectedId); setShowAddMenu(false) }}
-                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-text-primary hover:bg-bg-secondary transition-all text-left">
-                      <span className="w-6 text-center opacity-50">{et.icon}</span>
-                      <span>{et.desc}</span>
-                    </button>
-                  ))}
+            )
+          })}
+        </div>
+        <span className="text-[10px] text-text-dim font-mono">{dev.w}×{dev.h}</span>
+
+        <div className="h-4 w-px bg-border-primary" />
+
+        {/* Tools */}
+        <button onClick={() => setBuildMode(!buildMode)} className={cn('flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all', buildMode ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'text-text-dim hover:text-text-muted border border-transparent')}>
+          <MousePointer2 size={11} /> Select
+        </button>
+        <button onClick={() => setShowGrid(!showGrid)} className={cn('flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all', showGrid ? 'bg-accent-purple/10 text-accent-purple border border-accent-purple/20' : 'text-text-dim hover:text-text-muted border border-transparent')}>
+          <Grid3X3 size={11} /> Grid
+        </button>
+        <button onClick={() => setSnapToGrid(!snapToGrid)} className={cn('flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all', snapToGrid ? 'bg-accent-orange/10 text-accent-orange border border-accent-orange/20' : 'text-text-dim hover:text-text-muted border border-transparent')}>
+          Snap
+        </button>
+
+        <div className="h-4 w-px bg-border-primary" />
+
+        {/* Zoom */}
+        <button onClick={() => setZoom(z => Math.min(1.5, z + 0.1))} className="p-1 rounded text-text-dim hover:text-text-muted"><ZoomIn size={12} /></button>
+        <span className="text-[10px] text-text-dim w-8 text-center font-mono">{Math.round(zoom * 100)}%</span>
+        <button onClick={() => setZoom(z => Math.max(0.2, z - 0.1))} className="p-1 rounded text-text-dim hover:text-text-muted"><ZoomOut size={12} /></button>
+        <button onClick={() => { setZoom(0.55); setPan({ x: 0, y: 0 }) }} className="p-1 rounded text-text-dim hover:text-text-muted"><RotateCcw size={11} /></button>
+
+        <div className="flex-1" />
+
+        {/* Add + Export */}
+        <div className="flex items-center gap-1">
+          {ELEMENT_TYPES.map(et => (
+            <button key={et.type} onClick={() => addEl(et.type, selectedId)} title={`Add ${et.label}`}
+              className="px-2 py-1 rounded-md text-[10px] text-text-dim hover:text-text-primary hover:bg-bg-secondary border border-transparent hover:border-border-hover transition-all">
+              + {et.desc}
+            </button>
+          ))}
+        </div>
+
+        <button onClick={() => setShowImageSearch(true)} className="p-1.5 rounded-md text-text-dim hover:text-text-muted hover:bg-bg-secondary transition-all"><ImageIcon size={12} /></button>
+        <button onClick={() => setShowExport(true)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold bg-accent-purple/15 text-accent-purple border border-accent-purple/20 hover:bg-accent-purple/25 transition-all">
+          <Download size={11} /> Export
+        </button>
+      </div>
+
+      {/* ─── Main Area ─── */}
+      <div className="flex-1 flex min-h-0">
+
+        {/* ─── Layers Panel ─── */}
+        {showLayers && (
+          <div className="w-52 border-r border-border-primary flex flex-col bg-bg-primary/30">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-border-primary">
+              <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Layers</span>
+              <span className="text-[10px] text-text-dim">{elements.length}</span>
+            </div>
+            <div className="flex-1 overflow-y-auto py-1">
+              {elements.length === 0 && <p className="px-3 py-4 text-[10px] text-text-dim text-center">No elements yet</p>}
+              {[...elements].reverse().map(el => (
+                <div key={el.id}
+                  className={cn('flex items-center gap-1.5 px-2 py-1 cursor-pointer transition-all group',
+                    selectedId === el.id ? 'bg-accent-blue/10 text-accent-blue' : 'text-text-secondary hover:bg-bg-elevated')}
+                  onClick={() => setSelectedId(el.id)}
+                  style={{ paddingLeft: `${12 + (el.parentId ? 16 : 0)}px` }}>
+                  <span className="text-[10px] text-text-dim w-3">{el.type === 'Frame' ? '▬' : el.type === 'TextLabel' ? 'Aa' : el.type === 'TextButton' ? '☐' : el.type === 'ImageLabel' ? '🖼' : el.type === 'ScrollingFrame' ? '☰' : '□'}</span>
+                  <span className="flex-1 text-[10px] truncate font-medium">{el.name}</span>
+                  <button onClick={(e) => { e.stopPropagation(); updateEl(el.id, { visible: !el.visible }) }} className="opacity-0 group-hover:opacity-100 p-0.5 transition-opacity">
+                    {el.visible ? <Eye size={9} className="text-text-dim" /> : <EyeOff size={9} className="text-red-400" />}
+                  </button>
+                  <button onClick={(e) => { e.stopPropagation(); updateEl(el.id, { locked: !el.locked }) }} className="opacity-0 group-hover:opacity-100 p-0.5 transition-opacity">
+                    {el.locked ? <Lock size={9} className="text-yellow-400" /> : <Unlock size={9} className="text-text-dim" />}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ─── Canvas ─── */}
+        <div className="flex-1 overflow-hidden bg-[#08080c] relative"
+          onMouseDown={handleCanvasDown} onMouseMove={handleCanvasMove} onMouseUp={handleCanvasUp} onMouseLeave={handleCanvasUp}
+          onClick={() => setSelectedId(null)} style={{ cursor: isPanning ? 'grabbing' : 'default' }}>
+          <div ref={canvasRef} className="absolute" style={{
+            width: cw, height: ch,
+            left: `calc(50% + ${pan.x}px)`, top: `calc(50% + ${pan.y}px)`,
+            transform: 'translate(-50%, -50%)',
+          }}>
+            {/* Grid */}
+            {showGrid && (
+              <div className="absolute inset-0 pointer-events-none rounded-lg" style={{
+                backgroundImage: 'linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)',
+                backgroundSize: `${cw / (dev.w / gridSize)}px ${ch / (dev.h / gridSize)}px`
+              }} />
+            )}
+            {/* Screen */}
+            <div className="absolute inset-0 bg-[#1a1a2e] rounded-lg border border-white/5 shadow-2xl overflow-hidden">
+              {/* Elements */}
+              {roots.map(el => (
+                <div key={el.id} style={elStyle(el)}
+                  className="cursor-pointer select-none"
+                  onMouseDown={(e) => { e.stopPropagation(); if (buildMode && !el.locked) { setSelectedId(el.id); handleCanvasDown(e) } }}
+                  onClick={(e) => e.stopPropagation()}>
+                  {/* Render children inline */}
+                  {el.children.map(cid => {
+                    const child = elements.find(e => e.id === cid)
+                    if (!child || !child.visible) return null
+                    return (
+                      <div key={cid} style={childStyle(child)}
+                        className="cursor-pointer select-none"
+                        onClick={(e) => { e.stopPropagation(); setSelectedId(cid) }}
+                        onMouseDown={(e) => { e.stopPropagation(); if (buildMode && !child.locked) { setSelectedId(cid); handleCanvasDown(e) } }}>
+                        {(child.type === 'TextLabel' || child.type === 'TextButton' || child.type === 'TextBox') && (
+                          <span style={{ color: parseColor(child.props.TextColor3), fontSize: child.props.TextScaled ? undefined : child.props.TextSize || 14 }} className="px-1 text-center font-bold truncate w-full block">{child.props.Text || (child.type === 'TextBox' ? 'Input...' : 'Text')}</span>
+                        )}
+                        {child.type === 'ImageLabel' && child.props.Image && (
+                          <img src={child.props.Image} alt="" className="w-full h-full object-cover" style={{ opacity: 1 - (child.props.ImageTransparency || 0) }} />
+                        )}
+                      </div>
+                    )
+                  })}
+                  {/* Root element content */}
+                  {(el.type === 'TextLabel' || el.type === 'TextButton' || el.type === 'TextBox') && el.children.length === 0 && (
+                    <span style={{ color: parseColor(el.props.TextColor3), fontSize: el.props.TextScaled ? undefined : el.props.TextSize || 14 }} className="px-1 text-center font-bold truncate w-full block">{el.props.Text || (el.type === 'TextBox' ? 'Input...' : 'Text')}</span>
+                  )}
+                  {el.type === 'ImageLabel' && el.props.Image && el.children.length === 0 && (
+                    <img src={el.props.Image} alt="" className="w-full h-full object-cover" style={{ opacity: 1 - (el.props.ImageTransparency || 0) }} />
+                  )}
+                </div>
+              ))}
+              {elements.length === 0 && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-white/15 pointer-events-none">
+                  <Layers size={36} className="mb-2 opacity-30" />
+                  <p className="text-xs font-medium">Empty Canvas</p>
+                  <p className="text-[10px] opacity-50">Use AI chat or + buttons to add elements</p>
                 </div>
               )}
             </div>
-            <button onClick={() => setShowExport(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-accent-purple/15 text-accent-purple border border-accent-purple/25 hover:bg-accent-purple/25 transition-all">
-              <Download size={12} /> Export
-            </button>
-          </div>
-        </div>
-
-        {/* Canvas Area */}
-        <div className="flex-1 overflow-auto bg-[#0a0a0f] flex items-center justify-center p-6" onClick={() => { setSelectedId(null); setShowAddMenu(false) }}>
-          <div ref={canvasRef} className="relative" style={{ width: CANVAS_W * 0.55 * zoom, height: CANVAS_H * 0.55 * zoom, transition: 'width 0.2s, height 0.2s' }}
-            onMouseMove={(e) => { handleCanvasMouseMove(e); handleResizeMove(e) }} onMouseUp={handleCanvasMouseUp} onMouseLeave={handleCanvasMouseUp}>
-            {buildMode && (
-              <div className="absolute inset-0 pointer-events-none" style={{
-                backgroundImage: 'linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)',
-                backgroundSize: `${CANVAS_W * 0.55 * zoom / 20}px ${CANVAS_H * 0.55 * zoom / 20}px`
-              }} />
-            )}
-            {/* Screen border */}
-            <div className="absolute inset-0 border border-white/5 rounded-lg pointer-events-none" />
-            {/* Elements */}
-            {elements.filter(e => !e.parentId || !elements.find(p => p.id === e.parentId)).map(el => (
-              <div key={el.id} style={getElementStyle(el)}
-                className={cn('cursor-pointer transition-shadow group', selectedId === el.id && 'ring-2 ring-accent-blue ring-offset-1 ring-offset-transparent')}
-                onMouseDown={(e) => handleCanvasMouseDown(e, el.id)} onClick={(e) => { e.stopPropagation(); setSelectedId(el.id) }}>
-                {el.type === 'TextLabel' && <span style={{ color: parseColor(el.properties.TextColor3), fontSize: el.properties.TextScaled ? '100%' : 14, fontFamily: el.properties.Font === 'GothamBold' ? 'inherit' : undefined }} className="px-1 text-center font-bold truncate w-full">{el.properties.Text || 'Text'}</span>}
-                {el.type === 'TextButton' && <span style={{ color: parseColor(el.properties.TextColor3), fontSize: el.properties.TextScaled ? '100%' : 14 }} className="px-1 text-center font-bold truncate w-full">{el.properties.Text || 'Button'}</span>}
-                {el.type === 'ImageLabel' && el.properties.Image && <img src={el.properties.Image} alt="" className="w-full h-full object-cover" style={{ opacity: 1 - (el.properties.ImageTransparency || 0) }} />}
-                {el.type === 'ScrollingFrame' && <div className="w-full h-full overflow-auto p-1" />}
-                {/* Resize handles */}
-                {selectedId === el.id && buildMode && (
-                  <>
-                    {['nw', 'ne', 'sw', 'se'].map(corner => (
-                      <div key={corner} className={cn('absolute w-2.5 h-2.5 bg-accent-blue rounded-full border border-white shadow-md z-50',
-                        corner === 'nw' && '-top-1.5 -left-1.5 cursor-nw-resize',
-                        corner === 'ne' && '-top-1.5 -right-1.5 cursor-ne-resize',
-                        corner === 'sw' && '-bottom-1.5 -left-1.5 cursor-sw-resize',
-                        corner === 'se' && '-bottom-1.5 -right-1.5 cursor-se-resize'
-                      )} onMouseDown={(e) => handleResizeStart(e, corner)} />
-                    ))}
-                    <div className="absolute -top-5 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-accent-blue text-[9px] text-white font-mono whitespace-nowrap">{el.name}</div>
-                  </>
-                )}
-                {/* Render children */}
-                {el.children.map(cid => {
-                  const child = elements.find(e => e.id === cid)
-                  if (!child) return null
-                  const cp = child.position
-                  const cs = child.size
-                  return (
-                    <div key={cid} style={{ position: 'absolute', left: `${cp.X * 100}%`, top: `${cp.Y * 100}%`, width: `${cs.X * 100}%`, height: `${cs.Y * 100}%`, transform: 'translate(-50%, -50%)', borderRadius: child.properties.CornerRadius || 0, backgroundColor: child.properties.BackgroundTransparency >= 1 ? 'transparent' : parseColor(child.properties.BackgroundColor3), zIndex: child.zIndex || 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', border: child.properties.BorderSizePixel ? `${child.properties.BorderSizePixel}px solid ${parseColor(child.properties.BorderColor3 || '#000')}` : undefined }}
-                      className={cn('cursor-pointer', selectedId === cid && 'ring-2 ring-accent-blue')}
-                      onClick={(e) => { e.stopPropagation(); setSelectedId(cid) }}
-                      onMouseDown={(e) => handleCanvasMouseDown(e, cid)}>
-                      {child.type === 'TextLabel' && <span style={{ color: parseColor(child.properties.TextColor3), fontSize: child.properties.TextScaled ? '100%' : 14 }} className="px-1 text-center font-bold truncate w-full">{child.properties.Text || 'Text'}</span>}
-                      {child.type === 'TextButton' && <span style={{ color: parseColor(child.properties.TextColor3), fontSize: child.properties.TextScaled ? '100%' : 14 }} className="px-1 text-center font-bold truncate w-full">{child.properties.Text || 'Button'}</span>}
-                      {child.type === 'ImageLabel' && child.properties.Image && <img src={child.properties.Image} alt="" className="w-full h-full object-cover" style={{ opacity: 1 - (child.properties.ImageTransparency || 0) }} />}
-                    </div>
-                  )
-                })}
-              </div>
-            ))}
-            {elements.length === 0 && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-white/20 pointer-events-none">
-                <Box size={40} className="mb-3 opacity-30" />
-                <p className="text-sm font-medium">Empty Canvas</p>
-                <p className="text-xs opacity-60">Use AI or add elements manually</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Element Info Bar */}
-        {selectedEl && (
-          <div className="flex items-center gap-3 px-3 py-2 border-t border-border-primary bg-bg-elevated/50 text-xs">
-            <span className="text-accent-blue font-mono">{selectedEl.type}</span>
-            <span className="text-text-muted">{selectedEl.name}</span>
-            <span className="text-text-dim">Pos: ({(selectedEl.position.X * 100).toFixed(1)}%, {(selectedEl.position.Y * 100).toFixed(1)}%)</span>
-            <span className="text-text-dim">Size: ({(selectedEl.size.X * 100).toFixed(1)}%, {(selectedEl.size.Y * 100).toFixed(1)}%)</span>
-            <div className="flex-1" />
-            <button onClick={() => { modifyElement(selectedEl.id, {}); const p = selectedEl.properties; addLog('info', `Duplicated "${selectedEl.name}"`) }}
-              className="px-2 py-1 rounded text-[10px] text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-all">Duplicate</button>
-            <button onClick={() => removeElement(selectedEl.id)} className="px-2 py-1 rounded text-[10px] text-red-400 hover:bg-red-500/10 transition-all">Delete</button>
-          </div>
-        )}
-      </div>
-
-      {/* Right: AI Chat + Activity Log */}
-      <div className="w-full lg:w-[380px] border-l border-border-primary flex flex-col bg-bg-primary/50">
-        {/* Tabs */}
-        <div className="flex border-b border-border-primary">
-          <button className="flex-1 px-4 py-2.5 text-xs font-medium text-accent-purple border-b-2 border-accent-purple bg-accent-purple/5">AI Assistant</button>
-          <button onClick={() => {}} className="flex-1 px-4 py-2.5 text-xs font-medium text-text-muted hover:text-text-primary transition-all">Activity ({actionLog.length})</button>
-        </div>
-
-        {/* Chat */}
-        <div ref={chatContainerRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
-          {messages.length === 0 && (
-            <div className="flex flex-col items-center justify-center h-full text-center px-4">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-accent-purple/20 to-accent-pink/20 border border-accent-purple/10 flex items-center justify-center mb-4">
-                <Sparkles size={24} className="text-accent-purple/60" />
-              </div>
-              <h3 className="text-sm font-bold text-text-primary mb-1">Build your UI with AI</h3>
-              <p className="text-xs text-text-muted mb-4 leading-relaxed">Describe what you want and AI will add elements to the canvas in real-time.</p>
-              <div className="flex flex-wrap gap-1.5 justify-center">
-                {suggestedPrompts.map((p, i) => (
-                  <button key={i} onClick={() => sendMessage(p)}
-                    className="px-3 py-1.5 rounded-lg text-[10px] text-text-secondary bg-bg-elevated border border-border-primary hover:border-accent-purple/30 hover:text-accent-purple transition-all">
-                    {p}
-                  </button>
+            {/* Resize handles */}
+            {selected && buildMode && !selected.locked && (
+              <>
+                {['nw', 'ne', 'sw', 'se'].map(c => (
+                  <div key={c} className={cn('absolute w-3 h-3 bg-white border-2 border-accent-blue rounded-full z-50 shadow-lg',
+                    c === 'nw' && '-top-1.5 -left-1.5 cursor-nw-resize', c === 'ne' && '-top-1.5 -right-1.5 cursor-ne-resize',
+                    c === 'sw' && '-bottom-1.5 -left-1.5 cursor-sw-resize', c === 'se' && '-bottom-1.5 -right-1.5 cursor-se-resize'
+                  )} style={{ left: c.includes('w') ? `${selected.position.X * 100 - 1}%` : undefined, right: c.includes('e') ? `${(1 - selected.position.X) * 100 - 1}%` : undefined, top: c.includes('n') ? `${selected.position.Y * 100 - 1}%` : undefined, bottom: c.includes('s') ? `${(1 - selected.position.Y) * 100 - 1}%` : undefined, position: 'absolute' }}
+                    onMouseDown={(e) => { e.stopPropagation(); setResizing(true); setResizeData({ sx: e.clientX, sy: e.clientY, ow: selected.size.X, oh: selected.size.Y, corner: c }) }} />
                 ))}
+              </>
+            )}
+          </div>
+          {/* Keyboard hints */}
+          <div className="absolute bottom-2 left-2 flex gap-1.5 text-[9px] text-white/15 pointer-events-none">
+            <span>Arrow: nudge</span><span>Shift+Arrow: fast</span><span>Del: remove</span><span>Ctrl+Z: undo</span><span>Alt+Drag: pan</span>
+          </div>
+        </div>
+
+        {/* ─── Right Panel: Properties + Chat ─── */}
+        <div className="w-[320px] border-l border-border-primary flex flex-col bg-bg-primary/30">
+          {/* Properties */}
+          {selected && showProps && (
+            <div className="border-b border-border-primary max-h-[45%] overflow-y-auto">
+              <div className="flex items-center justify-between px-3 py-2 sticky top-0 bg-bg-elevated/90 backdrop-blur-sm z-10">
+                <div className="flex items-center gap-2">
+                  <Settings size={11} className="text-text-dim" />
+                  <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">{selected.type}</span>
+                  <span className="text-[10px] text-text-dim">{selected.name}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => duplicateEl(selected.id)} className="p-1 rounded hover:bg-bg-secondary text-text-dim hover:text-text-muted"><Copy size={10} /></button>
+                  <button onClick={() => removeEl(selected.id)} className="p-1 rounded hover:bg-red-500/10 text-text-dim hover:text-red-400"><Trash2 size={10} /></button>
+                </div>
               </div>
+              {/* Name */}
+              <div className="px-3 py-1.5 border-b border-border-primary/50">
+                <label className="text-[9px] text-text-dim block mb-0.5">Name</label>
+                <input value={selected.name} onChange={e => updateEl(selected.id, { name: e.target.value })}
+                  className="w-full px-2 py-1 rounded bg-bg-secondary border border-border-primary text-[10px] text-text-primary focus:outline-none focus:border-accent-blue/50" />
+              </div>
+              {/* Position */}
+              <div className="px-3 py-1.5 border-b border-border-primary/50 flex gap-2">
+                <div className="flex-1">
+                  <label className="text-[9px] text-text-dim block mb-0.5">Pos X</label>
+                  <input type="number" step="0.01" min="0" max="1" value={+selected.position.X.toFixed(3)}
+                    onChange={e => updateEl(selected.id, { position: { ...selected.position, X: Math.max(0, Math.min(1, parseFloat(e.target.value) || 0)) } })}
+                    className="w-full px-2 py-1 rounded bg-bg-secondary border border-border-primary text-[10px] text-text-primary font-mono focus:outline-none focus:border-accent-blue/50" />
+                </div>
+                <div className="flex-1">
+                  <label className="text-[9px] text-text-dim block mb-0.5">Pos Y</label>
+                  <input type="number" step="0.01" min="0" max="1" value={+selected.position.Y.toFixed(3)}
+                    onChange={e => updateEl(selected.id, { position: { ...selected.position, Y: Math.max(0, Math.min(1, parseFloat(e.target.value) || 0)) } })}
+                    className="w-full px-2 py-1 rounded bg-bg-secondary border border-border-primary text-[10px] text-text-primary font-mono focus:outline-none focus:border-accent-blue/50" />
+                </div>
+              </div>
+              {/* Size */}
+              <div className="px-3 py-1.5 border-b border-border-primary/50 flex gap-2">
+                <div className="flex-1">
+                  <label className="text-[9px] text-text-dim block mb-0.5">Size X</label>
+                  <input type="number" step="0.01" min="0.01" max="1" value={+selected.size.X.toFixed(3)}
+                    onChange={e => updateEl(selected.id, { size: { ...selected.size, X: Math.max(0.01, Math.min(1, parseFloat(e.target.value) || 0.01)) } })}
+                    className="w-full px-2 py-1 rounded bg-bg-secondary border border-border-primary text-[10px] text-text-primary font-mono focus:outline-none focus:border-accent-blue/50" />
+                </div>
+                <div className="flex-1">
+                  <label className="text-[9px] text-text-dim block mb-0.5">Size Y</label>
+                  <input type="number" step="0.01" min="0.01" max="1" value={+selected.size.Y.toFixed(3)}
+                    onChange={e => updateEl(selected.id, { size: { ...selected.size, Y: Math.max(0.01, Math.min(1, parseFloat(e.target.value) || 0.01)) } })}
+                    className="w-full px-2 py-1 rounded bg-bg-secondary border border-border-primary text-[10px] text-text-primary font-mono focus:outline-none focus:border-accent-blue/50" />
+                </div>
+              </div>
+              {/* Property Groups */}
+              {Object.entries(PROP_GROUPS).map(([group, keys]) => {
+                const relevant = keys.filter(k => {
+                  if (['Text', 'TextColor3', 'TextTransparency', 'TextScaled', 'Font', 'TextSize', 'TextWrapped', 'TextXAlignment', 'TextYAlignment', 'RichText'].includes(k) && !selected.type.includes('Text') && selected.type !== 'TextBox') return false
+                  if (['Image', 'ImageColor3', 'ImageTransparency'].includes(k) && !['ImageLabel', 'ImageButton'].includes(selected.type)) return false
+                  if (['CornerRadius'].includes(k) && !['Frame', 'TextLabel', 'TextButton', 'ImageLabel', 'ScrollingFrame', 'TextBox'].includes(selected.type)) return false
+                  if (['ScrollBarThickness', 'ScrollBarImageColor3', 'CanvasSize', 'AutomaticCanvasSize'].includes(k) && selected.type !== 'ScrollingFrame') return false
+                  return true
+                })
+                if (relevant.length === 0) return null
+                const expanded = expandedGroups.has(group)
+                return (
+                  <div key={group} className="border-b border-border-primary/50">
+                    <button onClick={() => { const s = new Set(expandedGroups); expanded.has(s.delete(group)) ? s.add(group) : null; setExpandedGroups(s) }}
+                      className="w-full flex items-center gap-1.5 px-3 py-1.5 text-[9px] font-bold text-text-dim uppercase tracking-wider hover:bg-bg-elevated transition-all">
+                      {expanded ? <ChevronDown size={9} /> : <ChevronRight size={9} />}{group}
+                    </button>
+                    {expanded && relevant.map(k => {
+                      const val = selected.props[k]
+                      const isColor = k.toLowerCase().includes('color') || k === 'BackgroundColor3' || k === 'TextColor3' || k === 'BorderColor3' || k === 'ImageColor3' || k === 'ScrollBarImageColor3'
+                      return (
+                        <div key={k} className="flex items-center gap-2 px-3 py-1">
+                          <label className="text-[9px] text-text-dim w-20 shrink-0 truncate">{k}</label>
+                          {isColor ? (
+                            <div className="flex items-center gap-1 flex-1">
+                              <input type="color" value={parseColor(val)} onChange={e => updateProps(selected.id, { [k]: e.target.value })}
+                                className="w-5 h-5 rounded border border-border-primary cursor-pointer" />
+                              <input value={parseColor(val)} onChange={e => updateProps(selected.id, { [k]: e.target.value })}
+                                className="flex-1 px-1.5 py-0.5 rounded bg-bg-secondary border border-border-primary text-[9px] text-text-primary font-mono focus:outline-none focus:border-accent-blue/50" />
+                            </div>
+                          ) : typeof val === 'boolean' ? (
+                            <button onClick={() => updateProps(selected.id, { [k]: !val })}
+                              className={cn('px-2 py-0.5 rounded text-[9px] font-medium transition-all', val ? 'bg-green-500/15 text-green-400' : 'bg-bg-secondary text-text-dim')}>
+                              {val ? 'True' : 'False'}
+                            </button>
+                          ) : typeof val === 'number' ? (
+                            <input type="number" step="1" value={val}
+                              onChange={e => updateProps(selected.id, { [k]: parseFloat(e.target.value) || 0 })}
+                              className="flex-1 px-1.5 py-0.5 rounded bg-bg-secondary border border-border-primary text-[9px] text-text-primary font-mono focus:outline-none focus:border-accent-blue/50" />
+                          ) : (
+                            <input value={String(val ?? '')}
+                              onChange={e => updateProps(selected.id, { [k]: e.target.value })}
+                              className="flex-1 px-1.5 py-0.5 rounded bg-bg-secondary border border-border-primary text-[9px] text-text-primary font-mono focus:outline-none focus:border-accent-blue/50" />
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })}
             </div>
           )}
 
-          {messages.map((msg, i) => (
-            <div key={i} className={cn('flex', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
-              <div className={cn('max-w-[90%] px-3 py-2 rounded-xl text-xs leading-relaxed',
-                msg.role === 'user' ? 'bg-accent-blue text-white rounded-br-md' : 'bg-bg-elevated text-text-primary rounded-bl-md border border-border-primary')}>
-                <p className="whitespace-pre-wrap break-words">{msg.content}</p>
-                {msg.commands && msg.commands.length > 0 && (
-                  <div className="mt-1.5 flex flex-wrap gap-1">
-                    {msg.commands.map((c: any, j: number) => (
-                      <span key={j} className={cn('px-1.5 py-0.5 rounded text-[9px] font-mono',
-                        c.action === 'add' && 'bg-green-500/10 text-green-400',
-                        c.action === 'modify' && 'bg-yellow-500/10 text-yellow-400',
-                        c.action === 'remove' && 'bg-red-500/10 text-red-400')}>
-                        {c.action}: {c.name || c.target || c.elementType}
-                      </span>
+          {/* AI Chat */}
+          <div className={cn('flex-1 flex flex-col min-h-0', !selected && 'h-full')}>
+            <div className="flex items-center justify-between px-3 py-2 border-b border-border-primary">
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 rounded bg-gradient-to-br from-accent-purple to-accent-pink flex items-center justify-center"><Sparkles size={10} className="text-white" /></div>
+                <span className="text-[10px] font-bold text-text-muted">AI Assistant</span>
+              </div>
+              {messages.length > 0 && (
+                <button onClick={() => setMessages([])} className="text-[9px] text-text-dim hover:text-text-muted transition-all">Clear</button>
+              )}
+            </div>
+            <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2">
+              {messages.length === 0 && (
+                <div className="flex flex-col items-center justify-center h-full text-center px-2">
+                  <Sparkles size={20} className="text-accent-purple/30 mb-2" />
+                  <p className="text-[10px] text-text-dim mb-3">Describe your UI and AI builds it on the canvas</p>
+                  <div className="flex flex-wrap gap-1 justify-center">
+                    {suggestedPrompts.slice(0, 4).map((p, i) => (
+                      <button key={i} onClick={() => sendMsg(p)} className="px-2 py-1 rounded-md text-[9px] text-text-dim bg-bg-elevated border border-border-primary hover:border-accent-purple/30 hover:text-accent-purple transition-all">{p}</button>
                     ))}
                   </div>
-                )}
-              </div>
-            </div>
-          ))}
-          {isLoading && (
-            <div className="flex justify-start">
-              <div className="bg-bg-elevated border border-border-primary rounded-xl rounded-bl-md px-3 py-2">
-                <div className="flex gap-1">
-                  <span className="w-1 h-1 rounded-full bg-accent-purple animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <span className="w-1 h-1 rounded-full bg-accent-purple animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <span className="w-1 h-1 rounded-full bg-accent-purple animate-bounce" style={{ animationDelay: '300ms' }} />
                 </div>
+              )}
+              {messages.map((msg, i) => (
+                <div key={i} className={cn('flex', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
+                  <div className={cn('max-w-[90%] px-2.5 py-1.5 rounded-lg text-[10px] leading-relaxed',
+                    msg.role === 'user' ? 'bg-accent-blue text-white rounded-br-sm' : 'bg-bg-elevated text-text-primary rounded-bl-sm border border-border-primary')}>
+                    <p className="whitespace-pre-wrap break-words">{msg.content}</p>
+                    {msg.commands?.length ? (
+                      <div className="mt-1 flex flex-wrap gap-0.5">
+                        {msg.commands.map((c: any, j: number) => (
+                          <span key={j} className={cn('px-1 py-0.5 rounded text-[8px] font-mono', c.action === 'add' && 'bg-green-500/10 text-green-400', c.action === 'modify' && 'bg-yellow-500/10 text-yellow-400', c.action === 'remove' && 'bg-red-500/10 text-red-400')}>
+                            {c.action} {c.name || c.target || c.elementType}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+              {isLoading && (
+                <div className="flex justify-start"><div className="bg-bg-elevated border border-border-primary rounded-lg px-3 py-1.5"><div className="flex gap-1"><span className="w-1 h-1 rounded-full bg-accent-purple animate-bounce" /><span className="w-1 h-1 rounded-full bg-accent-purple animate-bounce" style={{ animationDelay: '150ms' }} /><span className="w-1 h-1 rounded-full bg-accent-purple animate-bounce" style={{ animationDelay: '300ms' }} /></div></div></div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+            <div className="px-3 pb-2 pt-1 border-t border-border-primary">
+              <div className="flex items-end gap-1.5 bg-bg-elevated rounded-lg px-2.5 py-1.5 border border-border-primary focus-within:border-accent-purple/50 transition-colors">
+                <textarea value={input} onChange={e => setInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg() } }}
+                  placeholder="Describe your UI..." rows={1}
+                  className="flex-1 bg-transparent text-text-primary text-[10px] resize-none focus:outline-none placeholder:text-text-dim max-h-16" />
+                <button onClick={() => sendMsg()} disabled={!input.trim() || isLoading}
+                  className={cn('h-6 w-6 rounded-md flex-shrink-0 flex items-center justify-center transition-all', input.trim() && !isLoading ? 'bg-accent-purple text-white' : 'bg-bg-tertiary text-text-dim')}>
+                  {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+                </button>
               </div>
             </div>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
-
-        {/* Input */}
-        <div className="px-3 pb-3 pt-1 border-t border-border-primary">
-          <div className="flex items-end gap-2 bg-bg-elevated rounded-xl px-3 py-2 border border-border-primary focus-within:border-accent-purple/50 transition-colors">
-            <textarea value={input} onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
-              placeholder="Describe your UI..." rows={1}
-              className="flex-1 bg-transparent text-text-primary text-xs resize-none focus:outline-none placeholder:text-text-dim max-h-20" />
-            <button onClick={() => sendMessage()} disabled={!input.trim() || isLoading}
-              className={cn('h-7 w-7 rounded-lg flex-shrink-0 flex items-center justify-center transition-all',
-                input.trim() && !isLoading ? 'bg-accent-purple text-white hover:bg-purple-600' : 'bg-bg-tertiary text-text-dim')}>
-              {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
-            </button>
           </div>
         </div>
       </div>
 
-      {/* Image Search Modal */}
-      {showImageSearch && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowImageSearch(false)}>
-          <div className="bg-bg-elevated border border-border-primary rounded-2xl shadow-2xl w-[500px] max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-4 border-b border-border-primary">
-              <h3 className="text-sm font-bold text-text-primary">Add Image</h3>
-              <button onClick={() => setShowImageSearch(false)} className="p-1 rounded-lg hover:bg-bg-secondary transition-all"><X size={14} className="text-text-muted" /></button>
+      {/* ─── Export Modal ─── */}
+      {showExport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowExport(false)}>
+          <div className="bg-bg-elevated border border-border-primary rounded-2xl shadow-2xl w-[420px] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-border-primary">
+              <h3 className="text-sm font-bold text-text-primary">Export UI ({elements.length} elements)</h3>
+              <button onClick={() => setShowExport(false)} className="p-1 rounded-lg hover:bg-bg-secondary"><X size={14} className="text-text-muted" /></button>
             </div>
-            <div className="p-4 space-y-3">
-              <div>
-                <label className="text-xs text-text-muted mb-1 block">Image URL</label>
-                <input value={imageSearchQuery} onChange={(e) => setImageSearchQuery(e.target.value)} placeholder="Paste image URL or search term..."
-                  className="w-full px-3 py-2 rounded-xl bg-bg-secondary border border-border-primary text-xs text-text-primary placeholder:text-text-dim focus:outline-none focus:border-accent-purple/50" />
-              </div>
-              <div className="flex gap-2">
-                <button onClick={() => { if (imageSearchQuery) addImageFromUrl(imageSearchQuery) }}
-                  className="flex-1 px-4 py-2 rounded-xl bg-accent-purple text-white text-xs font-medium hover:bg-purple-600 transition-all">Add Image</button>
-                <label className="px-4 py-2 rounded-xl bg-bg-secondary border border-border-primary text-xs text-text-muted hover:text-text-primary cursor-pointer transition-all">
-                  <Upload size={12} className="inline mr-1.5" />Upload
-                  <input type="file" accept="image/*" className="hidden" onChange={(e) => {
-                    const file = e.target.files?.[0]; if (file) { const url = URL.createObjectURL(file); addImageFromUrl(url) }
-                  }} />
-                </label>
-              </div>
-              <div className="border-t border-border-primary pt-3">
-                <p className="text-[10px] text-text-dim mb-2">Quick search:</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {['robot icon', 'sword icon', 'coin icon', 'heart icon', 'star icon', 'shield icon', 'gem icon', 'crown icon'].map(q => (
-                    <button key={q} onClick={() => setImageSearchQuery(q)} className="px-2 py-1 rounded-lg text-[10px] text-text-muted bg-bg-secondary border border-border-primary hover:border-accent-purple/30 transition-all">{q}</button>
-                  ))}
-                </div>
-              </div>
+            <div className="p-4 space-y-2">
+              {[
+                { label: 'Lua Script', desc: 'Paste into Roblox Studio Command Bar', icon: FileCode2, color: 'green', fn: () => { navigator.clipboard.writeText(genLua(elements)); setShowExport(false) } },
+                { label: 'Download .lua', desc: 'LocalScript file for StarterGui', icon: Download, color: 'blue', fn: () => { const b = new Blob([genLua(elements)], { type: 'text/plain' }); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = 'GeneratedUI.lua'; a.click(); setShowExport(false) } },
+                { label: 'Download .rbxmx', desc: 'Import via Studio → Insert from File', icon: FileJson, color: 'purple', fn: () => { const b = new Blob([genRbxmx(elements)], { type: 'application/xml' }); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = 'GeneratedUI.rbxmx'; a.click(); setShowExport(false) } },
+                { label: 'JSON Project', desc: 'Re-import to continue editing', icon: FileJson, color: 'orange', fn: () => { const b = new Blob([genJSON(elements)], { type: 'application/json' }); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = 'UIProject.json'; a.click(); setShowExport(false) } },
+              ].map((item, i) => (
+                <button key={i} onClick={item.fn}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl bg-bg-secondary border border-border-primary hover:border-accent-blue/30 transition-all text-left group">
+                  <div className={`w-9 h-9 rounded-xl bg-${item.color === 'green' ? 'accent-green' : item.color === 'blue' ? 'accent-blue' : item.color === 'purple' ? 'accent-purple' : 'accent-orange'}/10 flex items-center justify-center`}>
+                    <item.icon size={16} className={`text-${item.color === 'green' ? 'accent-green' : item.color === 'blue' ? 'accent-blue' : item.color === 'purple' ? 'accent-purple' : 'accent-orange'}`} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-text-primary group-hover:text-accent-blue transition-colors">{item.label}</p>
+                    <p className="text-[10px] text-text-dim">{item.desc}</p>
+                  </div>
+                </button>
+              ))}
             </div>
           </div>
         </div>
       )}
 
-      {/* Export Modal */}
-      {showExport && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowExport(false)}>
-          <div className="bg-bg-elevated border border-border-primary rounded-2xl shadow-2xl w-[480px] flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-4 border-b border-border-primary">
-              <h3 className="text-sm font-bold text-text-primary">Export UI</h3>
-              <button onClick={() => setShowExport(false)} className="p-1 rounded-lg hover:bg-bg-secondary transition-all"><X size={14} className="text-text-muted" /></button>
+      {/* ─── Image Search Modal ─── */}
+      {showImageSearch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowImageSearch(false)}>
+          <div className="bg-bg-elevated border border-border-primary rounded-2xl shadow-2xl w-[400px]" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-border-primary">
+              <h3 className="text-sm font-bold text-text-primary">Add Image</h3>
+              <button onClick={() => setShowImageSearch(false)} className="p-1 rounded-lg hover:bg-bg-secondary"><X size={14} className="text-text-muted" /></button>
             </div>
             <div className="p-4 space-y-3">
-              <p className="text-xs text-text-muted">{elements.length} elements on canvas</p>
-              <button onClick={() => { downloadFile(generateLua(elements), 'GeneratedUI.lua', 'text/plain'); setShowExport(false) }}
-                className="w-full flex items-center gap-3 p-4 rounded-xl bg-bg-secondary border border-border-primary hover:border-accent-green/30 transition-all text-left group">
-                <div className="w-10 h-10 rounded-xl bg-accent-green/10 flex items-center justify-center"><FileCode2 size={18} className="text-accent-green" /></div>
-                <div>
-                  <p className="text-sm font-semibold text-text-primary group-hover:text-accent-green transition-colors">Lua Script</p>
-                  <p className="text-[10px] text-text-muted">Paste into Roblox Studio Command Bar or LocalScript</p>
-                </div>
-              </button>
-              <button onClick={() => { downloadFile(generateRbxmx(elements), 'GeneratedUI.rbxmx', 'application/xml'); setShowExport(false) }}
-                className="w-full flex items-center gap-3 p-4 rounded-xl bg-bg-secondary border border-border-primary hover:border-accent-blue/30 transition-all text-left group">
-                <div className="w-10 h-10 rounded-xl bg-accent-blue/10 flex items-center justify-center"><FileJson size={18} className="text-accent-blue" /></div>
-                <div>
-                  <p className="text-sm font-semibold text-text-primary group-hover:text-accent-blue transition-colors">RBXMX Model</p>
-                  <p className="text-[10px] text-text-muted">Import via Roblox Studio → Insert from File</p>
-                </div>
-              </button>
-              <button onClick={() => { navigator.clipboard.writeText(generateLua(elements)); setShowExport(false) }}
-                className="w-full flex items-center gap-3 p-4 rounded-xl bg-bg-secondary border border-border-primary hover:border-accent-purple/30 transition-all text-left group">
-                <div className="w-10 h-10 rounded-xl bg-accent-purple/10 flex items-center justify-center"><Copy size={18} className="text-accent-purple" /></div>
-                <div>
-                  <p className="text-sm font-semibold text-text-primary group-hover:text-accent-purple transition-colors">Copy to Clipboard</p>
-                  <p className="text-[10px] text-text-muted">Copy Lua script to clipboard</p>
-                </div>
-              </button>
+              <input value={imageUrl} onChange={e => setImageUrl(e.target.value)} placeholder="Paste image URL..."
+                className="w-full px-3 py-2 rounded-xl bg-bg-secondary border border-border-primary text-xs text-text-primary placeholder:text-text-dim focus:outline-none focus:border-accent-purple/50" />
+              <div className="flex gap-2">
+                <button onClick={() => { if (imageUrl) { addEl('ImageLabel'); const last = elements.length; setTimeout(() => { setElements(prev => { const n = [...prev]; const l = n[n.length - 1]; if (l) l.props.Image = imageUrl; return n }) }, 0); setImageUrl(''); setShowImageSearch(false) } }}
+                  className="flex-1 px-4 py-2 rounded-xl bg-accent-purple text-white text-xs font-medium hover:bg-purple-600 transition-all">Add to Canvas</button>
+                <label className="px-4 py-2 rounded-xl bg-bg-secondary border border-border-primary text-xs text-text-muted hover:text-text-primary cursor-pointer transition-all">
+                  <Upload size={11} className="inline mr-1" />Upload
+                  <input type="file" accept="image/*" className="hidden" onChange={e => {
+                    const f = e.target.files?.[0]; if (f) { addEl('ImageLabel'); const url = URL.createObjectURL(f); setTimeout(() => { setElements(prev => { const n = [...prev]; const l = n[n.length - 1]; if (l) l.props.Image = url; return n }) }, 0); setShowImageSearch(false) }
+                  }} />
+                </label>
+              </div>
             </div>
           </div>
         </div>
       )}
     </div>
   )
-}
-
-function Copy(props: any) {
-  return <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
 }

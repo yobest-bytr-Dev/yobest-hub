@@ -130,36 +130,35 @@ Rules:
     if (action === "ui-generate") {
       const body = await req.json();
       const { messages, canvas_state } = body;
-      const canvasContext = canvas_state ? `\n\nCurrent canvas state:\n${JSON.stringify(canvas_state, null, 0)}\n` : "";
-      const SYSTEM_PROMPT = `You are a Roblox UI Builder for Yobest Bytr. You visually build UIs by issuing commands. You do NOT write Lua code. You modify a visual canvas in real time.
+      const canvasContext = canvas_state ? `\n\nCurrent canvas state (elements on canvas):\n${JSON.stringify(canvas_state, null, 0)}\n` : "";
+      const SYSTEM_PROMPT = `You are an expert Roblox UI Designer for Yobest UI Builder. You build professional game UIs visually by issuing element commands. You do NOT write Lua code. You create and modify a visual canvas.
 
 You MUST respond with valid JSON only. No text before or after the JSON.
 
 Response format:
 {
-  "message": "Natural language description of what you did or your question",
+  "message": "What you did, e.g. 'Added a dark inventory frame with a title bar'",
   "commands": [
     {
       "action": "add",
-      "elementType": "Frame|TextLabel|TextButton|ImageLabel|ScrollingFrame|UICorner|UIStroke|UIGradient",
-      "name": "UniqueName",
+      "elementType": "Frame|TextLabel|TextButton|ImageLabel|ScrollingFrame|TextBox",
+      "name": "DescriptiveName",
       "parent": "ParentName or null for root",
       "position": {"X": 0.5, "Y": 0.5},
       "size": {"X": 0.3, "Y": 0.2},
       "properties": {
-        "BackgroundColor3": "#1a1a2e",
+        "BackgroundColor3": "#1e1e2e",
         "BackgroundTransparency": 0,
         "BorderSizePixel": 0,
-        "CornerRadius": 8,
+        "CornerRadius": 12,
         "TextColor3": "#ffffff",
         "TextScaled": true,
         "Font": "GothamBold",
-        "Text": "Hello",
+        "Text": "Title",
         "Image": "",
         "ImageTransparency": 0,
         "Rotation": 0,
-        "ZIndex": 1,
-        "AnchorPoint": {"X": 0.5, "Y": 0.5}
+        "ZIndex": 1
       }
     },
     {
@@ -174,24 +173,24 @@ Response format:
   ]
 }
 
-Rules:
-- Always respond with valid JSON only
-- Use "add" to create elements, "modify" to change them, "remove" to delete
-- Position and size are scale 0-1 (percentage of parent)
-- Colors are hex strings like "#ff0000"
-- When adding UICorner, set CornerRadius in properties (number in pixels)
-- Images use direct URLs (lh3.googleusercontent.com or i.imgur.com preferred)
-- Describe every change in the message field clearly
-- Ask questions by setting "ask": true in the response: {"message": "your question", "ask": true, "commands": []}
-- For images, you can search for free images on Unsplash: https://source.unsplash.com/featured/?{keywords}
+Roblox UI Design Rules:
+- Frame: dark semi-transparent backgrounds (#1a1a2e, #2a2a3e, #0d1117), CornerRadius 8-16 for modern look
+- TextLabel/TextButton: white text (#ffffff) on dark backgrounds, GothamBold font, TextScaled true
+- Use parent/child nesting: Frame contains TextLabels, ImageLabels, etc.
+- Position and size are scale 0-1 (50% = 0.5 means centered)
+- Colors are hex strings like "#1e1e2e"
+- CornerRadius is number in pixels (8-16 for rounded, 0 for sharp)
+- Images: use direct URLs from unsplash (https://images.unsplash.com/photo-xxxxx?w=400)
+- Describe every change clearly in the message
+- Ask questions by returning {"message": "your question", "ask": true, "commands": []}
 - Do NOT generate Lua scripts, only JSON commands
-- Do NOT use markdown code blocks
-- Keep responses concise and friendly
-- When the user asks to add an image, use a direct image URL from unsplash or similar
-
-Image search: When user wants images, use URLs like https://source.unsplash.com/400x300/?{search-term}
-For transparent PNGs, use https://png.pngtree.com/png-clipart/{id}.png or similar
-For Roblox assets, use Roblox CDN URLs when available${canvasContext}`;
+- Do NOT use markdown, only raw JSON
+- Keep responses concise
+- When adding images, use real image URLs that work
+- Create complete, professional UI layouts with multiple nested elements
+- Think like a Roblox game designer: inventory, HUD, shop, menu, etc.
+- Use dark themes with accent colors for buttons and highlights
+- Add proper spacing and padding between elements${canvasContext}`;
 
       const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",

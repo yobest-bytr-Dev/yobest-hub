@@ -133,26 +133,39 @@ Rules:
       const canvasContext = canvas_state && canvas_state.length > 0 ? `\nCurrent canvas has ${canvas_state.length} elements: ${canvas_state.map((e: any) => e.name).join(", ")}` : "\nCanvas is empty.";
       const SYSTEM_PROMPT = `OUTPUT ONLY VALID JSON. NO TEXT BEFORE OR AFTER. NO THINKING. NO EXPLANATION.
 
-You are a Roblox UI builder. You create UI elements by returning JSON commands.
+You are an expert Roblox game UI designer. You create professional, visually stunning game interfaces.
 
-RESPONSE FORMAT (copy this structure exactly):
-{"message":"short description","commands":[{"action":"add","elementType":"Frame","name":"MyFrame","parent":null,"position":{"X":0.5,"Y":0.5},"size":{"X":0.4,"Y":0.5},"properties":{"BackgroundColor3":"#1e1e2e","BackgroundTransparency":0,"BorderSizePixel":0,"CornerRadius":12,"ZIndex":1}},{"action":"add","elementType":"TextLabel","name":"Title1","parent":"MyFrame","position":{"X":0.5,"Y":0.08},"size":{"X":0.8,"Y":0.1},"properties":{"Text":"Shop","TextColor3":"#ffffff","TextScaled":true,"Font":"GothamBold","BackgroundTransparency":1}},{"action":"modify","target":"MyFrame","properties":{"BackgroundColor3":"#ff0000"}},{"action":"remove","target":"SomeName"}]}
+RESPONSE FORMAT (copy this exact structure):
+{"message":"1 sentence describing what you built","commands":[...]}
 
-RULES:
-- "message": 1 sentence describing what you did
-- "commands": array of add/modify/remove actions
-- add: elementType, name, parent (null=root or parent name), position {X,Y} scale 0-1, size {X,Y} scale 0-1, properties object
-- modify: target=name, properties=changed props
-- remove: target=name
-- Colors: hex strings "#rrggbb"
-- CornerRadius: number (8-16 typical)
-- Text: string, TextScaled: boolean, Font: "GothamBold" or "SourceSans"
-- BackgroundTransparency: 0=opaque, 1=invisible
-- Position 0.5,0.5 = center of parent
-- Nest elements: parent name must match an existing or planned element name
-- Dark themes: backgrounds #1a1a2e #2a2a3e #0d1117, text #ffffff, accents #4ecca3 #ff6b6b #ffd93d
-- Generate complete layouts with 5-15 elements for complex UIs
-- For questions: {"message":"your question?","ask":true,"commands":[]}${canvasContext}`;
+COMMAND TYPES:
+{"action":"add","elementType":"Frame","name":"FrameName","parent":null,"position":{"X":0.5,"Y":0.5},"size":{"X":0.4,"Y":0.5},"properties":{...}}
+{"action":"modify","target":"FrameName","properties":{"BackgroundColor3":"#ff0000"}}
+{"action":"remove","target":"FrameName"}
+
+ELEMENT TYPES: Frame, TextLabel, TextButton, ImageLabel, ScrollingFrame, TextBox
+
+DESIGN RULES:
+- Use dark themes: #0d1117 (darkest), #161b22 (dark), #1e293b (medium), #334155 (light border)
+- Accent colors: #3b82f6 (blue), #8b5cf6 (purple), #10b981 (green), #f59e0b (gold), #ef4444 (red), #ec4899 (pink)
+- Text: #f1f5f9 (primary), #94a3b8 (secondary), #64748b (muted)
+- CornerRadius: 8-16 for modern look, 4 for small elements
+- Font: "GothamBold" for headings, "SourceSans" for body
+- Position scale 0-1 where 0.5,0.5 = center
+- NEST elements: create Frame first, then add children inside it with parent name
+- Create 5-15 elements for a complete UI
+- For images, use URLs from picsum.photos: https://picsum.photos/seed/{keyword}/400/300
+- For game icons, use: https://picsum.photos/seed/{game}/200/200
+- For backgrounds, use: https://picsum.photos/seed/{theme}/1920/1080
+
+PROFESSIONAL UI PATTERNS:
+- Shop: Dark frame with title, scrolling item grid, each item has icon+name+price+buy button
+- Inventory: Grid of slots with item icons, item count badges
+- HUD: Health/mana bars at bottom, minimap top-right, currency top-left
+- Menu: Centered panel with logo, button list (Play, Settings, Credits), version text
+- Stats: Player avatar + name + level + stat bars (STR, DEF, SPD, etc.)
+
+Ask questions: {"message":"your question?","ask":true,"commands":[]}${canvasContext}`;
 
       const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
@@ -202,6 +215,47 @@ RULES:
       if (!parsed.message) parsed.message = "Done";
       
       return new Response(JSON.stringify(parsed), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "search-images") {
+      const url2 = new URL(req.url);
+      const query = url2.searchParams.get("q") || "";
+      if (!query) {
+        return new Response(JSON.stringify({ error: "Missing query" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        });
+      }
+      try {
+        const resp = await fetch(
+          `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=8&orientation=landscape`,
+          { headers: { Authorization: `Client-ID ${OPENROUTER_KEY}` } }
+        );
+        if (resp.ok) {
+          const data = await resp.json();
+          const images = (data.results || []).map((img: any) => ({
+            url: img.urls?.small || img.urls?.regular,
+            full: img.urls?.full,
+            thumb: img.urls?.thumb,
+            alt: img.alt_description || query,
+            author: img.user?.name || "Unknown",
+          }));
+          return new Response(JSON.stringify({ images }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      } catch {}
+      // Fallback: generate placeholder URLs
+      const images = Array.from({ length: 6 }, (_, i) => ({
+        url: `https://picsum.photos/seed/${encodeURIComponent(query)}${i}/400/300`,
+        full: `https://picsum.photos/seed/${encodeURIComponent(query)}${i}/1200/800`,
+        thumb: `https://picsum.photos/seed/${encodeURIComponent(query)}${i}/200/150`,
+        alt: `${query} ${i + 1}`,
+        author: "Picsum",
+      }));
+      return new Response(JSON.stringify({ images }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

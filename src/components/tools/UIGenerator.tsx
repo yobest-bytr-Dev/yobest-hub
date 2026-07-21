@@ -301,9 +301,20 @@ export default function UIGenerator() {
     setElements(newEls); pushHist(newEls); setSelectedId(newId)
   }, [elements, pushHist])
 
-  // ─── AI Commands ───
-  const applyCmds = useCallback((cmds: any[]) => {
-    // Sort: adds without parents first, then adds with parents, then modifies, then removes
+  // Building state
+  const [building, setBuilding] = useState(false)
+  const [buildingId, setBuildingId] = useState<string | null>(null)
+  const [buildingMsg, setBuildingMsg] = useState('')
+  const buildingRef = useRef(false)
+
+  // ─── AI Commands (synchronized, one by one) ───
+  const applyCmds = useCallback(async (cmds: any[]) => {
+    if (buildingRef.current) return // already building
+    buildingRef.current = true
+    setBuilding(true)
+    setBuildingMsg('Building...')
+
+    // Sort: root adds first, then children, then modifies
     const sorted = [...cmds].sort((a: any, b: any) => {
       if (a.action === 'add' && !a.parent) return -1
       if (b.action === 'add' && !b.parent) return 1
@@ -312,39 +323,54 @@ export default function UIGenerator() {
       if (a.action === 'remove') return 2
       return 0
     })
-    
-    const newEls = [...elements]
+
     const nameToId = new Map<string, string>()
-    // Index existing elements by name
-    newEls.forEach(e => nameToId.set(e.name, e.id))
-    
-    for (const cmd of sorted) {
+
+    for (let i = 0; i < sorted.length; i++) {
+      const cmd = sorted[i]
       if (cmd.action === 'add') {
         const id = uid()
-        const resolvedParent = cmd.parent ? (nameToId.get(cmd.parent) || newEls.find(e => e.name.toLowerCase() === cmd.parent.toLowerCase())?.id || null) : null
+        const resolvedParent = cmd.parent ? (nameToId.get(cmd.parent) || elements.find(e => e.name.toLowerCase() === cmd.parent.toLowerCase())?.id || null) : null
         const el: UIEl = {
-          id, type: cmd.elementType || 'Frame', name: cmd.name || `${cmd.elementType}${newEls.length + 1}`,
+          id, type: cmd.elementType || 'Frame', name: cmd.name || `${cmd.elementType}${elements.length + 1}`,
           parentId: resolvedParent,
           position: cmd.position || { X: 0.5, Y: 0.5 }, size: cmd.size || { X: 0.3, Y: 0.2 },
           props: { BackgroundColor3: '#1a1a2e', TextColor3: '#ffffff', Text: '', Font: 'GothamBold', TextScaled: true, TextSize: 14, ...cmd.properties },
-          children: [], zIndex: newEls.length + 1, locked: false, visible: true,
+          children: [], zIndex: elements.length + 1, locked: false, visible: true,
         }
         nameToId.set(el.name, id)
-        newEls.push(el)
-        if (el.parentId) { const p = newEls.find(e => e.id === el.parentId); if (p) p.children = [...p.children, id] }
+        setBuildingId(id)
+        setBuildingMsg(`Adding ${el.name}...`)
+        setElements(prev => {
+          const newEls = [...prev, el]
+          if (el.parentId) { const p = newEls.find(e => e.id === el.parentId); if (p) p.children = [...p.children, id] }
+          return newEls
+        })
+        await new Promise(r => setTimeout(r, 350)) // delay between elements
       } else if (cmd.action === 'modify') {
-        const t = newEls.find(e => e.name.toLowerCase() === (cmd.target || '').toLowerCase() || e.id === cmd.target)
-        if (t) t.props = { ...t.props, ...cmd.properties }
+        setBuildingMsg(`Modifying ${cmd.target}...`)
+        setElements(prev => prev.map(e => e.name.toLowerCase() === (cmd.target || '').toLowerCase() ? { ...e, props: { ...e.props, ...cmd.properties } } : e))
+        await new Promise(r => setTimeout(r, 200))
       } else if (cmd.action === 'remove') {
-        const idx = newEls.findIndex(e => e.name.toLowerCase() === (cmd.target || '').toLowerCase() || e.id === cmd.target)
-        if (idx >= 0) { const rid = newEls[idx].id; newEls.splice(idx, 1); newEls.forEach(e => { e.children = e.children.filter(c => c !== rid) }) }
+        setBuildingMsg(`Removing ${cmd.target}...`)
+        setElements(prev => {
+          const idx = prev.findIndex(e => e.name.toLowerCase() === (cmd.target || '').toLowerCase())
+          if (idx >= 0) { const rid = prev[idx].id; return prev.filter(e => e.id !== rid).map(e => ({ ...e, children: e.children.filter(c => c !== rid) })) }
+          return prev
+        })
+        await new Promise(r => setTimeout(r, 200))
       }
     }
-    setElements(newEls); pushHist(newEls)
+
+    setBuildingId(null)
+    setBuildingMsg('')
+    setBuilding(false)
+    buildingRef.current = false
+    pushHist(elements)
   }, [elements, pushHist])
 
   const sendMsg = async (text?: string) => {
-    const msg = (text || input).trim(); if (!msg || isLoading) return
+    const msg = (text || input).trim(); if (!msg || isLoading || building) return
     const um: ChatMsg = { role: 'user', content: msg }
     setMessages(p => [...p, um]); setInput(''); setIsLoading(true)
     try {
@@ -354,16 +380,17 @@ export default function UIGenerator() {
         body: JSON.stringify({ messages: [{ role: 'user', content: msg }], canvas_state: cs }),
       })
       const d = await r.json()
+      setIsLoading(false)
       const am: ChatMsg = { role: 'assistant', content: d.message || d.content || 'Done', commands: d.commands || [] }
       setMessages(p => [...p, am])
       if (d.commands?.length) {
-        setTimeout(() => applyCmds(d.commands), 50)
+        await applyCmds(d.commands)
       }
     } catch (e) {
       console.error('UI Builder error:', e)
+      setIsLoading(false)
       setMessages(p => [...p, { role: 'assistant', content: 'Connection error. Try again.' }])
     }
-    setIsLoading(false)
   }
 
   // ─── Canvas Interactions ───
@@ -447,7 +474,6 @@ export default function UIGenerator() {
   // ─── Element Style ───
   function elStyle(el: UIEl): React.CSSProperties {
     const p = el.props
-    const isContainer = ['Frame', 'ScrollingFrame'].includes(el.type)
     return {
       position: 'absolute', left: `${el.position.X * 100}%`, top: `${el.position.Y * 100}%`,
       width: `${el.size.X * 100}%`, height: `${el.size.Y * 100}%`,
@@ -596,14 +622,13 @@ export default function UIGenerator() {
                 const renderEl = (el: UIEl, isChild = false): React.ReactNode => {
                   if (!el.visible) return null
                   const childEls = el.children.map(cid => elements.find(e => e.id === cid)).filter(Boolean) as UIEl[]
+                  const isBuilding = buildingId === el.id
                   return (
                     <div key={el.id} style={isChild ? childStyle(el) : elStyle(el)}
-                      className="cursor-pointer select-none"
+                      className={cn('cursor-pointer select-none', isBuilding && 'el-building')}
                       onClick={(e) => { e.stopPropagation(); setSelectedId(el.id) }}
                       onMouseDown={(e) => { e.stopPropagation(); if (buildMode && !el.locked) { setSelectedId(el.id); handleCanvasDown(e) } }}>
-                      {/* Render all children recursively */}
                       {childEls.map(child => renderEl(child, true))}
-                      {/* Content for text/image elements */}
                       {(el.type === 'TextLabel' || el.type === 'TextButton' || el.type === 'TextBox') && childEls.length === 0 && (
                         <span style={{ color: parseColor(el.props.TextColor3), fontSize: el.props.TextScaled ? undefined : (el.props.TextSize || 14), textAlign: el.props.TextXAlignment === 'Left' ? 'left' : el.props.TextXAlignment === 'Right' ? 'right' : 'center' }} className="px-2 font-bold truncate w-full block">{el.props.Text || (el.type === 'TextBox' ? 'Input...' : 'Text')}</span>
                       )}
@@ -639,6 +664,13 @@ export default function UIGenerator() {
               </>
             )}
           </div>
+          {/* Building progress */}
+          {building && (
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-4 py-2 rounded-xl bg-black/70 backdrop-blur-md border border-accent-purple/30 shadow-lg shadow-accent-purple/10">
+              <div className="w-2 h-2 rounded-full bg-accent-purple animate-pulse" />
+              <span className="text-[11px] text-white/90 font-medium">{buildingMsg}</span>
+            </div>
+          )}
           {/* Keyboard hints */}
           <div className="absolute bottom-2 left-2 flex gap-1.5 text-[9px] text-white/15 pointer-events-none">
             <span>Arrow: nudge</span><span>Shift+Arrow: fast</span><span>Del: remove</span><span>Ctrl+Z: undo</span><span>Alt+Drag: pan</span>

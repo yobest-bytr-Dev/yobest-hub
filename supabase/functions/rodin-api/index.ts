@@ -324,33 +324,46 @@ Rules:
       const { messages, canvas_state, force_template } = body;
       const userMsg = messages?.length > 0 ? messages[messages.length - 1].content : "Create a shop UI";
 
-      // Build canvas context for AI
+      // Build rich canvas context for AI — includes element names, types, positions, sizes, and key props
       let canvasContext = "";
       if (canvas_state && Array.isArray(canvas_state) && canvas_state.length > 0) {
-        canvasContext = "\n\nCurrent canvas elements:\n" + canvas_state.map((e: any) =>
-          `- ${e.name} (${e.type}) at pos(${e.pos?.X?.toFixed(2)},${e.pos?.Y?.toFixed(2)}) size(${e.size?.X?.toFixed(2)},${e.size?.Y?.toFixed(2)})`
-        ).join("\n");
+        canvasContext = "\n\nCurrent canvas elements (" + canvas_state.length + " total):\n" + canvas_state.map((e: any) => {
+          const props = e.props || {};
+          const keyProps: string[] = [];
+          if (props.Text) keyProps.push(`Text:"${props.Text}"`);
+          if (props.BackgroundColor3 && props.BackgroundColor3 !== '#c8c8c8') keyProps.push(`BG:${props.BackgroundColor3}`);
+          if (props.TextColor3 && props.TextColor3 !== '#000000') keyProps.push(`FG:${props.TextColor3}`);
+          if (props.Font && props.Font !== 'Legacy') keyProps.push(`Font:${props.Font}`);
+          if (props.CornerRadius) keyProps.push(`Corner:${props.CornerRadius}`);
+          if (props.Image) keyProps.push(`Image:${props.Image.substring(0, 60)}`);
+          if (props.BackgroundTransparency !== undefined && props.BackgroundTransparency > 0) keyProps.push(`BGAlpha:${props.BackgroundTransparency}`);
+          if (props.TextScaled) keyProps.push("Scaled");
+          return `- ${e.name} (${e.type}) pos(${e.position?.X?.toFixed(3)},${e.position?.Y?.toFixed(3)}) size(${e.size?.X?.toFixed(3)},${e.size?.Y?.toFixed(3)})${keyProps.length ? ' {' + keyProps.join(', ') + '}' : ''}`;
+        }).join("\n");
       }
 
-      const SYSTEM_PROMPT = `You are a Roblox UI generator. Output ONLY a JSON object with this exact structure:
+      const SYSTEM_PROMPT = `You are a Roblox UI generator AND editor. Output ONLY a JSON object.
 
-{"message":"what you built in one sentence","commands":[{"action":"add","elementType":"Frame","name":"UniqueName","parent":null,"position":{"X":0.5,"Y":0.5},"size":{"X":0.4,"Y":0.5},"properties":{"BackgroundColor3":"#0d1117","CornerRadius":12}}]}
+COMMAND FORMAT — "commands" MUST be an array of these command objects:
 
-COMMAND FORMAT (each command MUST be an object with these exact fields):
-- action: always "add"
-- elementType: "Frame" | "TextLabel" | "TextButton" | "ImageLabel" | "ScrollingFrame" | "TextBox"
-- name: unique PascalCase name (no spaces, no duplicates)
-- parent: null for root, or exact name of a parent element defined earlier in commands array
-- position: {"X": number 0-1, "Y": number 0-1} — center of element as fraction of parent (0.5, 0.5 = center)
-- size: {"X": number 0-1, "Y": number 0-1} — fraction of parent
-- properties: {"BackgroundColor3":"#hex", "CornerRadius":number, "Text":"string", "TextColor3":"#hex", "TextScaled":true, "Font":"GothamBold", "Image":"url", "BackgroundTransparency":number 0-1, "BorderSizePixel":number, "ZIndex":number}
+1) ADD command — create a new element:
+{"action":"add","elementType":"Frame|TextLabel|TextButton|ImageLabel|ScrollingFrame|TextBox","name":"PascalCase","parent":null|"ParentName","position":{"X":0.5,"Y":0.5},"size":{"X":0.4,"Y":0.5},"properties":{"BackgroundColor3":"#hex","CornerRadius":12,"Text":"string","TextColor3":"#hex","TextScaled":true,"Font":"GothamBold","Image":"url","BackgroundTransparency":0-1,"BorderSizePixel":0,"ZIndex":number}}
+
+2) MODIFY command — change an existing element's properties (match by exact name):
+{"action":"modify","target":"ExactName","properties":{"BackgroundColor3":"#hex","Text":"new text","TextColor3":"#hex","TextScaled":true,"CornerRadius":8,"BackgroundTransparency":0.5}}
+
+3) REMOVE command — delete an element and its children:
+{"action":"remove","target":"ExactName"}
+
+RESPONSE FORMAT:
+{"message":"what you did in one sentence","commands":[...]}
 
 RULES:
 1. "commands" MUST be an ARRAY of objects. Never a string, never an object.
-2. Put root elements first (parent: null), then children after their parent.
-3. Use dark theme colors: #0d1117, #161b22, #1e293b, #334155, #f1f5f9, #94a3b8, #64748b
-4. 0.5, 0.5 = center of screen. Build complete, professional UIs with 10-30 elements.
-5. Include title bars, content areas, buttons, labels, images where appropriate.
+2. For new UIs: put root elements first (parent: null), then children after their parent. Build 10-30 elements.
+3. For editing: use modify/remove commands targeting EXACT element names shown in canvas context. You can change colors, text, size, position, font, transparency, etc.
+4. Dark theme colors: #0d1117, #161b22, #1e293b, #334155, #f1f5f9, #94a3b8, #64748b
+5. 0.5, 0.5 = center of screen. Include title bars, content areas, buttons, labels, images.
 6. Output ONLY the JSON object. No markdown, no explanation, no \`\`\`json blocks.`;
 
       let parsed = null;
@@ -397,12 +410,12 @@ RULES:
       }
       } // end else (AI attempt)
 
-      // Validate: commands MUST be an array with items
+      // Validate: commands MUST be an array with valid actions
       const isValid = parsed
         && typeof parsed === "object"
         && Array.isArray(parsed.commands)
         && parsed.commands.length > 0
-        && parsed.commands.every((c: any) => c && typeof c === "object" && c.action === "add");
+        && parsed.commands.every((c: any) => c && typeof c === "object" && ["add", "modify", "remove"].includes(c.action));
 
       // Fallback: template-based generation
       if (!isValid) {
@@ -427,9 +440,10 @@ RULES:
           status: 400,
         });
       }
+      // Try Unsplash with API key, fall back to curated Picsum seeds
       try {
         const resp = await fetch(
-          `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=8&orientation=landscape`,
+          `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=12&orientation=landscape`,
           { headers: { Authorization: `Client-ID ${OPENROUTER_KEY}` } }
         );
         if (resp.ok) {
@@ -440,21 +454,34 @@ RULES:
             thumb: img.urls?.thumb,
             alt: img.alt_description || query,
             author: img.user?.name || "Unknown",
+            width: img.width,
+            height: img.height,
           }));
-          return new Response(JSON.stringify({ images }), {
+          return new Response(JSON.stringify({ images, source: "unsplash" }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
       } catch {}
-      // Fallback: generate placeholder URLs
-      const images = Array.from({ length: 6 }, (_, i) => ({
-        url: `https://picsum.photos/seed/${encodeURIComponent(query)}${i}/400/300`,
-        full: `https://picsum.photos/seed/${encodeURIComponent(query)}${i}/1200/800`,
-        thumb: `https://picsum.photos/seed/${encodeURIComponent(query)}${i}/200/150`,
+      // Fallback: curated Picsum with varied seeds based on query
+      const queryWords = query.toLowerCase().split(/\s+/);
+      const seeds = [
+        ...queryWords,
+        ...queryWords.map((w: string) => w + "-dark"),
+        ...queryWords.map((w: string) => w + "-texture"),
+        "abstract-" + queryWords[0],
+        "gradient-" + queryWords[0],
+        "pattern-" + queryWords[0],
+      ].slice(0, 12);
+      const images = seeds.map((seed: string, i: number) => ({
+        url: `https://picsum.photos/seed/${encodeURIComponent(seed)}/400/300`,
+        full: `https://picsum.photos/seed/${encodeURIComponent(seed)}/1200/800`,
+        thumb: `https://picsum.photos/seed/${encodeURIComponent(seed)}/200/150`,
         alt: `${query} ${i + 1}`,
         author: "Picsum",
+        width: 400,
+        height: 300,
       }));
-      return new Response(JSON.stringify({ images }), {
+      return new Response(JSON.stringify({ images, source: "picsum" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

@@ -359,6 +359,9 @@ export default function UIGenerator() {
   const [showExport, setShowExport] = useState(false)
   const [showImageSearch, setShowImageSearch] = useState(false)
   const [imageUrl, setImageUrl] = useState('')
+  const [imgSearchQuery, setImgSearchQuery] = useState('')
+  const [imgSearchResults, setImgSearchResults] = useState<{url:string;full:string;alt:string;author:string}[]>([])
+  const [imgSearching, setImgSearching] = useState(false)
   const [instantBuild, setInstantBuild] = useState(() => localStorage.getItem('ui-instant-build') === 'true')
 
   // Drag & Resize
@@ -449,6 +452,33 @@ export default function UIGenerator() {
     setElements(updated); pushHist(updated)
   }, [elements, pushHist])
 
+  // ─── Image Search ───
+  const SEARCH_API = `${supabaseUrl}/functions/v1/rodin-api?action=search-images`
+  const searchImages = async (q: string) => {
+    if (!q.trim()) return
+    setImgSearching(true)
+    try {
+      const r = await fetch(`${SEARCH_API}&q=${encodeURIComponent(q.trim())}`)
+      const d = await r.json()
+      setImgSearchResults(d.images || [])
+    } catch { setImgSearchResults([]) }
+    setImgSearching(false)
+  }
+
+  const addImageToCanvas = (url: string) => {
+    addEl('ImageLabel')
+    setTimeout(() => {
+      setElements(prev => {
+        const n = [...prev]; const l = n[n.length - 1]
+        if (l) { l.props.Image = url; l.name = `Image_${l.name.replace('Element', '')}` }
+        return n
+      })
+    }, 0)
+    setShowImageSearch(false)
+    setImgSearchResults([])
+    setImgSearchQuery('')
+  }
+
   // ─── Apply template ───
   const applyTemplate = useCallback((template: typeof COMPONENT_TEMPLATES[0]) => {
     const cmds = template.fn()
@@ -533,7 +563,7 @@ export default function UIGenerator() {
     const um: ChatMsg = { role: 'user', content: msg }
     setMessages(p => [...p, um]); setInput(''); setIsLoading(true)
     try {
-      const cs = elements.map(e => ({ name: e.name, type: e.type, pos: e.position, size: e.size }))
+      const cs = elements.map(e => ({ name: e.name, type: e.type, position: e.position, size: e.size, props: { ...e.props, Text: e.props.Text || '', BackgroundColor3: e.props.BackgroundColor3, TextColor3: e.props.TextColor3, Font: e.props.Font, CornerRadius: e.props.CornerRadius, Image: e.props.Image || '', BackgroundTransparency: e.props.BackgroundTransparency, TextScaled: e.props.TextScaled } }))
       const r = await fetch(CHAT_API, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: [{ role: 'user', content: msg }], canvas_state: cs }),
@@ -879,6 +909,9 @@ export default function UIGenerator() {
         <div className="flex items-center gap-1.5">
           <Sparkles size={14} className="text-accent-purple" />
           <span className="text-xs font-bold text-text-primary">UI Builder</span>
+          {elements.length > 0 && (
+            <span className="px-1.5 py-0.5 rounded-md text-[9px] font-mono text-text-dim bg-bg-secondary border border-border-primary">{elements.length} el</span>
+          )}
         </div>
         <div className="h-4 w-px bg-border-primary" />
 
@@ -1290,7 +1323,11 @@ export default function UIGenerator() {
                   {messages.length === 0 && (
                     <div className="flex flex-col items-center justify-center h-full text-center px-2">
                       <Sparkles size={20} className="text-accent-purple/30 mb-2" />
-                      <p className="text-[10px] text-text-dim mb-3">Describe your UI and AI builds it on the canvas</p>
+                      <p className="text-[10px] text-text-dim mb-3">
+                        {elements.length > 0
+                          ? 'Describe changes to apply to your canvas, or create new UI from scratch'
+                          : 'Describe your UI and AI builds it on the canvas'}
+                      </p>
                       <div className="grid grid-cols-3 gap-1.5 mb-3 w-full">
                         {quickPresets.map((p, i) => (
                           <button key={i} onClick={() => sendMsg(p.prompt)}
@@ -1300,11 +1337,20 @@ export default function UIGenerator() {
                           </button>
                         ))}
                       </div>
-                      <div className="flex flex-wrap gap-1 justify-center">
-                        {suggestedPrompts.slice(0, 4).map((p, i) => (
-                          <button key={i} onClick={() => sendMsg(p)} className="px-2 py-1 rounded-md text-[9px] text-text-dim bg-bg-elevated border border-border-primary hover:border-accent-purple/30 hover:text-accent-purple transition-all">{p}</button>
-                        ))}
-                      </div>
+                      {elements.length === 0 && (
+                        <div className="flex flex-wrap gap-1 justify-center">
+                          {suggestedPrompts.slice(0, 4).map((p, i) => (
+                            <button key={i} onClick={() => sendMsg(p)} className="px-2 py-1 rounded-md text-[9px] text-text-dim bg-bg-elevated border border-border-primary hover:border-accent-purple/30 hover:text-accent-purple transition-all">{p}</button>
+                          ))}
+                        </div>
+                      )}
+                      {elements.length > 0 && (
+                        <div className="flex flex-wrap gap-1 justify-center">
+                          {['Change all backgrounds to blue', 'Make the title bigger', 'Add a close button', 'Remove the last element'].map((p, i) => (
+                            <button key={i} onClick={() => sendMsg(p)} className="px-2 py-1 rounded-md text-[9px] text-text-dim bg-bg-elevated border border-border-primary hover:border-accent-purple/30 hover:text-accent-purple transition-all">{p}</button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                   {messages.map((msg, i) => (
@@ -1399,22 +1445,68 @@ export default function UIGenerator() {
 
       {/* ─── Image Search Modal ─── */}
       {showImageSearch && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowImageSearch(false)}>
-          <div className="bg-bg-elevated border border-border-primary rounded-2xl shadow-2xl w-[400px]" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-3 border-b border-border-primary">
-              <h3 className="text-sm font-bold text-text-primary">Add Image</h3>
-              <button onClick={() => setShowImageSearch(false)} className="p-1 rounded-lg hover:bg-bg-secondary"><X size={14} className="text-text-muted" /></button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => { setShowImageSearch(false); setImgSearchResults([]); setImgSearchQuery('') }}>
+          <div className="bg-bg-elevated border border-border-primary rounded-2xl shadow-2xl w-[520px] max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-border-primary shrink-0">
+              <h3 className="text-sm font-bold text-text-primary flex items-center gap-2">
+                <ImageIcon size={14} className="text-accent-purple" /> Search Images
+              </h3>
+              <button onClick={() => { setShowImageSearch(false); setImgSearchResults([]); setImgSearchQuery('') }} className="p-1 rounded-lg hover:bg-bg-secondary"><X size={14} className="text-text-muted" /></button>
             </div>
-            <div className="p-4 space-y-3">
-              <input value={imageUrl} onChange={e => setImageUrl(e.target.value)} placeholder="Paste image URL..."
-                className="w-full px-3 py-2 rounded-xl bg-bg-secondary border border-border-primary text-xs text-text-primary placeholder:text-text-dim focus:outline-none focus:border-accent-purple/50" />
+            <div className="px-4 pt-3 pb-2 shrink-0">
               <div className="flex gap-2">
-                <button onClick={() => { if (imageUrl) { addEl('ImageLabel'); const last = elements.length; setTimeout(() => { setElements(prev => { const n = [...prev]; const l = n[n.length - 1]; if (l) l.props.Image = imageUrl; return n }) }, 0); setImageUrl(''); setShowImageSearch(false) } }}
-                  className="flex-1 px-4 py-2 rounded-xl bg-accent-purple text-white text-xs font-medium hover:bg-purple-600 transition-all">Add to Canvas</button>
-                <label className="px-4 py-2 rounded-xl bg-bg-secondary border border-border-primary text-xs text-text-muted hover:text-text-primary cursor-pointer transition-all">
-                  <Upload size={11} className="inline mr-1" />Upload
+                <input value={imgSearchQuery} onChange={e => setImgSearchQuery(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') searchImages(imgSearchQuery) }}
+                  placeholder="Search for images (e.g. sword, galaxy, button)..."
+                  className="flex-1 px-3 py-2 rounded-xl bg-bg-secondary border border-border-primary text-xs text-text-primary placeholder:text-text-dim focus:outline-none focus:border-accent-purple/50" />
+                <button onClick={() => searchImages(imgSearchQuery)} disabled={imgSearching || !imgSearchQuery.trim()}
+                  className={cn('px-4 py-2 rounded-xl text-xs font-medium transition-all', imgSearchQuery.trim() && !imgSearching ? 'bg-accent-purple text-white hover:bg-purple-600' : 'bg-bg-tertiary text-text-dim')}>
+                  {imgSearching ? <Loader2 size={12} className="animate-spin" /> : 'Search'}
+                </button>
+              </div>
+              <div className="flex gap-1.5 mt-2 flex-wrap">
+                {['gaming', 'nature', 'abstract', 'tech', 'fantasy', 'space', 'medieval', 'cyberpunk'].map(tag => (
+                  <button key={tag} onClick={() => { setImgSearchQuery(tag); searchImages(tag) }}
+                    className="px-2 py-0.5 rounded-md text-[9px] text-text-dim bg-bg-secondary border border-border-primary hover:border-accent-purple/40 hover:text-accent-purple transition-all capitalize">{tag}</button>
+                ))}
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto px-4 pb-4">
+              {imgSearchResults.length > 0 ? (
+                <div className="grid grid-cols-3 gap-2 mt-1">
+                  {imgSearchResults.map((img, i) => (
+                    <button key={i} onClick={() => addImageToCanvas(img.url)}
+                      className="group relative aspect-video rounded-lg overflow-hidden border border-border-primary hover:border-accent-purple/60 hover:ring-2 hover:ring-accent-purple/20 transition-all bg-bg-secondary">
+                      <img src={img.url} alt={img.alt} className="w-full h-full object-cover" loading="lazy" />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center">
+                        <span className="opacity-0 group-hover:opacity-100 text-white text-[10px] font-bold bg-accent-purple/80 px-2 py-1 rounded-md transition-all">+ Add</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : !imgSearching && imgSearchQuery ? (
+                <div className="text-center py-8 text-text-dim text-xs">No results. Try different keywords.</div>
+              ) : !imgSearchQuery ? (
+                <div className="text-center py-8 text-text-dim text-xs">Search for images or click a category above.</div>
+              ) : null}
+              {imgSearching && (
+                <div className="flex items-center justify-center py-8 gap-2 text-text-dim text-xs">
+                  <Loader2 size={14} className="animate-spin" /> Searching...
+                </div>
+              )}
+            </div>
+            <div className="px-4 py-2 border-t border-border-primary shrink-0">
+              <p className="text-[9px] text-text-dim">Or paste a URL and add manually:</p>
+              <div className="flex gap-2 mt-1">
+                <input value={imageUrl} onChange={e => setImageUrl(e.target.value)} placeholder="https://example.com/image.png"
+                  className="flex-1 px-3 py-1.5 rounded-lg bg-bg-secondary border border-border-primary text-[10px] text-text-primary placeholder:text-text-dim focus:outline-none focus:border-accent-purple/50" />
+                <button onClick={() => { if (imageUrl) addImageToCanvas(imageUrl); setImageUrl('') }}
+                  disabled={!imageUrl.trim()}
+                  className={cn('px-3 py-1.5 rounded-lg text-[10px] font-medium transition-all', imageUrl.trim() ? 'bg-accent-blue text-white hover:bg-blue-600' : 'bg-bg-tertiary text-text-dim')}>Add URL</button>
+                <label className="px-3 py-1.5 rounded-lg bg-bg-secondary border border-border-primary text-[10px] text-text-muted hover:text-text-primary cursor-pointer transition-all">
+                  <Upload size={10} className="inline mr-1" />Upload
                   <input type="file" accept="image/*" className="hidden" onChange={e => {
-                    const f = e.target.files?.[0]; if (f) { addEl('ImageLabel'); const url = URL.createObjectURL(f); setTimeout(() => { setElements(prev => { const n = [...prev]; const l = n[n.length - 1]; if (l) l.props.Image = url; return n }) }, 0); setShowImageSearch(false) }
+                    const f = e.target.files?.[0]; if (f) { const url = URL.createObjectURL(f); addImageToCanvas(url) }
                   }} />
                 </label>
               </div>

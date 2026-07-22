@@ -405,14 +405,30 @@ Valid properties: BackgroundColor3 (#hex), Text (string with emojis), TextColor3
 - Use emojis in Text: 🎮 ⚔️ 🛡️ 💰 🔥 ✨ 🏆 ⭐ 💎 🛒
 - 15-25 elements minimum — complete, professional
 - Root elements: parent null. Children: parent "ParentName"
-- Position/size use 0.0-1.0 relative coordinates
 - Image URLs: https://picsum.photos/seed/KEYWORD/200/200
 - Bold titles with GothamBold, body with Gotham
 - Layered frames with varying transparency
 
+=== POSITION AND SIZE RULES (CRITICAL) ===
+- ALL position values MUST be objects with BOTH X and Y: {"X":0.5,"Y":0.5}
+- ALL size values MUST be objects with BOTH X and Y: {"X":0.4,"Y":0.5}
+- NEVER output position as a single number, string, null, or missing a field
+- Root Frame: position 0.5,0.5 = center of screen. size 0.6,0.7 = 60% wide, 70% tall
+- Child elements: position is RELATIVE to parent center (0.5,0.5 = center of parent)
+- Child elements: size is RELATIVE to parent (1.0,1.0 = same size as parent)
+- For 3 side-by-side cards: use position X values like 0.17, 0.5, 0.83 (evenly spaced)
+- Values MUST be between 0.0 and 1.0 (never negative, never over 1.0)
+
 === RESPONSE FORMAT ===
 For clarifying questions: {"message":"question text","commands":[]}
 For building UI: {"message":"Built [description]","commands":[...]}
+
+Each command MUST look EXACTLY like this:
+{"action":"add","elementType":"Frame","name":"MyFrame","parent":null,"position":{"X":0.5,"Y":0.5},"size":{"X":0.4,"Y":0.5},"properties":{"BackgroundColor3":"#0d1117","CornerRadius":8}}
+
+IMPORTANT: position={"X":0.5,"Y":0.5} — both X and Y are required numbers.
+IMPORTANT: size={"X":0.4,"Y":0.5} — both X and Y are required numbers.
+NEVER: position={"X":0.5} (missing Y) or position=0.5 (not an object) or position={"X":-0.3} (negative)
 
 Output ONLY the JSON object. No markdown fences. No explanation text before or after.` + EDIT_INSTRUCTION;
 
@@ -450,6 +466,12 @@ Output ONLY the JSON object. No markdown fences. No explanation text before or a
             }
             if (!c.position || typeof c.position !== "object") c.position = { X: 0.5, Y: 0.5 };
             if (c.position.x !== undefined) { c.position.X = c.position.x; c.position.Y = c.position.y; }
+            // Ensure X and Y exist and are valid numbers
+            if (typeof c.position.X !== "number" || isNaN(c.position.X)) c.position.X = 0.5;
+            if (typeof c.position.Y !== "number" || isNaN(c.position.Y)) c.position.Y = 0.5;
+            // Clamp to valid range (0-1 for position)
+            c.position.X = Math.max(0, Math.min(1, c.position.X));
+            c.position.Y = Math.max(0, Math.min(1, c.position.Y));
 
             // Fix size format variations
             if (typeof c.size === "string") {
@@ -458,6 +480,12 @@ Output ONLY the JSON object. No markdown fences. No explanation text before or a
             }
             if (!c.size || typeof c.size !== "object") c.size = { X: 0.4, Y: 0.5 };
             if (c.size.x !== undefined) { c.size.X = c.size.x; c.size.Y = c.size.y; }
+            // Ensure X and Y exist and are valid numbers
+            if (typeof c.size.X !== "number" || isNaN(c.size.X)) c.size.X = 0.4;
+            if (typeof c.size.Y !== "number" || isNaN(c.size.Y)) c.size.Y = 0.5;
+            // Clamp size (must be positive, reasonable range)
+            c.size.X = Math.max(0.02, Math.min(1.5, c.size.X));
+            c.size.Y = Math.max(0.02, Math.min(1.5, c.size.Y));
 
             // Fix parent mapping from filtered wrappers
             if (c.parent && nameMap.has(c.parent)) {

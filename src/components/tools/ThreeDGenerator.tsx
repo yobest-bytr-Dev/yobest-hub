@@ -9,16 +9,11 @@ import OptionsDialog from './OptionsDialog'
 import type { ModelStats, AnimationInfo, DetectedMesh, MeshAssignment } from './ModelComponent'
 
 const SAMPLE_MODELS = [
-  { name: 'Damaged Helmet', file: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/main/2.0/DamagedHelmet/glTF-Binary/DamagedHelmet.glb', desc: 'Battle-worn sci-fi helmet', icon: '🪖', color: 'from-red-500/20 to-orange-500/20' },
-  { name: 'Flight Helmet', file: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/main/2.0/FlightHelmet/glTF-Binary/FlightHelmet.glb', desc: 'Vintage aviator helmet & goggles', icon: '飞行员', color: 'from-amber-500/20 to-yellow-500/20' },
-  { name: 'Fox', file: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/main/2.0/Fox/glTF-Binary/Fox.glb', desc: 'Animated cartoon fox', icon: '🦊', color: 'from-orange-500/20 to-amber-500/20' },
-  { name: 'Boom Box', file: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/main/2.0/BoomBox/glTF-Binary/BoomBox.glb', desc: 'Retro boombox speaker', icon: '📻', color: 'from-pink-500/20 to-rose-500/20' },
-  { name: 'Avocado', file: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/main/2.0/Avocado/glTF-Binary/Avocado.glb', desc: 'Realistic avocado', icon: '🥑', color: 'from-green-500/20 to-emerald-500/20' },
-  { name: 'Lantern', file: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/main/2.0/Lantern/glTF-Binary/Lantern.glb', desc: 'Ornate gas lantern', icon: '🏮', color: 'from-yellow-500/20 to-amber-500/20' },
-  { name: 'Water Bottle', file: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/main/2.0/WaterBottle/glTF-Binary/WaterBottle.glb', desc: 'Modern water bottle', icon: '🧴', color: 'from-cyan-500/20 to-blue-500/20' },
-  { name: 'Brain Stem', file: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/main/2.0/BrainStem/glTF-Binary/BrainStem.glb', desc: 'Animated robot character', icon: '🤖', color: 'from-violet-500/20 to-purple-500/20' },
-  { name: 'Milk Truck', file: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/main/2.0/CesiumMilkTruck/glTF-Binary/CesiumMilkTruck.glb', desc: 'Animated delivery truck', icon: '🚚', color: 'from-blue-500/20 to-indigo-500/20' },
-  { name: 'Duck', file: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/main/2.0/Duck/glTF-Binary/Duck.glb', desc: 'Classic rubber duck', icon: '🦆', color: 'from-yellow-400/20 to-yellow-600/20' },
+  { name: 'PBR Sphere', file: '/models/base_basic_pbr.glb', desc: 'Standard PBR material sphere', icon: '🔵', color: 'from-blue-500/20 to-cyan-500/20' },
+  { name: 'PBR Variant A', file: '/models/base_basic_pbr%20(3).glb', desc: 'PBR material with scratches', icon: '🟠', color: 'from-orange-500/20 to-amber-500/20' },
+  { name: 'PBR Variant B', file: '/models/base_basic_pbr%20(6).glb', desc: 'PBR material with wear', icon: '🟤', color: 'from-amber-600/20 to-yellow-600/20' },
+  { name: 'PBR Variant C', file: '/models/base_basic_pbr%20(9).glb', desc: 'PBR material polished', icon: '⚪', color: 'from-gray-400/20 to-gray-600/20' },
+  { name: 'Cyber Car', file: '/models/floating_futuristic_cyber_car_jfg.glb', desc: 'Futuristic floating cyber car', icon: '🚗', color: 'from-violet-500/20 to-purple-500/20' },
 ]
 
 const RODIN_API = `${supabaseUrl}/functions/v1/rodin-api`

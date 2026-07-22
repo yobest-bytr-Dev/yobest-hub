@@ -694,23 +694,25 @@ export default function UIGenerator() {
   }, [selectedId, buildMode, building, elements, removeEl, updateEl, undo, redo, duplicateEl, planeMode])
 
   const suggestedPrompts = [
-    'Shop with 4 items, prices, and buy buttons',
-    'Main menu with play, settings, credits buttons',
-    'Health and mana bar HUD at bottom of screen',
-    'Inventory grid with 12 item slots',
-    'Character stats panel with avatar and level',
-    'Chat box with messages and input field',
-    'Quest tracker on the right side with progress bars',
-    'Settings panel with toggles and sliders',
+    'Create a neon cyberpunk shop with glowing borders',
+    'Medieval fantasy inventory with rarity-colored item slots',
+    'Anime-style character stats panel with level and XP bar',
+    'Space galaxy themed main menu with nebula background',
+    'Steampunk settings panel with brass-colored toggles',
+    'Underwater themed quest tracker with bubble effects',
+    'Military tactical HUD with radar-style health display',
+    'Fun colorful daily rewards calendar with bouncing icons',
+    'Dark elegant guild leaderboard with gold accents',
+    'Toxic gamer-style kill feed with neon green highlights',
   ]
 
   const quickPresets = [
-    { label: 'Shop', emoji: '🛒', prompt: 'Shop with 4 items, prices, and buy buttons' },
-    { label: 'Menu', emoji: '🎮', prompt: 'Main menu with play, settings, credits buttons' },
-    { label: 'HUD', emoji: '❤️', prompt: 'Health and mana bar HUD at bottom of screen' },
-    { label: 'Inventory', emoji: '🎒', prompt: 'Inventory grid with 12 item slots' },
-    { label: 'Stats', emoji: '⚔️', prompt: 'Character stats panel with avatar and level' },
-    { label: 'Chat', emoji: '💬', prompt: 'Chat box with messages and input field' },
+    { label: 'Shop', emoji: '🛒', prompt: 'Create a shop with a unique style - surprise me!' },
+    { label: 'Menu', emoji: '🎮', prompt: 'Design a main menu that looks like a AAA Roblox game' },
+    { label: 'HUD', emoji: '❤️', prompt: 'Build a stylish HUD with health, mana, and XP bars' },
+    { label: 'Inventory', emoji: '🎒', prompt: 'Make an inventory grid with item rarity colors' },
+    { label: 'Stats', emoji: '⚔️', prompt: 'Create a character stats panel with avatar and level' },
+    { label: 'Quest', emoji: '📜', prompt: 'Design a quest tracker with progress bars and objectives' },
   ]
 
   // ─── Element Style ───
@@ -959,8 +961,8 @@ export default function UIGenerator() {
         <button onClick={() => setBuildMode(!buildMode)} className={cn('flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all', buildMode ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'text-text-dim hover:text-text-muted border border-transparent')} title="Toggle select/drag/resize mode">
           <MousePointer2 size={11} /> Build
         </button>
-        <button onClick={() => elements.length > 0 && setPlaneMode(!planeMode)} className={cn('flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all', planeMode ? 'bg-accent-purple/10 text-accent-purple border border-accent-purple/20' : elements.length === 0 ? 'text-text-dim/30 border border-transparent cursor-not-allowed' : 'text-text-dim hover:text-text-muted border border-transparent')} title={elements.length === 0 ? "Add elements first to preview" : "Preview UI without editor chrome"}>
-          <Eye size={11} /> Plane
+        <button onClick={() => elements.length > 0 && setPlaneMode(!planeMode)} className={cn('flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all', planeMode ? 'bg-accent-purple/10 text-accent-purple border border-accent-purple/20' : elements.length === 0 ? 'text-text-dim/30 border border-transparent cursor-not-allowed' : 'text-text-dim hover:text-text-muted border border-transparent')} title={elements.length === 0 ? "Add elements first to preview" : "Fullscreen preview of your UI"}>
+          <Eye size={11} /> Preview
         </button>
         <button onClick={() => setShowGrid(!showGrid)} className={cn('flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all', showGrid ? 'bg-accent-purple/10 text-accent-purple border border-accent-purple/20' : 'text-text-dim hover:text-text-muted border border-transparent')}>
           <Grid3X3 size={11} /> Grid
@@ -1382,9 +1384,9 @@ export default function UIGenerator() {
                           ))}
                         </div>
                       )}
-                      {elements.length > 0 && (
+                        {elements.length > 0 && (
                         <div className="flex flex-wrap gap-1 justify-center">
-                          {['Make the title bigger and gold', 'Change all backgrounds to #1e293b', 'Add a close button at top-right', 'Make this look like a professional game menu', 'Change the font to GothamBold everywhere', 'Add rounded corners to everything'].map((p, i) => (
+                          {['Change the style to neon cyberpunk', 'Make it look medieval/fantasy', 'Switch to a colorful fun theme', 'Add glowing border effects', 'Change to an anime/Japanese style', 'Make it look like a military HUD'].map((p, i) => (
                             <button key={i} onClick={() => sendMsg(p)} className="px-2 py-1 rounded-md text-[9px] text-text-dim bg-bg-elevated border border-border-primary hover:border-accent-purple/30 hover:text-accent-purple transition-all">{p}</button>
                           ))}
                         </div>
@@ -1493,7 +1495,7 @@ export default function UIGenerator() {
             <X size={14} /> Exit Plane
           </button>
           <div className="fixed bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 px-4 py-2 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 text-white/50 text-[10px] z-50">
-            <span>Preview</span><span className="text-white/20">|</span><span>{elements.length} elements</span><span className="text-white/20">|</span><span>{dev.name} {dev.w}×{dev.h}</span><span className="text-white/20">|</span><span>Esc to exit</span>
+            <span>Fullscreen Preview</span><span className="text-white/20">|</span><span>{elements.length} elements</span><span className="text-white/20">|</span><span>{dev.name} {dev.w}×{dev.h}</span><span className="text-white/20">|</span><span>Esc to exit</span>
           </div>
         </div>
       )}

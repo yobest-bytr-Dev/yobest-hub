@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowLeft, Box, Palette, Loader2 } from 'lucide-react'
 
@@ -9,14 +9,14 @@ const UIGenerator = lazy(() => import('@/components/tools/UIGenerator'))
 const TOOL_CONFIG: Record<string, { title: string; desc: string; icon: any; gradient: string; component: any }> = {
   '3d-generator': {
     title: '3D Model Generator',
-    desc: 'Generate stunning 3D models from text descriptions using Yobest3D AI. Describe your model, choose quality settings, and download as GLB.',
+    desc: 'Generate stunning 3D models from text descriptions using Yobest3D AI.',
     icon: Box,
     gradient: 'from-accent-blue to-accent-purple',
     component: ThreeDGenerator,
   },
   'ui-generator': {
     title: 'Roblox UI Generator',
-    desc: 'Build professional Roblox game interfaces with AI. Design shops, menus, HUDs, and more — export as Lua, .rbxmx, or JSON.',
+    desc: 'Build professional Roblox game interfaces with AI.',
     icon: Palette,
     gradient: 'from-accent-purple to-accent-pink',
     component: UIGenerator,
@@ -55,10 +55,6 @@ export default function StandaloneTool({ toolId }: { toolId: string }) {
                 <h1 className="text-lg font-bold text-text-primary">{config.title}</h1>
                 <p className="text-xs text-text-muted">{config.desc}</p>
               </div>
-            </div>
-            <div className="flex-1" />
-            <div className="text-[10px] text-text-dim font-mono px-2 py-1 rounded-lg bg-bg-secondary border border-border-primary">
-              yobest-bytr.vercel.app/tools/{toolId}
             </div>
           </div>
 

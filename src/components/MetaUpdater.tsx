@@ -84,6 +84,28 @@ async function resolveGameData(pathname: string): Promise<{ title?: string; desc
       image: DEFAULT_IMAGE,
     }
   }
+  // Tool pages
+  if (pathname.match(/^\/tools\/3d-generator\/?$/)) {
+    return {
+      title: `3D Model Generator — ${SITE_NAME}`,
+      description: 'Generate stunning 3D models from text descriptions using AI. Download as GLB for Blender, Roblox Studio, or other 3D software.',
+      image: DEFAULT_IMAGE,
+    }
+  }
+  if (pathname.match(/^\/tools\/ui-generator\/?$/)) {
+    return {
+      title: `Roblox UI Generator — ${SITE_NAME}`,
+      description: 'Build professional Roblox game interfaces with AI. Design shops, menus, HUDs, inventories — export as Lua, .rbxmx, or JSON.',
+      image: DEFAULT_IMAGE,
+    }
+  }
+  if (pathname.match(/^\/tools\/?$/)) {
+    return {
+      title: `Tools — ${SITE_NAME}`,
+      description: 'Official tools and utilities for Roblox developers. 3D Model Generator, UI Generator, and more.',
+      image: DEFAULT_IMAGE,
+    }
+  }
   return {}
 }
 

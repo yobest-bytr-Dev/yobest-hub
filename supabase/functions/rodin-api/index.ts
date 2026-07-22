@@ -306,11 +306,11 @@ Rules:
           "X-Title": "Yobest 3D Generator",
         },
         body: JSON.stringify({
-          model: "openrouter/free",
-          messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
-          temperature: 0.7,
-          max_tokens: 500,
-        }),
+            model: "google/gemma-4-26b-a4b-it:free",
+            messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
+            temperature: 0.7,
+            max_tokens: 500,
+          }),
       });
       const data = await resp.json();
       const content = data.choices?.[0]?.message?.content || "";
@@ -329,11 +329,6 @@ Rules:
       const editWords = ['change', 'make', 'edit', 'update', 'modify', 'adjust', 'tweak', 'better', 'improve', 'fix', 'remove', 'delete', 'move', 'resize', 'recolor', 'replace', 'swap', 'bigger', 'smaller', 'darker', 'lighter', 'brighter', 'add a', 'add new', 'turn', 'set', 'put'];
       const lowerMsg = userMsg.toLowerCase();
       const forceEdit = (edit_mode || false) || (hasElements && editWords.some(w => lowerMsg.includes(w)));
-
-      // Detect if user is answering clarification questions (has option picks like "A", "1", "dark", etc.)
-      const isShortAnswer = userMsg.length < 50 && !lowerMsg.includes('create') && !lowerMsg.includes('make') && !lowerMsg.includes('build');
-      // Detect if user wants to just build without questions
-      const skipQuestions = lowerMsg.includes('just build') || lowerMsg.includes('skip') || lowerMsg.includes('generate') || lowerMsg.includes('create now') || lowerMsg.includes('do it') || lowerMsg.includes('go ahead');
 
       // Build hierarchy-aware canvas context
       let canvasContext = "";
@@ -364,72 +359,171 @@ Rules:
         canvasContext = `\n\n=== EXISTING CANVAS (${canvas_state.length} elements) ===\n${tree}\n\nElement names listed above are EXACT. Use them for modify/remove.`;
       }
 
-      // EDIT INSTRUCTION — extremely forceful
+      // EDIT INSTRUCTION
       const EDIT_INSTRUCTION = forceEdit && hasElements ? `
 \n\n*** CRITICAL: EDIT MODE — DO NOT CREATE NEW UI ***
 The canvas already has ${canvas_state.length} elements. The user wants to CHANGE the existing UI.
-YOU MUST output ONLY "modify" and/or "remove" commands. 
+YOU MUST output ONLY "modify" and/or "remove" commands.
 DO NOT output "add" commands unless the user EXPLICITLY says "add" or "create".
 DO NOT rebuild or recreate the UI. MODIFY what exists.
 Use the EXACT element names from the canvas list above.
 Example: if user says "make title bigger", output: {"action":"modify","target":"TitleName","properties":{"Size":{"X":0.8,"Y":0.15}}}
 Example: if user says "change color to red", output: {"action":"modify","target":"FrameName","properties":{"BackgroundColor3":"#ef4444"}}` : '';
 
-      const SYSTEM_PROMPT = `You are a world-class Roblox UI designer and creative director. You create interfaces that look like they belong in top Roblox games.
+      const SYSTEM_PROMPT = `You are an expert Roblox UI designer. Generate stunning, professional game interfaces.
 
-=== YOUR TWO ROLES ===
+=== OUTPUT FORMAT — EXACTLY THIS JSON STRUCTURE ===
+You MUST return a single JSON object with exactly these two keys:
+- "message": short description string
+- "commands": array of command objects
 
-ROLE 1: CREATIVE DIRECTOR (when user gives a vague request like "make a shop" or "create a menu")
-- First, ask 2-3 short clarifying questions to understand what they want
-- Questions should use this exact format with options:
-  {"message":"Here are a few quick questions to build your perfect UI:\n\n🎨 **Style?**\n1. Dark & sleek (modern game feel)\n2. Bright & colorful (fun/casual)\n3. Neon cyberpunk (sci-fi)\n4. Fantasy medieval (swords & magic)\n\n📐 **Size?**\nA. Small popup (centered)\nB. Full-screen overlay\nC. Side panel (left or right)\n\n🎯 **Items/Buttons?**\n- How many items/buttons do you want?\n- Any specific text or labels?\n\nType your picks (e.g. \"1, B, 4 items: Sword, Shield, Potion, Bow\") or say \"just build\" to skip.","commands":[]}
+=== ADD COMMAND FORMAT (for creating elements) ===
+{"action":"add","elementType":"Frame","name":"UniqueName","parent":null,"position":{"X":0.5,"Y":0.5},"size":{"X":0.4,"Y":0.5},"properties":{"BackgroundColor3":"#0d1117","CornerRadius":12,"BackgroundTransparency":0,"BorderSizePixel":0}}
 
-ROLE 2: UI BUILDER (when user has answered questions or says "just build" or gives a detailed request)
-- Generate the full UI with commands
-- Make it STUNNING — different from any generic template
-- Use the answers from questions to personalize
+Valid elementType values: "Frame", "TextLabel", "TextButton", "ImageLabel", "ScrollingFrame", "TextBox"
+Valid properties: BackgroundColor3 (#hex), Text (string with emojis), TextColor3 (#hex), TextScaled (boolean), Font ("GothamBold" or "Gotham"), CornerRadius (number 0-50), BackgroundTransparency (0-1), BorderSizePixel (0), Image (picsum URL), ImageTransparency (0-1), TextSize (number), TextXAlignment ("Left"/"Center"/"Right"), LayoutOrder (number)
 
-=== STYLE VARIATIONS (rotate between these, NEVER repeat the same style twice) ===
-- Dark Sleek: #0d1117 bg, glass morphism, subtle borders, #3b82f6 accent
-- Neon Cyber: #0a0a1a bg, glowing borders, #06b6d4/#8b5cf6 neon accents, shadow glow
-- Fantasy Medieval: #1a0f0a bg, gold #d4a373 accents, parchment textures, ornate borders
-- Fun Colorful: #1e1e2e bg, rounded bubble shapes, #f472b6/#a78bfa pastel accents  
-- Military/Tactical: #111318 bg, sharp corners, #22c55e radar green accents, HUD style
-- Anime/Japanese: #0f0f23 bg, sakura #fda4af accents, clean lines, minimalist
-- Steampunk: #1a1208 bg, copper #b87333 accents, gear patterns, vintage feel
-- Underwater: #0a1628 bg, teal #14b8a6 accents, bubble effects, fluid shapes
-- Space/Galaxy: #050510 bg, star particles, #7c3aed purple nebula accents
-- Toxic/Gamer: #0a0a0a bg, neon green #22c55e toxic glow, dark aggressive style
+=== MODIFY COMMAND FORMAT ===
+{"action":"modify","target":"ExactElementName","properties":{"BackgroundColor3":"#hex","Text":"new text"}}
+
+=== REMOVE COMMAND FORMAT ===
+{"action":"remove","target":"ExactElementName"}
+
+=== STYLE VARIATIONS (pick one that matches the request) ===
+- Dark Sleek: bg #0d1117, accent #3b82f6, glass borders
+- Neon Cyber: bg #0a0a1a, neon glow #06b6d4/#8b5cf6
+- Fantasy Medieval: bg #1a0f0a, gold #d4a373, ornate
+- Fun Colorful: bg #1e1e2e, pastels #f472b6/#a78bfa
+- Military HUD: bg #111318, green #22c55e, sharp
+- Anime: bg #0f0f23, sakura #fda4af, minimalist
+- Steampunk: bg #1a1208, copper #b87333, vintage
+- Underwater: bg #0a1628, teal #14b8a6, fluid
+- Space Galaxy: bg #050510, purple #7c3aed, cosmic
+- Toxic Gamer: bg #0a0a0a, neon green #22c55e
 
 === DESIGN RULES ===
-- EMOJIS in titles: 🎮 ⚔️ 🛡️ 💰 🔥 ✨ 🏆 ⭐ 💎 ❤️ 🗡️ 🏠 📦 🎯 👑 🎪 🌟 💫 🛒 🎪
-- Special chars: ★ ● ▶ ◀ ▲ ▼ ♦ ◆ → ← ✕ ✓ ► ■ 
-- Rounded corners 8-24px, layered frames with different transparency levels
-- Bold GothamBold/GothamBlack titles, Gotham body text
-- 15-30+ elements per UI — complete, not minimal
+- Use emojis in Text: 🎮 ⚔️ 🛡️ 💰 🔥 ✨ 🏆 ⭐ 💎 🛒
+- 15-25 elements minimum — complete, professional
+- Root elements: parent null. Children: parent "ParentName"
+- Position/size use 0.0-1.0 relative coordinates
 - Image URLs: https://picsum.photos/seed/KEYWORD/200/200
+- Bold titles with GothamBold, body with Gotham
+- Layered frames with varying transparency
 
-=== COMMANDS ===
+=== RESPONSE FORMAT ===
+For clarifying questions: {"message":"question text","commands":[]}
+For building UI: {"message":"Built [description]","commands":[...]}
 
-ADD: {"action":"add","elementType":"Frame|TextLabel|TextButton|ImageLabel|ScrollingFrame|TextBox","name":"PascalCase","parent":null|"ParentName","position":{"X":0.5,"Y":0.5},"size":{"X":0.4,"Y":0.5},"properties":{"BackgroundColor3":"#hex","CornerRadius":12,"Text":"🎮 Game Title","TextColor3":"#f1f5f9","TextScaled":true,"Font":"GothamBold","Image":"https://picsum.photos/seed/xxx/200/200","BackgroundTransparency":0,"BorderSizePixel":0}}
+Output ONLY the JSON object. No markdown fences. No explanation text before or after.` + EDIT_INSTRUCTION;
 
-MODIFY: {"action":"modify","target":"ExactName","properties":{"BackgroundColor3":"#hex","Text":"new text ✨","Size":{"X":0.5,"Y":0.3}}}
+      // Normalization: fix common AI output variations to match our expected format
+      function normalizeCommands(parsed: any): any {
+        if (!parsed || typeof parsed !== "object") return parsed;
+        if (!Array.isArray(parsed.commands)) return parsed;
 
-REMOVE: {"action":"remove","target":"ExactName"}
+        const skipTypes = new Set(["ScreenGui", "ScreenGui", "LocalScript", "Script"]);
+        const nameMap = new Map<string, string>();
 
-RESPONSE: {"message":"description with questions OR build confirmation","commands":[...]}
+        // Pass 1: Build name map, filter wrappers
+        const cleaned = parsed.commands.filter((c: any) => {
+          if (!c || typeof c !== "object") return false;
+          // Fix action names
+          if (c.action === "create") c.action = "add";
+          if (c.action === "delete") c.action = "remove";
+          if (!["add", "modify", "remove"].includes(c.action)) return false;
+          // Filter out wrapper types we don't need
+          if (c.action === "add" && skipTypes.has(c.elementType)) {
+            // But remember its name for child remapping
+            if (c.name) nameMap.set(c.name, "__ROOT__");
+            return false;
+          }
+          return true;
+        });
 
-=== EDITING RULES (when edit_mode active) ===
-- ONLY use modify/remove. NO add commands.
-- Match element names EXACTLY from canvas list
+        // Pass 2: Fix each command
+        for (const c of cleaned) {
+          if (c.action === "add") {
+            // Fix position format variations
+            if (typeof c.position === "string") {
+              const parts = c.position.split(/[,\s]+/).map(Number);
+              c.position = { X: parts[0] || 0.5, Y: parts[1] || 0.5 };
+            }
+            if (!c.position || typeof c.position !== "object") c.position = { X: 0.5, Y: 0.5 };
+            if (c.position.x !== undefined) { c.position.X = c.position.x; c.position.Y = c.position.y; }
 
-=== CREATION RULES ===
-- Root elements first (parent: null), then children
-- 15-30+ elements minimum
-- Color variety: never use the same style for different requests
-- Professional layered look
+            // Fix size format variations
+            if (typeof c.size === "string") {
+              const parts = c.size.split(/[,\s]+/).map(Number);
+              c.size = { X: parts[0] || 0.4, Y: parts[1] || 0.5 };
+            }
+            if (!c.size || typeof c.size !== "object") c.size = { X: 0.4, Y: 0.5 };
+            if (c.size.x !== undefined) { c.size.X = c.size.x; c.size.Y = c.size.y; }
 
-Output ONLY the JSON. No markdown, no explanation.` + EDIT_INSTRUCTION;
+            // Fix parent mapping from filtered wrappers
+            if (c.parent && nameMap.has(c.parent)) {
+              c.parent = null; // Promote to root
+            }
+
+            // Remap CoreGui/StarterGui parents to null
+            if (typeof c.parent === "string" && ["CoreGui", "StarterGui", "StarterGui", "game.Players.LocalPlayer.PlayerGui"].includes(c.parent)) {
+              c.parent = null;
+            }
+
+            // Ensure properties exist
+            if (!c.properties || typeof c.properties !== "object") c.properties = {};
+
+            // Fix Color3.fromRGB(r,g,b) -> #hex
+            const props = c.properties;
+            for (const key of ["BackgroundColor3", "TextColor3", "ImageColor3"]) {
+              if (typeof props[key] === "string" && props[key].includes("fromRGB")) {
+                const match = props[key].match(/fromRGB\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+                if (match) {
+                  const r = parseInt(match[1]).toString(16).padStart(2, "0");
+                  const g = parseInt(match[2]).toString(16).padStart(2, "0");
+                  const b = parseInt(match[3]).toString(16).padStart(2, "0");
+                  props[key] = `#${r}${g}${b}`;
+                }
+              }
+            }
+
+            // Ensure name exists
+            if (!c.name) c.name = `${c.elementType}${Math.random().toString(36).substring(2, 6)}`;
+
+            // Clamp values
+            if (typeof props.BackgroundTransparency === "number") props.BackgroundTransparency = Math.max(0, Math.min(1, props.BackgroundTransparency));
+            if (typeof props.CornerRadius === "number") props.CornerRadius = Math.max(0, Math.min(50, props.CornerRadius));
+          }
+
+          if (c.action === "modify") {
+            // Fix target -> name alias
+            if (c.target && !c.name) c.name = c.target;
+            // Fix properties location (some models put props at root)
+            if (!c.properties) {
+              c.properties = {};
+              for (const k of ["BackgroundColor3", "TextColor3", "Text", "TextScaled", "Font", "CornerRadius", "BackgroundTransparency", "Image", "BorderSizePixel", "Size"]) {
+                if (c[k] !== undefined) { c.properties[k] = c[k]; delete c[k]; }
+              }
+            }
+            // Fix nested size in properties
+            if (c.properties.Size && typeof c.properties.Size === "object") {
+              // Size as modify target — convert to size command
+              if (!c.properties.Size.X && c.properties.Size.x !== undefined) {
+                c.properties.Size = { X: c.properties.Size.x, Y: c.properties.Size.y };
+              }
+            }
+          }
+        }
+
+        // Filter out any remaining invalid commands
+        parsed.commands = cleaned.filter((c: any) => {
+          if (c.action === "add") return c.elementType && c.name;
+          if (c.action === "modify") return (c.target || c.name) && c.properties;
+          if (c.action === "remove") return c.target || c.name;
+          return false;
+        });
+
+        return parsed;
+      }
 
       let parsed = null;
 
@@ -438,41 +532,56 @@ Output ONLY the JSON. No markdown, no explanation.` + EDIT_INSTRUCTION;
         console.log("Force template mode for:", userMsg);
         parsed = generateFromTemplate(userMsg);
       } else {
-      // Try AI model with timeout
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 25000);
-        const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${OPENROUTER_KEY}`,
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://yobest-bytr.vercel.app",
-            "X-Title": "Yobest UI Builder",
-          },
-          body: JSON.stringify({
-            model: "google/gemini-2.0-flash-001:free",
-            messages: [
-              { role: "system", content: SYSTEM_PROMPT + canvasContext },
-              { role: "user", content: userMsg }
-            ],
-            temperature: 0.2,
-            max_tokens: 3000,
-          }),
-          signal: controller.signal,
-        });
-        clearTimeout(timeout);
-        const data = await resp.json();
-        const content = data.choices?.[0]?.message?.content || "";
+        // Try AI model with timeout — fallback through models (fastest first)
+        const models = [
+          "google/gemma-4-26b-a4b-it:free",
+          "nvidia/nemotron-nano-9b-v2:free",
+          "openai/gpt-oss-20b:free",
+        ];
 
-        // Try parse — extract JSON from response
-        try { parsed = JSON.parse(content); } catch {
-          const m = content.match(/\{[\s\S]*\}/);
-          if (m) try { parsed = JSON.parse(m[0]); } catch {}
+        for (const model of models) {
+          if (parsed) break;
+          try {
+            console.log(`Trying AI model: ${model}`);
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 20000);
+            const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${OPENROUTER_KEY}`,
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://yobest-bytr.vercel.app",
+                "X-Title": "Yobest UI Builder",
+              },
+              body: JSON.stringify({
+                model,
+                messages: [
+                  { role: "system", content: SYSTEM_PROMPT + canvasContext },
+                  { role: "user", content: userMsg }
+                ],
+                temperature: 0.2,
+                max_tokens: 3000,
+              }),
+              signal: controller.signal,
+            });
+            clearTimeout(timeout);
+            const data = await resp.json();
+            console.log(`Model ${model} responded:`, resp.status, data.error ? data.error.message : "ok");
+            const content = data.choices?.[0]?.message?.content || "";
+
+            // Try parse — extract JSON from response
+            try { parsed = JSON.parse(content); } catch {
+              const m = content.match(/\{[\s\S]*\}/);
+              if (m) try { parsed = JSON.parse(m[0]); } catch {}
+            }
+
+            if (parsed) {
+              parsed = normalizeCommands(parsed);
+            }
+          } catch (e) {
+            console.log(`Model ${model} failed:`, e instanceof Error ? e.message : e);
+          }
         }
-      } catch (e) {
-        console.log("AI generation failed:", e instanceof Error ? e.message : e);
-      }
       } // end else (AI attempt)
 
       // Validate: commands MUST be an array with valid actions

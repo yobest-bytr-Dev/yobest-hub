@@ -561,6 +561,7 @@ export default function UIGenerator() {
     setBuildingMsg('')
     setBuilding(false)
     buildingRef.current = false
+    setIsLoading(false)
   }, [])
 
   const sendMsg = async (text?: string) => {
@@ -607,8 +608,8 @@ export default function UIGenerator() {
         await applyCmds(am.commands)
       } else {
         setMessages(p => [...p, { role: 'assistant', content: 'No UI elements generated. Try describing what you want, like "shop with 4 items" or "health bar HUD".' }])
+        setIsLoading(false)
       }
-      setIsLoading(false)
     } catch (e) {
       console.error('UI Builder error:', e)
       setIsLoading(false)

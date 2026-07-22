@@ -366,6 +366,18 @@ export default function UIGenerator() {
   const [imgSearching, setImgSearching] = useState(false)
   const [instantBuild, setInstantBuild] = useState(() => localStorage.getItem('ui-instant-build') === 'true')
 
+  // Context menu
+  const [ctxMenu, setCtxMenu] = useState<{x:number; y:number; elId:string} | null>(null)
+
+  // Layer search
+  const [layerSearch, setLayerSearch] = useState('')
+
+  // Clipboard
+  const [clipboard, setClipboard] = useState<UIEl | null>(null)
+
+  // Canvas background
+  const [canvasBg, setCanvasBg] = useState('#1a1a2e')
+
   // Drag & Resize
   const [dragging, setDragging] = useState(false)
   const [dragData, setDragData] = useState<{ sx: number; sy: number; ox: number; oy: number; startX: number; startY: number } | null>(null)
@@ -435,6 +447,67 @@ export default function UIGenerator() {
     const dup: UIEl = { ...el, id: newId, name: el.name + ' Copy', position: { X: el.position.X + 0.02, Y: el.position.Y + 0.02 }, children: [], props: { ...el.props } }
     const newEls = [...elements, dup]
     setElements(newEls); pushHist(newEls); setSelectedId(newId)
+  }, [elements, pushHist])
+
+  const copyEl = useCallback((id: string) => {
+    const el = elements.find(e => e.id === id); if (!el) return
+    setClipboard({ ...el })
+  }, [elements])
+
+  const pasteEl = useCallback(() => {
+    if (!clipboard) return
+    const newId = uid()
+    const paste: UIEl = { ...clipboard, id: newId, name: clipboard.name + ' Paste', position: { X: clipboard.position.X + 0.03, Y: clipboard.position.Y + 0.03 }, children: [], props: { ...clipboard.props } }
+    const newEls = [...elements, paste]
+    setElements(newEls); pushHist(newEls); setSelectedId(newId)
+  }, [clipboard, elements, pushHist])
+
+  const groupEl = useCallback((id: string) => {
+    const el = elements.find(e => e.id === id); if (!el || !el.parentId) return
+    const siblings = elements.filter(e => e.parentId === el.parentId)
+    if (siblings.length < 2) return
+    const frameId = uid()
+    const frame: UIEl = {
+      id: frameId, type: 'Frame', name: 'Group', parentId: el.parentId,
+      position: { X: 0.5, Y: 0.5 }, size: { X: 0.8, Y: 0.8 },
+      props: { BackgroundColor3: '#1a1a2e', BackgroundTransparency: 1, BorderSizePixel: 0, CornerRadius: 0 },
+      children: siblings.map(s => s.id), zIndex: el.zIndex, locked: false, visible: true,
+    }
+    let newEls = elements.map(e => {
+      if (e.id === el.parentId) return { ...e, children: [...e.children, frameId] }
+      if (siblings.some(s => s.id === e.id)) return { ...e, parentId: frameId }
+      return e
+    })
+    newEls = [...newEls, frame]
+    setElements(newEls); pushHist(newEls)
+  }, [elements, pushHist])
+
+  const ungroupEl = useCallback((id: string) => {
+    const el = elements.find(e => e.id === id); if (!el || el.type !== 'Frame' || !el.parentId) return
+    const parent = elements.find(e => e.id === el.parentId)
+    if (!parent) return
+    let newEls = elements.map(e => {
+      if (e.id === id) return null
+      if (el.children.includes(e.id)) return { ...e, parentId: el.parentId }
+      return e
+    }).filter(Boolean) as UIEl[]
+    newEls = newEls.map(e => {
+      if (e.id === el.parentId) return { ...e, children: e.children.filter(c => c !== id).concat(el.children) }
+      return e
+    })
+    setElements(newEls); pushHist(newEls); setSelectedId(null)
+  }, [elements, pushHist])
+
+  const bringToFront = useCallback((id: string) => {
+    const maxZ = Math.max(...elements.map(e => e.zIndex))
+    const newEls = elements.map(e => e.id === id ? { ...e, zIndex: maxZ + 1 } : e)
+    setElements(newEls); pushHist(newEls)
+  }, [elements, pushHist])
+
+  const sendToBack = useCallback((id: string) => {
+    const minZ = Math.min(...elements.map(e => e.zIndex))
+    const newEls = elements.map(e => e.id === id ? { ...e, zIndex: Math.max(0, minZ - 1) } : e)
+    setElements(newEls); pushHist(newEls)
   }, [elements, pushHist])
 
   // Building state
@@ -681,7 +754,9 @@ export default function UIGenerator() {
       if (e.ctrlKey && e.key === 'z') { e.preventDefault(); undo() }
       if (e.ctrlKey && e.key === 'y') { e.preventDefault(); redo() }
       if (e.ctrlKey && e.key === 'd') { e.preventDefault(); if (selectedId) duplicateEl(selectedId) }
-      if (e.key === 'Escape') { if (planeMode) setPlaneMode(false); else setSelectedId(null) }
+      if (e.ctrlKey && e.key === 'c') { e.preventDefault(); if (selectedId) copyEl(selectedId) }
+      if (e.ctrlKey && e.key === 'v') { e.preventDefault(); pasteEl() }
+      if (e.key === 'Escape') { if (planeMode) setPlaneMode(false); else { setSelectedId(null); setCtxMenu(null) } }
       if (selectedId && buildMode && !building) {
         const nudge = e.shiftKey ? 0.01 : 0.005
         const el = elements.find(x => x.id === selectedId); if (!el) return
@@ -692,7 +767,7 @@ export default function UIGenerator() {
       }
     }
     window.addEventListener('keydown', handler); return () => window.removeEventListener('keydown', handler)
-  }, [selectedId, buildMode, building, elements, removeEl, updateEl, undo, redo, duplicateEl, planeMode])
+  }, [selectedId, buildMode, building, elements, removeEl, updateEl, undo, redo, duplicateEl, copyEl, pasteEl, planeMode])
 
   const suggestedPrompts = [
     'Create a neon cyberpunk shop with glowing borders',
@@ -761,12 +836,19 @@ export default function UIGenerator() {
       const isContainer = CONTAINER_TYPES.includes(el.type)
       const isCollapsed = collapsedNodes.has(el.id)
       const childCount = el.children.length
+      const matchesSearch = !layerSearch || el.name.toLowerCase().includes(layerSearch.toLowerCase()) || el.type.toLowerCase().includes(layerSearch.toLowerCase())
+      const hasMatchingChild = layerSearch && el.children.some(cid => {
+        const child = elements.find(e => e.id === cid)
+        return child && (child.name.toLowerCase().includes(layerSearch.toLowerCase()) || child.type.toLowerCase().includes(layerSearch.toLowerCase()))
+      })
+      if (!matchesSearch && !hasMatchingChild && layerSearch) return null
       return (
         <div key={el.id}>
           <div
             className={cn('flex items-center gap-1.5 px-2 py-1 cursor-pointer transition-all group',
               selectedId === el.id ? 'bg-accent-blue/10 text-accent-blue' : 'text-text-secondary hover:bg-bg-elevated')}
             onClick={() => setSelectedId(el.id)}
+            onContextMenu={(e) => { e.preventDefault(); setSelectedId(el.id); setCtxMenu({ x: e.clientX, y: e.clientY, elId: el.id }) }}
             style={{ paddingLeft: `${12 + depth * 12}px` }}>
             {isContainer && childCount > 0 ? (
               <button onClick={(e) => { e.stopPropagation(); toggleCollapse(el.id) }}
@@ -974,6 +1056,11 @@ export default function UIGenerator() {
         <button onClick={() => setInstantBuild(!instantBuild)} className={cn('flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all', instantBuild ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'text-text-dim hover:text-text-muted border border-transparent')} title="Skip animation, build instantly">
           <Zap size={11} /> Instant
         </button>
+        <div className="flex items-center gap-1" title="Canvas background color">
+          <span className="text-[9px] text-text-dim">BG:</span>
+          <input type="color" value={canvasBg} onChange={e => setCanvasBg(e.target.value)}
+            className="w-5 h-5 rounded border border-border-primary cursor-pointer" />
+        </div>
 
         {/* Layout mode selector - only visible when container is selected */}
         {isContainerSelected && (
@@ -1066,6 +1153,12 @@ export default function UIGenerator() {
               <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Layers</span>
               <span className="text-[10px] text-text-dim">{elements.length}</span>
             </div>
+            {elements.length > 0 && (
+              <div className="px-2 py-1.5 border-b border-border-primary/50">
+                <input value={layerSearch} onChange={e => setLayerSearch(e.target.value)} placeholder="Search layers..."
+                  className="w-full px-2 py-1 rounded bg-bg-secondary border border-border-primary text-[9px] text-text-primary placeholder:text-text-dim focus:outline-none focus:border-accent-blue/50" />
+              </div>
+            )}
             <div className="flex-1 overflow-y-auto py-1">
               {elements.length === 0 && <p className="px-3 py-4 text-[10px] text-text-dim text-center">No elements yet</p>}
               {renderLayerTree(null, 0)}
@@ -1090,7 +1183,7 @@ export default function UIGenerator() {
               }} />
             )}
             {/* Screen */}
-            <div className="absolute inset-0 bg-[#1a1a2e] rounded-lg border border-white/5 shadow-2xl overflow-hidden">
+            <div className="absolute inset-0 rounded-lg border border-white/5 shadow-2xl overflow-hidden" style={{ backgroundColor: canvasBg }}>
               {/* Recursive element renderer */}
               {(() => {
                 const renderEl = (el: UIEl, isChild = false): React.ReactNode => {
@@ -1121,6 +1214,7 @@ export default function UIGenerator() {
                       }}
                       className={cn('cursor-pointer select-none group', isBuilding && 'el-building', isContainer && 'hover:ring-1 hover:ring-white/10')}
                       onClick={(e) => { e.stopPropagation(); setSelectedId(el.id) }}
+                      onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedId(el.id); setCtxMenu({ x: e.clientX, y: e.clientY, elId: el.id }) }}
                       onMouseDown={(e) => { e.stopPropagation(); if (buildMode && !el.locked) { setSelectedId(el.id); handleCanvasDown(e) } }}>
                       {childEls.map(child => renderEl(child, true))}
                       {/* Hover label */}
@@ -1270,7 +1364,7 @@ export default function UIGenerator() {
                 const expanded = expandedGroups.has(group)
                 return (
                   <div key={group} className="border-b border-border-primary/50">
-                    <button onClick={() => { const s = new Set(expandedGroups); expanded.has(s.delete(group)) ? s.add(group) : null; setExpandedGroups(s) }}
+                    <button onClick={() => { const s = new Set(expandedGroups); if (s.has(group)) s.delete(group); else s.add(group); setExpandedGroups(s) }}
                       className="w-full flex items-center gap-1.5 px-3 py-1.5 text-[9px] font-bold text-text-dim uppercase tracking-wider hover:bg-bg-elevated transition-all">
                       {expanded ? <ChevronDown size={9} /> : <ChevronRight size={9} />}{group}
                     </button>
@@ -1497,6 +1591,34 @@ export default function UIGenerator() {
           </button>
           <div className="fixed bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 px-4 py-2 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 text-white/50 text-[10px] z-50">
             <span>Fullscreen Preview</span><span className="text-white/20">|</span><span>{elements.length} elements</span><span className="text-white/20">|</span><span>{dev.name} {dev.w}×{dev.h}</span><span className="text-white/20">|</span><span>Esc to exit</span>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Context Menu ─── */}
+      {ctxMenu && (
+        <div className="fixed inset-0 z-[70]" onClick={() => setCtxMenu(null)} onContextMenu={e => { e.preventDefault(); setCtxMenu(null) }}>
+          <div className="absolute bg-bg-elevated border border-border-primary rounded-xl shadow-2xl py-1 min-w-[160px]"
+            style={{ left: ctxMenu.x, top: ctxMenu.y }} onClick={e => e.stopPropagation()}>
+            {[
+              { label: 'Duplicate', icon: '📋', fn: () => { duplicateEl(ctxMenu.elId); setCtxMenu(null) } },
+              { label: 'Copy', icon: '📄', fn: () => { copyEl(ctxMenu.elId); setCtxMenu(null) } },
+              { label: 'Paste', icon: '📌', fn: () => { pasteEl(); setCtxMenu(null) }, disabled: !clipboard },
+              'sep',
+              { label: 'Bring to Front', icon: '⬆️', fn: () => { bringToFront(ctxMenu.elId); setCtxMenu(null) } },
+              { label: 'Send to Back', icon: '⬇️', fn: () => { sendToBack(ctxMenu.elId); setCtxMenu(null) } },
+              'sep',
+              { label: 'Delete', icon: '🗑️', fn: () => { removeEl(ctxMenu.elId); setCtxMenu(null) }, danger: true },
+            ].map((item, i) => item === 'sep' ? (
+              <div key={i} className="h-px bg-border-primary my-1" />
+            ) : (
+              <button key={i} onClick={(item as any).fn} disabled={(item as any).disabled}
+                className={cn('w-full flex items-center gap-2 px-3 py-1.5 text-[10px] transition-all',
+                  (item as any).disabled ? 'text-text-dim/30 cursor-not-allowed' : (item as any).danger ? 'text-red-400 hover:bg-red-500/10' : 'text-text-primary hover:bg-bg-secondary')}>
+                <span className="text-[11px]">{(item as any).icon}</span>
+                <span className="font-medium">{(item as any).label}</span>
+              </button>
+            ))}
           </div>
         </div>
       )}

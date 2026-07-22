@@ -7,6 +7,7 @@ import { supabase } from '@/config/supabase'
 import { cn } from '@/lib/utils'
 import AdBanner from '@/components/AdBanner'
 import { useNavigate } from 'react-router-dom'
+import { useToast } from '@/components/ui/Toast'
 
 const ThreeDGenerator = lazy(() => import('@/components/tools/ThreeDGenerator'))
 const UIGenerator = lazy(() => import('@/components/tools/UIGenerator'))
@@ -111,6 +112,7 @@ function ToolLoader() {
 
 export default function Tools() {
   const navigate = useNavigate()
+  const { toast } = useToast()
   const [tools, setTools] = useState<YobestTool[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -219,8 +221,14 @@ export default function Tools() {
             <div className="mb-6 p-5 rounded-2xl bg-gradient-to-r from-accent-blue/10 to-accent-purple/10 border border-accent-blue/15">
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 rounded-xl bg-accent-blue/20 flex items-center justify-center shrink-0"><Box size={24} className="text-accent-blue" /></div>
-                <div>
-                  <h2 className="text-lg font-bold text-text-primary mb-1">3D Model Generator</h2>
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-1">
+                    <h2 className="text-lg font-bold text-text-primary">3D Model Generator</h2>
+                    <button onClick={() => { navigator.clipboard.writeText(window.location.origin + '/tools/3d-generator'); toast('Link copied!', 'success') }}
+                      className="text-[10px] text-text-dim hover:text-accent-blue px-2 py-0.5 rounded-md bg-bg-secondary border border-border-primary hover:border-accent-blue/30 transition-all">
+                      📋 Copy Share Link
+                    </button>
+                  </div>
                   <p className="text-sm text-text-muted leading-relaxed">Generate 3D models from text descriptions using Yobest3D AI. Describe your model, choose quality settings, and generate in seconds. Download as GLB for Blender, Roblox Studio, or other 3D software.</p>
                 </div>
               </div>
@@ -236,8 +244,14 @@ export default function Tools() {
             <div className="mb-6 p-5 rounded-2xl bg-gradient-to-r from-accent-purple/10 to-accent-pink/10 border border-accent-purple/15">
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 rounded-xl bg-accent-purple/20 flex items-center justify-center shrink-0"><Palette size={24} className="text-accent-purple" /></div>
-                <div>
-                  <h2 className="text-lg font-bold text-text-primary mb-1">Roblox UI Generator</h2>
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-1">
+                    <h2 className="text-lg font-bold text-text-primary">Roblox UI Generator</h2>
+                    <button onClick={() => { navigator.clipboard.writeText(window.location.origin + '/tools/ui-generator'); toast('Link copied!', 'success') }}
+                      className="text-[10px] text-text-dim hover:text-accent-purple px-2 py-0.5 rounded-md bg-bg-secondary border border-border-primary hover:border-accent-purple/30 transition-all">
+                      📋 Copy Share Link
+                    </button>
+                  </div>
                   <p className="text-sm text-text-muted leading-relaxed">Describe the UI you want and AI will generate ready-to-use Roblox Studio Lua code. Includes Frames, TextLabels, Buttons, UICorner, UIStroke, UIGradient, and more. Copy and paste directly into Roblox Studio.</p>
                 </div>
               </div>

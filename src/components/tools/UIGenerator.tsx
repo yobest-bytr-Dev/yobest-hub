@@ -680,7 +680,7 @@ export default function UIGenerator() {
       if (e.ctrlKey && e.key === 'z') { e.preventDefault(); undo() }
       if (e.ctrlKey && e.key === 'y') { e.preventDefault(); redo() }
       if (e.ctrlKey && e.key === 'd') { e.preventDefault(); if (selectedId) duplicateEl(selectedId) }
-      if (e.key === 'Escape') setSelectedId(null)
+      if (e.key === 'Escape') { if (planeMode) setPlaneMode(false); else setSelectedId(null) }
       if (selectedId && buildMode && !building) {
         const nudge = e.shiftKey ? 0.01 : 0.005
         const el = elements.find(x => x.id === selectedId); if (!el) return
@@ -691,7 +691,7 @@ export default function UIGenerator() {
       }
     }
     window.addEventListener('keydown', handler); return () => window.removeEventListener('keydown', handler)
-  }, [selectedId, buildMode, building, elements, removeEl, updateEl, undo, redo, duplicateEl])
+  }, [selectedId, buildMode, building, elements, removeEl, updateEl, undo, redo, duplicateEl, planeMode])
 
   const suggestedPrompts = [
     'Shop with 4 items, prices, and buy buttons',
@@ -959,7 +959,7 @@ export default function UIGenerator() {
         <button onClick={() => setBuildMode(!buildMode)} className={cn('flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all', buildMode ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'text-text-dim hover:text-text-muted border border-transparent')} title="Toggle select/drag/resize mode">
           <MousePointer2 size={11} /> Build
         </button>
-        <button onClick={() => setPlaneMode(!planeMode)} className={cn('flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all', planeMode ? 'bg-accent-purple/10 text-accent-purple border border-accent-purple/20' : 'text-text-dim hover:text-text-muted border border-transparent')} title="Preview UI without editor chrome">
+        <button onClick={() => elements.length > 0 && setPlaneMode(!planeMode)} className={cn('flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all', planeMode ? 'bg-accent-purple/10 text-accent-purple border border-accent-purple/20' : elements.length === 0 ? 'text-text-dim/30 border border-transparent cursor-not-allowed' : 'text-text-dim hover:text-text-muted border border-transparent')} title={elements.length === 0 ? "Add elements first to preview" : "Preview UI without editor chrome"}>
           <Eye size={11} /> Plane
         </button>
         <button onClick={() => setShowGrid(!showGrid)} className={cn('flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-all', showGrid ? 'bg-accent-purple/10 text-accent-purple border border-accent-purple/20' : 'text-text-dim hover:text-text-muted border border-transparent')}>
@@ -1451,35 +1451,40 @@ export default function UIGenerator() {
       </div>
 
       {/* ─── Plane Mode ─── */}
-      {planeMode && (
+      {planeMode && elements.length > 0 && (
         <div className="fixed inset-0 z-[60] bg-[#08080c] flex items-center justify-center">
           <div className="relative" style={{ width: cw, height: ch }}>
             <div className="absolute inset-0 bg-[#1a1a2e] rounded-lg shadow-2xl overflow-hidden">
               {(() => {
-                const renderPreviewEl = (el: UIEl, isRoot = false): React.ReactNode => {
+                const renderPreviewEl = (el: UIEl): React.ReactNode => {
                   if (!el.visible) return null
                   const childEls = el.children.map(cid => elements.find(e => e.id === cid)).filter(Boolean) as UIEl[]
+                  const p = el.props
                   const style: React.CSSProperties = {
                     position: 'absolute', left: `${el.position.X * 100}%`, top: `${el.position.Y * 100}%`,
                     width: `${el.size.X * 100}%`, height: `${el.size.Y * 100}%`,
-                    transform: 'translate(-50%, -50%)',
-                    backgroundColor: (el.props.BackgroundTransparency ?? 0) >= 1 ? 'transparent' : parseColor(el.props.BackgroundColor3),
-                    borderRadius: el.props.CornerRadius || 0, zIndex: el.zIndex || 1, overflow: 'hidden',
-                    border: el.props.BorderSizePixel > 0 ? `${el.props.BorderSizePixel}px solid ${parseColor(el.props.BorderColor3)}` : undefined,
+                    transform: `translate(-50%, -50%)${p.Rotation ? ` rotate(${p.Rotation}deg)` : ''}`,
+                    backgroundColor: (p.BackgroundTransparency ?? 0) >= 1 ? 'transparent' : parseColor(p.BackgroundColor3),
+                    borderRadius: p.CornerRadius || 0, zIndex: el.zIndex || 1,
+                    overflow: el.type === 'ScrollingFrame' ? 'auto' : 'hidden',
+                    border: p.BorderSizePixel > 0 ? `${p.BorderSizePixel}px solid ${parseColor(p.BorderColor3)}` : undefined,
                   }
                   return (
                     <div key={el.id} style={style} className="select-none">
                       {childEls.map(child => renderPreviewEl(child))}
                       {(el.type === 'TextLabel' || el.type === 'TextButton' || el.type === 'TextBox') && childEls.length === 0 && (
-                        <span style={{ color: parseColor(el.props.TextColor3), fontSize: el.props.TextScaled ? undefined : (el.props.TextSize || 14), textAlign: el.props.TextXAlignment === 'Left' ? 'left' : el.props.TextXAlignment === 'Right' ? 'right' : 'center' }} className="px-2 font-bold truncate w-full block">{el.props.Text || (el.type === 'TextBox' ? 'Input...' : 'Text')}</span>
+                        <span style={{ color: parseColor(p.TextColor3), fontSize: p.TextScaled ? undefined : (p.TextSize || 14), textAlign: p.TextXAlignment === 'Left' ? 'left' : p.TextXAlignment === 'Right' ? 'right' : 'center', fontWeight: p.Font?.includes('Bold') ? 'bold' : undefined }} className="px-2 truncate w-full block">{p.Text || (el.type === 'TextBox' ? 'Input...' : 'Text')}</span>
                       )}
-                      {el.type === 'ImageLabel' && el.props.Image && childEls.length === 0 && (
-                        <img src={el.props.Image} alt="" className="w-full h-full object-cover" style={{ opacity: 1 - (el.props.ImageTransparency || 0) }} />
+                      {el.type === 'ImageLabel' && p.Image && childEls.length === 0 && (
+                        <img src={p.Image} alt="" className="w-full h-full object-cover" style={{ opacity: 1 - (p.ImageTransparency || 0) }} />
+                      )}
+                      {el.type === 'ScrollingFrame' && childEls.length === 0 && (
+                        <div className="absolute inset-0 flex items-center justify-center text-white/10 text-[9px]">Scroll Area</div>
                       )}
                     </div>
                   )
                 }
-                return roots.map(el => renderPreviewEl(el, true))
+                return roots.map(el => renderPreviewEl(el))
               })()}
             </div>
           </div>
@@ -1487,8 +1492,8 @@ export default function UIGenerator() {
             className="fixed top-4 right-4 flex items-center gap-2 px-4 py-2 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 text-white text-xs font-medium hover:bg-black/80 transition-all z-50">
             <X size={14} /> Exit Plane
           </button>
-          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 text-white/50 text-[10px] z-50">
-            Plane Mode — {elements.length} elements — {dev.w}×{dev.h}
+          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 px-4 py-2 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 text-white/50 text-[10px] z-50">
+            <span>Preview</span><span className="text-white/20">|</span><span>{elements.length} elements</span><span className="text-white/20">|</span><span>{dev.name} {dev.w}×{dev.h}</span><span className="text-white/20">|</span><span>Esc to exit</span>
           </div>
         </div>
       )}

@@ -9,11 +9,16 @@ import OptionsDialog from './OptionsDialog'
 import type { ModelStats, AnimationInfo, DetectedMesh, MeshAssignment } from './ModelComponent'
 
 const SAMPLE_MODELS = [
-  { name: 'Basic PBR', file: '/models/base_basic_pbr.glb', desc: 'Standard PBR material model' },
-  { name: 'PBR Variant A', file: '/models/base_basic_pbr%20(3).glb', desc: 'PBR material variant' },
-  { name: 'PBR Variant B', file: '/models/base_basic_pbr%20(6).glb', desc: 'PBR material variant' },
-  { name: 'PBR Variant C', file: '/models/base_basic_pbr%20(9).glb', desc: 'PBR material variant' },
-  { name: 'Cyber Car', file: '/models/floating_futuristic_cyber_car_jfg.glb', desc: 'Futuristic floating cyber car' },
+  { name: 'Damaged Helmet', file: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/main/2.0/DamagedHelmet/glTF-Binary/DamagedHelmet.glb', desc: 'Battle-worn sci-fi helmet', icon: '🪖', color: 'from-red-500/20 to-orange-500/20' },
+  { name: 'Flight Helmet', file: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/main/2.0/FlightHelmet/glTF-Binary/FlightHelmet.glb', desc: 'Vintage aviator helmet & goggles', icon: '飞行员', color: 'from-amber-500/20 to-yellow-500/20' },
+  { name: 'Fox', file: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/main/2.0/Fox/glTF-Binary/Fox.glb', desc: 'Animated cartoon fox', icon: '🦊', color: 'from-orange-500/20 to-amber-500/20' },
+  { name: 'Boom Box', file: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/main/2.0/BoomBox/glTF-Binary/BoomBox.glb', desc: 'Retro boombox speaker', icon: '📻', color: 'from-pink-500/20 to-rose-500/20' },
+  { name: 'Avocado', file: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/main/2.0/Avocado/glTF-Binary/Avocado.glb', desc: 'Realistic avocado', icon: '🥑', color: 'from-green-500/20 to-emerald-500/20' },
+  { name: 'Lantern', file: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/main/2.0/Lantern/glTF-Binary/Lantern.glb', desc: 'Ornate gas lantern', icon: '🏮', color: 'from-yellow-500/20 to-amber-500/20' },
+  { name: 'Water Bottle', file: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/main/2.0/WaterBottle/glTF-Binary/WaterBottle.glb', desc: 'Modern water bottle', icon: '🧴', color: 'from-cyan-500/20 to-blue-500/20' },
+  { name: 'Brain Stem', file: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/main/2.0/BrainStem/glTF-Binary/BrainStem.glb', desc: 'Animated robot character', icon: '🤖', color: 'from-violet-500/20 to-purple-500/20' },
+  { name: 'Milk Truck', file: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/main/2.0/CesiumMilkTruck/glTF-Binary/CesiumMilkTruck.glb', desc: 'Animated delivery truck', icon: '🚚', color: 'from-blue-500/20 to-indigo-500/20' },
+  { name: 'Duck', file: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/main/2.0/Duck/glTF-Binary/Duck.glb', desc: 'Classic rubber duck', icon: '🦆', color: 'from-yellow-400/20 to-yellow-600/20' },
 ]
 
 const RODIN_API = `${supabaseUrl}/functions/v1/rodin-api`
@@ -240,15 +245,15 @@ export default function ThreeDGenerator() {
           <div className="absolute bottom-0 left-0 right-0 pointer-events-auto">
             <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
             <div className="relative px-4 pb-4 max-w-4xl mx-auto">
-              <div className="mb-3 flex gap-2 overflow-x-auto pb-2 scrollbar-none">
+              <div className="mb-3 flex gap-2 overflow-x-auto pb-2 scrollbar-none px-1">
                 {SAMPLE_MODELS.map((m, i) => (
                   <button key={i} onClick={() => { setModelUrl(m.file); setShowPrompt(false); setIsLoading(false); setStage(null); setError(null) }}
-                    className="shrink-0 w-40 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 hover:border-white/25 p-3 text-left transition-all hover:bg-white/10 group">
-                    <div className="w-10 h-10 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                      <Box size={18} className="text-white/40" />
+                    className="shrink-0 w-44 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 hover:border-white/30 p-3 text-left transition-all hover:bg-white/10 group hover:scale-[1.02]">
+                    <div className={`w-full h-12 rounded-lg bg-gradient-to-br ${m.color} border border-white/5 flex items-center justify-center mb-2.5 group-hover:scale-105 transition-transform`}>
+                      <span className="text-2xl">{m.icon}</span>
                     </div>
-                    <p className="text-xs font-medium text-white/80 truncate">{m.name}</p>
-                    <p className="text-[10px] text-white/30 truncate">{m.desc}</p>
+                    <p className="text-[11px] font-semibold text-white/90 truncate">{m.name}</p>
+                    <p className="text-[9px] text-white/35 truncate mt-0.5">{m.desc}</p>
                   </button>
                 ))}
               </div>

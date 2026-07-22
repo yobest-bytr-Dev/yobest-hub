@@ -23,6 +23,7 @@ import Tools from '@/pages/Tools'
 import ForgotPassword from '@/pages/ForgotPassword'
 import ResetPassword from '@/pages/ResetPassword'
 import NotFound from '@/pages/NotFound'
+import StandaloneTool from '@/pages/StandaloneTool'
 
 const Router = import.meta.env.PROD ? BrowserRouter : HashRouter
 
@@ -52,6 +53,8 @@ export default function App() {
             <Route path="/dmca" element={<DMCA />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/tools" element={<Tools />} />
+            <Route path="/tools/3d-generator" element={<StandaloneTool toolId="3d-generator" />} />
+            <Route path="/tools/ui-generator" element={<StandaloneTool toolId="ui-generator" />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="*" element={<NotFound />} />

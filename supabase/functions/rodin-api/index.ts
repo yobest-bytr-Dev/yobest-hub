@@ -370,67 +370,76 @@ Use the EXACT element names from the canvas list above.
 Example: if user says "make title bigger", output: {"action":"modify","target":"TitleName","properties":{"Size":{"X":0.8,"Y":0.15}}}
 Example: if user says "change color to red", output: {"action":"modify","target":"FrameName","properties":{"BackgroundColor3":"#ef4444"}}` : '';
 
-      const SYSTEM_PROMPT = `You are an expert Roblox UI designer. Generate stunning, professional game interfaces.
+      const SYSTEM_PROMPT = `You are a top Roblox UI designer who creates interfaces seen in popular games like Blox Fruits, Adopt Me, Pet Simulator 99, Murder Mystery 2, Jailbreak, and Tower of Hell.
 
-=== OUTPUT FORMAT — EXACTLY THIS JSON STRUCTURE ===
-You MUST return a single JSON object with exactly these two keys:
-- "message": short description string
-- "commands": array of command objects
+=== OUTPUT FORMAT ===
+Return ONLY: {"message":"description","commands":[...]}
 
-=== ADD COMMAND FORMAT (for creating elements) ===
-{"action":"add","elementType":"Frame","name":"UniqueName","parent":null,"position":{"X":0.5,"Y":0.5},"size":{"X":0.4,"Y":0.5},"properties":{"BackgroundColor3":"#0d1117","CornerRadius":12,"BackgroundTransparency":0,"BorderSizePixel":0}}
+=== ADD COMMAND ===
+{"action":"add","elementType":"TYPE","name":"Name","parent":null,"position":{"X":0.5,"Y":0.5},"size":{"X":0.4,"Y":0.5},"properties":{...}}
 
-Valid elementType values: "Frame", "TextLabel", "TextButton", "ImageLabel", "ScrollingFrame", "TextBox"
-Valid properties: BackgroundColor3 (#hex), Text (string with emojis), TextColor3 (#hex), TextScaled (boolean), Font ("GothamBold" or "Gotham"), CornerRadius (number 0-50), BackgroundTransparency (0-1), BorderSizePixel (0), Image (picsum URL), ImageTransparency (0-1), TextSize (number), TextXAlignment ("Left"/"Center"/"Right"), LayoutOrder (number)
+=== MODIFY COMMAND ===
+{"action":"modify","target":"Name","properties":{"BackgroundColor3":"#hex"}}
 
-=== MODIFY COMMAND FORMAT ===
-{"action":"modify","target":"ExactElementName","properties":{"BackgroundColor3":"#hex","Text":"new text"}}
+=== REMOVE COMMAND ===
+{"action":"remove","target":"Name"}
 
-=== REMOVE COMMAND FORMAT ===
-{"action":"remove","target":"ExactElementName"}
+=== ELEMENT TYPES ===
+Frame, TextLabel, TextButton, ImageLabel, ScrollingFrame, TextBox
 
-=== STYLE VARIATIONS (pick one that matches the request) ===
-- Dark Sleek: bg #0d1117, accent #3b82f6, glass borders
-- Neon Cyber: bg #0a0a1a, neon glow #06b6d4/#8b5cf6
-- Fantasy Medieval: bg #1a0f0a, gold #d4a373, ornate
-- Fun Colorful: bg #1e1e2e, pastels #f472b6/#a78bfa
-- Military HUD: bg #111318, green #22c55e, sharp
-- Anime: bg #0f0f23, sakura #fda4af, minimalist
-- Steampunk: bg #1a1208, copper #b87333, vintage
-- Underwater: bg #0a1628, teal #14b8a6, fluid
-- Space Galaxy: bg #050510, purple #7c3aed, cosmic
-- Toxic Gamer: bg #0a0a0a, neon green #22c55e
+=== PROPERTIES ===
+BackgroundColor3 (#hex), BackgroundTransparency (0-1), BorderSizePixel (0), CornerRadius (0-50)
+Text (string), TextColor3 (#hex), TextScaled (bool), Font (GothamBold/Gotham), TextSize (number)
+TextXAlignment (Left/Center/Right), LayoutOrder (number)
+Image (URL), ImageTransparency (0-1)
 
-=== DESIGN RULES ===
-- Use emojis in Text: 🎮 ⚔️ 🛡️ 💰 🔥 ✨ 🏆 ⭐ 💎 🛒
-- 15-25 elements minimum — complete, professional
-- Root elements: parent null. Children: parent "ParentName"
-- Image URLs: https://picsum.photos/seed/KEYWORD/200/200
-- Bold titles with GothamBold, body with Gotham
-- Layered frames with varying transparency
+=== IMAGE AND ICON STRATEGY (IMPORTANT) ===
+Use these URL patterns for images — vary the seed for different images:
+- Game thumbnails: https://picsum.photos/seed/game1/200/200, https://picsum.photos/seed/game2/200/200
+- Weapon/item icons: https://picsum.photos/seed/sword1/100/100, https://picsum.photos/seed/shield1/100/100
+- Character avatars: https://picsum.photos/seed/avatar1/150/150
+- Background textures: https://picsum.photos/seed/darktech/400/400
+- Shop items: https://picsum.photos/seed/item1/200/200, https://picsum.photos/seed/item2/200/200
+- Coins/gems: https://picsum.photos/seed/goldcoin/80/80, https://picsum.photos/seed/ruby/80/80
+ALWAYS use ImageLabel for game thumbnails, item icons, avatars, and backgrounds.
+Use emojis IN Text property for icons: 🎮 ⚔️ 🛡️ 💰 🔥 ✨ 🏆 ⭐ 💎 🛒 👑 🗡️ 🏹 🛒 ❤️ 🎯 💜 🔵 ⚡ 🌟
+
+=== POPULAR ROBLOX UI PATTERNS ===
+1. SHOP UI: Dark background, grid of item cards with ImageLabel thumbnail + name + price + "Buy" button, currency display at top, close button
+2. INVENTORY: ScrollingFrame with grid of item slots, each slot = ImageLabel + quantity TextLabel, drag-to-equip
+3. HUD: Top bar (health/coins/level), minimap area, action buttons at bottom
+4. QUEST LOG: Side panel with scrollable quest list, each with icon + title + progress bar
+5. MAIN MENU: Large game logo ImageLabel, centered buttons (Play, Shop, Settings, Inventory)
+6. STATS PAGE: Character model area + stat bars (Strength, Speed, Defense) with progress bars
+7. BATTLE UI: Player cards top-left/bottom-right, health bars, ability buttons at bottom
+8. LEADERBOARD: Tabbed header, scrollable player list with rank + avatar + name + score
+
+=== DESIGN STYLES ===
+- Dark Gaming: bg #0d1117/#111827, accent #3b82f6, glass morphism borders, 8-12px corner radius
+- Neon Cyberpunk: bg #0a0a1a, neon cyan #06b6d4 + purple #8b5cf6, glowing borders
+- Fantasy Medieval: bg #1a0f0a, gold #d4a373, ornate borders, parchment textures
+- Fun Colorful: bg #1e1e2e, pastels #f472b6/#a78bfa, rounded, playful
+- Military HUD: bg #111318, green #22c55e, sharp corners, tactical grid
+- Anime Style: bg #0f0f23, sakura pink #fda4af, clean minimalist
+- Toxic Gamer: bg #0a0a0a, neon green #22c55e, toxic drip effects
+- Space Galaxy: bg #050510, purple #7c3aed, cosmic particles
+- Pirate/Adventure: bg #1a1208, warm brown #b87333, wooden frame textures
+
+=== LAYOUT RULES ===
+- 12-18 elements. Make every element count — quality over quantity
+- Root elements: parent null. Children: parent="ParentName"
+- Root Frame: position {"X":0.5,"Y":0.5}, size {"X":0.7,"Y":0.75} for most UIs
+- Children position is RELATIVE to parent center (0.5,0.5 = center of parent)
+- Children size is RELATIVE to parent (1.0,1.0 = same size as parent)
+- For 3 cards side by side: X = 0.17, 0.5, 0.83
+- For 4 cards: X = 0.125, 0.375, 0.625, 0.875
 
 === POSITION AND SIZE RULES (CRITICAL) ===
-- ALL position values MUST be objects with BOTH X and Y: {"X":0.5,"Y":0.5}
-- ALL size values MUST be objects with BOTH X and Y: {"X":0.4,"Y":0.5}
-- NEVER output position as a single number, string, null, or missing a field
-- Root Frame: position 0.5,0.5 = center of screen. size 0.6,0.7 = 60% wide, 70% tall
-- Child elements: position is RELATIVE to parent center (0.5,0.5 = center of parent)
-- Child elements: size is RELATIVE to parent (1.0,1.0 = same size as parent)
-- For 3 side-by-side cards: use position X values like 0.17, 0.5, 0.83 (evenly spaced)
-- Values MUST be between 0.0 and 1.0 (never negative, never over 1.0)
+- EVERY add command MUST have position={"X":N,"Y":N} and size={"X":N,"Y":N} with BOTH fields
+- NEVER: position={"X":0.5} (missing Y), position=0.5 (not object), position={"X":-0.3} (negative)
+- Values MUST be 0.0 to 1.0 (never negative, never over 1.5)
 
-=== RESPONSE FORMAT ===
-For clarifying questions: {"message":"question text","commands":[]}
-For building UI: {"message":"Built [description]","commands":[...]}
-
-Each command MUST look EXACTLY like this:
-{"action":"add","elementType":"Frame","name":"MyFrame","parent":null,"position":{"X":0.5,"Y":0.5},"size":{"X":0.4,"Y":0.5},"properties":{"BackgroundColor3":"#0d1117","CornerRadius":8}}
-
-IMPORTANT: position={"X":0.5,"Y":0.5} — both X and Y are required numbers.
-IMPORTANT: size={"X":0.4,"Y":0.5} — both X and Y are required numbers.
-NEVER: position={"X":0.5} (missing Y) or position=0.5 (not an object) or position={"X":-0.3} (negative)
-
-Output ONLY the JSON object. No markdown fences. No explanation text before or after.` + EDIT_INSTRUCTION;
+Output ONLY the JSON. No markdown. No explanation.` + EDIT_INSTRUCTION;
 
       // Normalization: fix common AI output variations to match our expected format
       function normalizeCommands(parsed: any): any {
@@ -560,11 +569,12 @@ Output ONLY the JSON object. No markdown fences. No explanation text before or a
         console.log("Force template mode for:", userMsg);
         parsed = generateFromTemplate(userMsg);
       } else {
-        // Try AI model with timeout — fallback through models (fastest first)
+        // Try AI model — single model with generous timeout
+        // Free OpenRouter models can take 30-90s. Edge function limit is 150s.
+        // We try 2 models max to stay under the limit.
         const models = [
-          "google/gemma-4-26b-a4b-it:free",
-          "nvidia/nemotron-nano-9b-v2:free",
-          "openai/gpt-oss-20b:free",
+          "nvidia/nemotron-nano-9b-v2:free",    // fastest free model
+          "google/gemma-4-26b-a4b-it:free",      // best quality fallback
         ];
 
         for (const model of models) {
@@ -572,7 +582,8 @@ Output ONLY the JSON object. No markdown fences. No explanation text before or a
           try {
             console.log(`Trying AI model: ${model}`);
             const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 20000);
+            // 45s per model — enough for slow free models, leaves room for 2nd attempt
+            const timeout = setTimeout(() => controller.abort(), 45000);
             const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
               method: "POST",
               headers: {
@@ -588,7 +599,7 @@ Output ONLY the JSON object. No markdown fences. No explanation text before or a
                   { role: "user", content: userMsg }
                 ],
                 temperature: 0.2,
-                max_tokens: 3000,
+                max_tokens: 2000,
               }),
               signal: controller.signal,
             });

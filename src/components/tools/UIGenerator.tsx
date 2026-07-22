@@ -9,6 +9,74 @@ import { cn } from '@/lib/utils'
 import { supabaseUrl } from '@/config/supabase'
 
 const CHAT_API = `${supabaseUrl}/functions/v1/rodin-api?action=ui-generate`
+const OPENROUTER_KEY = import.meta.env.VITE_OPENROUTER_KEY || ''
+
+const UI_SYSTEM_PROMPT = `You are a top Roblox UI designer who creates interfaces seen in popular games like Blox Fruits, Adopt Me, Pet Simulator 99, Murder Mystery 2, Jailbreak, and Tower of Hell.
+
+=== OUTPUT FORMAT ===
+Return ONLY: {"message":"description","commands":[...]}
+
+=== ADD COMMAND ===
+{"action":"add","elementType":"TYPE","name":"Name","parent":null,"position":{"X":0.5,"Y":0.5},"size":{"X":0.4,"Y":0.5},"properties":{...}}
+
+=== MODIFY/REMOVE ===
+{"action":"modify","target":"Name","properties":{"BackgroundColor3":"#hex"}}
+{"action":"remove","target":"Name"}
+
+=== ELEMENT TYPES ===
+Frame, TextLabel, TextButton, ImageLabel, ScrollingFrame, TextBox
+
+=== PROPERTIES ===
+BackgroundColor3 (#hex), BackgroundTransparency (0-1), BorderSizePixel (0), CornerRadius (0-50)
+Text (string), TextColor3 (#hex), TextScaled (bool), Font (GothamBold/Gotham), TextSize (number)
+TextXAlignment (Left/Center/Right), LayoutOrder (number)
+Image (URL), ImageTransparency (0-1)
+
+=== IMAGE AND ICON STRATEGY (IMPORTANT) ===
+Use these URL patterns for images — vary the seed for different images:
+- Game thumbnails: https://picsum.photos/seed/game1/200/200, https://picsum.photos/seed/game2/200/200
+- Weapon/item icons: https://picsum.photos/seed/sword1/100/100, https://picsum.photos/seed/shield1/100/100
+- Character avatars: https://picsum.photos/seed/avatar1/150/150
+- Background textures: https://picsum.photos/seed/darktech/400/400
+- Shop items: https://picsum.photos/seed/item1/200/200, https://picsum.photos/seed/item2/200/200
+- Coins/gems: https://picsum.photos/seed/goldcoin/80/80, https://picsum.photos/seed/ruby/80/80
+ALWAYS use ImageLabel for game thumbnails, item icons, avatars, and backgrounds.
+Use emojis IN Text property for icons: 🎮 ⚔️ 🛡️ 💰 🔥 ✨ 🏆 ⭐ 💎 🛒 👑 🗡️ 🏹 ❤️ 🎯 💜 🔵 ⚡ 🌟
+
+=== POPULAR ROBLOX UI PATTERNS ===
+1. SHOP UI: Dark background, grid of item cards with ImageLabel thumbnail + name + price + "Buy" button, currency display at top, close button
+2. INVENTORY: ScrollingFrame with grid of item slots, each slot = ImageLabel + quantity TextLabel
+3. HUD: Top bar (health/coins/level), minimap area, action buttons at bottom
+4. QUEST LOG: Side panel with scrollable quest list, each with icon + title + progress bar
+5. MAIN MENU: Large game logo ImageLabel, centered buttons (Play, Shop, Settings, Inventory)
+6. STATS PAGE: Character model area + stat bars (Strength, Speed, Defense) with progress bars
+7. BATTLE UI: Player cards top-left/bottom-right, health bars, ability buttons at bottom
+8. LEADERBOARD: Tabbed header, scrollable player list with rank + avatar + name + score
+
+=== DESIGN STYLES ===
+- Dark Gaming: bg #0d1117/#111827, accent #3b82f6, glass morphism, 8-12px corner radius
+- Neon Cyberpunk: bg #0a0a1a, neon cyan #06b6d4 + purple #8b5cf6, glowing borders
+- Fantasy Medieval: bg #1a0f0a, gold #d4a373, ornate borders
+- Fun Colorful: bg #1e1e2e, pastels #f472b6/#a78bfa, rounded, playful
+- Military HUD: bg #111318, green #22c55e, sharp corners, tactical
+- Anime: bg #0f0f23, sakura pink #fda4af, clean minimalist
+- Toxic Gamer: bg #0a0a0a, neon green #22c55e
+- Space Galaxy: bg #050510, purple #7c3aed, cosmic
+
+=== LAYOUT RULES ===
+- 12-18 elements. Quality over quantity
+- Root elements: parent null. Children: parent="ParentName"
+- Root Frame: position {"X":0.5,"Y":0.5}, size {"X":0.7,"Y":0.75}
+- Children position RELATIVE to parent center (0.5,0.5 = center of parent)
+- Children size RELATIVE to parent (1.0,1.0 = same size as parent)
+- For 3 cards: X = 0.17, 0.5, 0.83
+
+=== POSITION AND SIZE RULES (CRITICAL) ===
+- EVERY add command MUST have position={"X":N,"Y":N} and size={"X":N,"Y":N} with BOTH fields
+- NEVER: missing Y, negative values, or non-object format
+- Values MUST be 0.0 to 1.0
+
+Output ONLY the JSON. No markdown. No explanation.`
 
 const ROBLOX_DEFAULTS: Record<string, any> = {
   BackgroundColor3: '#c8c8c8', BackgroundTransparency: 0, BorderSizePixel: 1,
@@ -637,48 +705,173 @@ export default function UIGenerator() {
     setIsLoading(false)
   }, [])
 
+  // Client-side normalizer — fixes common AI output variations
+  const normalizeCommands = useCallback((parsed: any): any => {
+    if (!parsed || !Array.isArray(parsed.commands)) return parsed
+    const skipTypes = new Set(['ScreenGui', 'LocalScript', 'Script'])
+    const nameMap = new Map<string, string>()
+
+    const cleaned = parsed.commands.filter((c: any) => {
+      if (!c || typeof c !== 'object') return false
+      if (c.action === 'create') c.action = 'add'
+      if (c.action === 'delete') c.action = 'remove'
+      if (!['add', 'modify', 'remove'].includes(c.action)) return false
+      if (c.action === 'add' && skipTypes.has(c.elementType)) {
+        if (c.name) nameMap.set(c.name, '__ROOT__')
+        return false
+      }
+      return true
+    })
+
+    for (const c of cleaned) {
+      if (c.action === 'add') {
+        // Position normalization
+        if (typeof c.position === 'string') {
+          const parts = c.position.split(/[,\s]+/).map(Number)
+          c.position = { X: parts[0] || 0.5, Y: parts[1] || 0.5 }
+        }
+        if (!c.position || typeof c.position !== 'object') c.position = { X: 0.5, Y: 0.5 }
+        if (c.position.x !== undefined) { c.position.X = c.position.x; c.position.Y = c.position.y }
+        if (typeof c.position.X !== 'number' || isNaN(c.position.X)) c.position.X = 0.5
+        if (typeof c.position.Y !== 'number' || isNaN(c.position.Y)) c.position.Y = 0.5
+        c.position.X = Math.max(0, Math.min(1, c.position.X))
+        c.position.Y = Math.max(0, Math.min(1, c.position.Y))
+
+        // Size normalization
+        if (typeof c.size === 'string') {
+          const parts = c.size.split(/[,\s]+/).map(Number)
+          c.size = { X: parts[0] || 0.4, Y: parts[1] || 0.5 }
+        }
+        if (!c.size || typeof c.size !== 'object') c.size = { X: 0.4, Y: 0.5 }
+        if (c.size.x !== undefined) { c.size.X = c.size.x; c.size.Y = c.size.y }
+        if (typeof c.size.X !== 'number' || isNaN(c.size.X)) c.size.X = 0.4
+        if (typeof c.size.Y !== 'number' || isNaN(c.size.Y)) c.size.Y = 0.5
+        c.size.X = Math.max(0.02, Math.min(1.5, c.size.X))
+        c.size.Y = Math.max(0.02, Math.min(1.5, c.size.Y))
+
+        // Parent fixes
+        if (c.parent && nameMap.has(c.parent)) c.parent = null
+        if (typeof c.parent === 'string' && ['CoreGui', 'StarterGui', 'game.Players.LocalPlayer.PlayerGui'].includes(c.parent)) c.parent = null
+
+        // Properties
+        if (!c.properties || typeof c.properties !== 'object') c.properties = {}
+        const props = c.properties
+        for (const key of ['BackgroundColor3', 'TextColor3', 'ImageColor3']) {
+          if (typeof props[key] === 'string' && props[key].includes('fromRGB')) {
+            const m = props[key].match(/fromRGB\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/)
+            if (m) props[key] = `#${parseInt(m[1]).toString(16).padStart(2, '0')}${parseInt(m[2]).toString(16).padStart(2, '0')}${parseInt(m[3]).toString(16).padStart(2, '0')}`
+          }
+        }
+        if (!c.name) c.name = `${c.elementType}${Math.random().toString(36).substring(2, 6)}`
+        if (typeof props.BackgroundTransparency === 'number') props.BackgroundTransparency = Math.max(0, Math.min(1, props.BackgroundTransparency))
+        if (typeof props.CornerRadius === 'number') props.CornerRadius = Math.max(0, Math.min(50, props.CornerRadius))
+      }
+      if (c.action === 'modify') {
+        if (c.target && !c.name) c.name = c.target
+        if (!c.properties) {
+          c.properties = {}
+          for (const k of ['BackgroundColor3', 'TextColor3', 'Text', 'TextScaled', 'Font', 'CornerRadius', 'BackgroundTransparency', 'Image', 'BorderSizePixel']) {
+            if (c[k] !== undefined) { c.properties[k] = c[k]; delete c[k] }
+          }
+        }
+      }
+    }
+
+    parsed.commands = cleaned.filter((c: any) => {
+      if (c.action === 'add') return c.elementType && c.name
+      if (c.action === 'modify') return (c.target || c.name) && c.properties
+      if (c.action === 'remove') return c.target || c.name
+      return false
+    })
+    return parsed
+  }, [])
+
   const sendMsg = async (text?: string) => {
     const msg = (text || input).trim(); if (!msg || isLoading || building) return
     const um: ChatMsg = { role: 'user', content: msg }
     setMessages(p => [...p, um]); setInput(''); setIsLoading(true)
 
-    // Detect if this is an edit request (canvas has elements and user wants changes)
     const editKeywords = ['change', 'make', 'edit', 'update', 'modify', 'alter', 'adjust', 'tweak', 'better', 'improve', 'fix', 'remove', 'delete', 'add', 'move', 'resize', 'recolor', 'replace', 'swap']
     const lowerMsg = msg.toLowerCase()
     const isEditRequest = elements.length > 0 && editKeywords.some(k => lowerMsg.includes(k))
 
     try {
       const cs = elements.map(e => ({ name: e.name, type: e.type, parent: e.parentId ? elements.find(p => p.id === e.parentId)?.name || null : null, position: e.position, size: e.size, props: e.props }))
-      const body: any = { messages: [{ role: 'user', content: msg }], canvas_state: cs }
-      if (isEditRequest) body.edit_mode = true
 
-      const r = await fetch(CHAT_API, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      const d = await r.json()
+      let canvasContext = ''
+      if (cs.length > 0) {
+        const lines = cs.map((e, i) => `[${i+1}] ${e.name} (${e.type}) parent=${e.parent || 'null'} pos=(${e.position.X.toFixed(3)},${e.position.Y.toFixed(3)}) sz=(${e.size.X.toFixed(3)},${e.size.Y.toFixed(3)})`)
+        canvasContext = `\n\n=== EXISTING CANVAS (${cs.length} elements) ===\n${lines.join('\n')}\n\nUse EXACT element names above for modify/remove.`
+      }
 
-      if (!r.ok || d.error) {
-        setIsLoading(false)
-        setMessages(p => [...p, { role: 'assistant', content: `Error: ${d.error || d.message || 'Request failed'}. Using template instead.` }])
+      let editInstruction = ''
+      if (isEditRequest) {
+        editInstruction = `\n\n*** EDIT MODE — DO NOT CREATE NEW UI ***\nThe canvas has ${cs.length} elements. Output ONLY "modify" and/or "remove" commands. DO NOT output "add" commands. Use EXACT element names from the canvas.`
+      }
+
+      const systemMsg = UI_SYSTEM_PROMPT + canvasContext + editInstruction
+
+      // ── Step 1: Try AI directly via OpenRouter (no edge function timeout) ──
+      let parsed: any = null
+      const models = ['nvidia/nemotron-nano-9b-v2:free', 'google/gemma-4-26b-a4b-it:free']
+
+      for (const model of models) {
+        if (parsed) break
+        try {
+          const controller = new AbortController()
+          const timeout = setTimeout(() => controller.abort(), 50000) // 50s — no edge function limit
+          const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${OPENROUTER_KEY}`,
+              'Content-Type': 'application/json',
+              'HTTP-Referer': 'https://yobest-bytr.vercel.app',
+              'X-Title': 'Yobest UI Builder',
+            },
+            body: JSON.stringify({
+              model,
+              messages: [
+                { role: 'system', content: systemMsg },
+                { role: 'user', content: msg },
+              ],
+              temperature: 0.2,
+              max_tokens: 2000,
+            }),
+            signal: controller.signal,
+          })
+          clearTimeout(timeout)
+          const data = await r.json()
+          const content = data.choices?.[0]?.message?.content || ''
+
+          // Parse JSON from response
+          try { parsed = JSON.parse(content) } catch {
+            const m = content.match(/\{[\s\S]*\}/)
+            if (m) try { parsed = JSON.parse(m[0]) } catch {}
+          }
+          if (parsed) {
+            parsed = normalizeCommands(parsed)
+            console.log(`AI model ${model} succeeded`)
+          }
+        } catch (e) {
+          console.log(`AI model ${model} failed:`, e instanceof Error ? e.message : e)
+        }
+      }
+
+      // ── Step 2: If AI failed, use edge function template fallback ──
+      if (!parsed || !parsed.commands?.length) {
+        console.log('AI failed, using template fallback')
         const tmplResp = await fetch(CHAT_API, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ messages: [{ role: 'user', content: msg }], canvas_state: cs, force_template: true }),
         })
-        const tmpl = await tmplResp.json()
-        if (tmpl.commands?.length) {
-          const am: ChatMsg = { role: 'assistant', content: tmpl.message || 'Built from template', commands: tmpl.commands }
-          setMessages(p => [...p, am])
-          await applyCmds(tmpl.commands)
-        }
-        return
+        parsed = await tmplResp.json()
       }
 
-      const am: ChatMsg = { role: 'assistant', content: d.message || d.content || 'Done', commands: d.commands || [] }
-      setMessages(p => [...p, am])
-
-      if (am.commands?.length) {
-        await applyCmds(am.commands)
+      // ── Step 3: Apply commands ──
+      if (parsed?.commands?.length) {
+        const am: ChatMsg = { role: 'assistant', content: parsed.message || 'Built your UI', commands: parsed.commands }
+        setMessages(p => [...p, am])
+        await applyCmds(parsed.commands)
       } else {
         setMessages(p => [...p, { role: 'assistant', content: 'No UI elements generated. Try describing what you want, like "shop with 4 items" or "health bar HUD".' }])
         setIsLoading(false)

@@ -9,7 +9,6 @@ import { cn } from '@/lib/utils'
 import { supabaseUrl } from '@/config/supabase'
 
 const CHAT_API = `${supabaseUrl}/functions/v1/rodin-api?action=ui-generate`
-const OPENROUTER_KEY = import.meta.env.VITE_OPENROUTER_KEY || ''
 
 const UI_SYSTEM_PROMPT = `You are a top Roblox UI designer who creates interfaces seen in popular games like Blox Fruits, Adopt Me, Pet Simulator 99, Murder Mystery 2, Jailbreak, and Tower of Hell.
 
@@ -810,8 +809,17 @@ export default function UIGenerator() {
       }
 
       const systemMsg = UI_SYSTEM_PROMPT + canvasContext + editInstruction
+      const userPayload = {
+        model: 'nvidia/nemotron-nano-9b-v2:free',
+        messages: [
+          { role: 'system', content: systemMsg },
+          { role: 'user', content: msg },
+        ],
+        temperature: 0.2,
+        max_tokens: 2000,
+      }
 
-      // ── Step 1: Try AI directly via OpenRouter (no edge function timeout) ──
+      // ── Step 1: Try AI — proxy through edge function (no CORS, key server-side) ──
       let parsed: any = null
       const models = ['nvidia/nemotron-nano-9b-v2:free', 'google/gemma-4-26b-a4b-it:free']
 
@@ -819,41 +827,28 @@ export default function UIGenerator() {
         if (parsed) break
         try {
           const controller = new AbortController()
-          const timeout = setTimeout(() => controller.abort(), 50000) // 50s — no edge function limit
-          const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${OPENROUTER_KEY}`,
-              'Content-Type': 'application/json',
-              'HTTP-Referer': 'https://yobest-bytr.vercel.app',
-              'X-Title': 'Yobest UI Builder',
-            },
-            body: JSON.stringify({
-              model,
-              messages: [
-                { role: 'system', content: systemMsg },
-                { role: 'user', content: msg },
-              ],
-              temperature: 0.2,
-              max_tokens: 2000,
-            }),
+          const timeout = setTimeout(() => controller.abort(), 55000)
+          const body = { ...userPayload, model }
+          const r = await fetch(`${CHAT_API.replace('action=ui-generate', 'action=proxy-openrouter')}`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
             signal: controller.signal,
           })
           clearTimeout(timeout)
           const data = await r.json()
           const content = data.choices?.[0]?.message?.content || ''
-
-          // Parse JSON from response
-          try { parsed = JSON.parse(content) } catch {
-            const m = content.match(/\{[\s\S]*\}/)
-            if (m) try { parsed = JSON.parse(m[0]) } catch {}
+          if (content) {
+            try { parsed = JSON.parse(content) } catch {
+              const m = content.match(/\{[\s\S]*\}/)
+              if (m) try { parsed = JSON.parse(m[0]) } catch {}
+            }
           }
           if (parsed) {
             parsed = normalizeCommands(parsed)
-            console.log(`AI model ${model} succeeded`)
+            console.log(`AI model ${model} succeeded via proxy`)
           }
         } catch (e) {
-          console.log(`AI model ${model} failed:`, e instanceof Error ? e.message : e)
+          console.log(`AI proxy model ${model} failed:`, e instanceof Error ? e.message : e)
         }
       }
 

@@ -699,6 +699,26 @@ Output ONLY the JSON. No markdown. No explanation.` + EDIT_INSTRUCTION;
       });
     }
 
+    // Proxy: forward request to OpenRouter (keeps API key server-side)
+    if (action === "proxy-openrouter") {
+      const body = await req.json();
+      const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${OPENROUTER_KEY}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": "https://yobest-bytr.vercel.app",
+          "X-Title": "Yobest UI Builder",
+        },
+        body: JSON.stringify(body),
+      });
+      const data = await resp.json();
+      return new Response(JSON.stringify(data), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: resp.status,
+      });
+    }
+
     return new Response(JSON.stringify({ error: "Unknown action" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 400,

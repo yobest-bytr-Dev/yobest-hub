@@ -21,25 +21,25 @@ function generateFromTemplate(prompt: string): { message: string; commands: any[
       { action: "add", elementType: "ScrollingFrame", name: "ItemGrid", parent: "ShopFrame", position: { X: 0.5, Y: 0.55 }, size: { X: 0.92, Y: 0.82 }, properties: { BackgroundColor3: "#161b22", BackgroundTransparency: 0.3, BorderSizePixel: 0, CornerRadius: 8, ZIndex: 2, ScrollBarThickness: 6 }},
       // Item 1
       { action: "add", elementType: "Frame", name: "Item1", parent: "ItemGrid", position: { X: 0.25, Y: 0.15 }, size: { X: 0.45, Y: 0.25 }, properties: { BackgroundColor3: "#1e293b", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 10, ZIndex: 3 }},
-      { action: "add", elementType: "ImageLabel", name: "ItemIcon1", parent: "Item1", position: { X: 0.2, Y: 0.45 }, size: { X: 0.3, Y: 0.65 }, properties: { BackgroundColor3: "#334155", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 8, Image: "https://picsum.photos/seed/sword/200/200", ZIndex: 4 }},
+      { action: "add", elementType: "ImageLabel", name: "ItemIcon1", parent: "Item1", position: { X: 0.2, Y: 0.45 }, size: { X: 0.3, Y: 0.65 }, properties: { BackgroundTransparency: 1, Image: "https://placehold.co/120x120/1e293b/ef4444?text=%E2%9A%94%EF%B8%8F&font-size=50", ZIndex: 4 }},
       { action: "add", elementType: "TextLabel", name: "ItemName1", parent: "Item1", position: { X: 0.62, Y: 0.25 }, size: { X: 0.7, Y: 0.3 }, properties: { Text: "⚔️ Iron Sword", TextColor3: "#f1f5f9", TextScaled: true, Font: "GothamBold", BackgroundTransparency: 1, TextXAlignment: "Left", ZIndex: 4 }},
       { action: "add", elementType: "TextLabel", name: "ItemPrice1", parent: "Item1", position: { X: 0.62, Y: 0.55 }, size: { X: 0.4, Y: 0.25 }, properties: { Text: "500 Gold", TextColor3: "#f59e0b", TextScaled: true, Font: "GothamBold", BackgroundTransparency: 1, TextXAlignment: "Left", ZIndex: 4 }},
       { action: "add", elementType: "TextButton", name: "BuyBtn1", parent: "Item1", position: { X: 0.82, Y: 0.75 }, size: { X: 0.25, Y: 0.35 }, properties: { Text: "BUY", TextColor3: "#ffffff", TextScaled: true, Font: "GothamBold", BackgroundColor3: "#10b981", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 6, ZIndex: 4 }},
       // Item 2
       { action: "add", elementType: "Frame", name: "Item2", parent: "ItemGrid", position: { X: 0.75, Y: 0.15 }, size: { X: 0.45, Y: 0.25 }, properties: { BackgroundColor3: "#1e293b", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 10, ZIndex: 3 }},
-      { action: "add", elementType: "ImageLabel", name: "ItemIcon2", parent: "Item2", position: { X: 0.2, Y: 0.45 }, size: { X: 0.3, Y: 0.65 }, properties: { BackgroundColor3: "#334155", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 8, Image: "https://picsum.photos/seed/shield/200/200", ZIndex: 4 }},
+      { action: "add", elementType: "ImageLabel", name: "ItemIcon2", parent: "Item2", position: { X: 0.2, Y: 0.45 }, size: { X: 0.3, Y: 0.65 }, properties: { BackgroundTransparency: 1, Image: "https://placehold.co/120x120/1e293b/3b82f6?text=%F0%9F%9E%A1%EF%B8%8F&font-size=50", ZIndex: 4 }},
       { action: "add", elementType: "TextLabel", name: "ItemName2", parent: "Item2", position: { X: 0.62, Y: 0.25 }, size: { X: 0.7, Y: 0.3 }, properties: { Text: "Steel Shield", TextColor3: "#f1f5f9", TextScaled: true, Font: "GothamBold", BackgroundTransparency: 1, TextXAlignment: "Left", ZIndex: 4 }},
       { action: "add", elementType: "TextLabel", name: "ItemPrice2", parent: "Item2", position: { X: 0.62, Y: 0.55 }, size: { X: 0.4, Y: 0.25 }, properties: { Text: "1200 Gold", TextColor3: "#f59e0b", TextScaled: true, Font: "GothamBold", BackgroundTransparency: 1, TextXAlignment: "Left", ZIndex: 4 }},
       { action: "add", elementType: "TextButton", name: "BuyBtn2", parent: "Item2", position: { X: 0.82, Y: 0.75 }, size: { X: 0.25, Y: 0.35 }, properties: { Text: "BUY", TextColor3: "#ffffff", TextScaled: true, Font: "GothamBold", BackgroundColor3: "#10b981", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 6, ZIndex: 4 }},
       // Item 3
       { action: "add", elementType: "Frame", name: "Item3", parent: "ItemGrid", position: { X: 0.25, Y: 0.5 }, size: { X: 0.45, Y: 0.25 }, properties: { BackgroundColor3: "#1e293b", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 10, ZIndex: 3 }},
-      { action: "add", elementType: "ImageLabel", name: "ItemIcon3", parent: "Item3", position: { X: 0.2, Y: 0.45 }, size: { X: 0.3, Y: 0.65 }, properties: { BackgroundColor3: "#334155", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 8, Image: "https://picsum.photos/seed/potion/200/200", ZIndex: 4 }},
+      { action: "add", elementType: "ImageLabel", name: "ItemIcon3", parent: "Item3", position: { X: 0.2, Y: 0.45 }, size: { X: 0.3, Y: 0.65 }, properties: { BackgroundTransparency: 1, Image: "https://placehold.co/120x120/1e293b/22c55e?text=%F0%9F%A7%A3&font-size=50", ZIndex: 4 }},
       { action: "add", elementType: "TextLabel", name: "ItemName3", parent: "Item3", position: { X: 0.62, Y: 0.25 }, size: { X: 0.7, Y: 0.3 }, properties: { Text: "Health Potion", TextColor3: "#f1f5f9", TextScaled: true, Font: "GothamBold", BackgroundTransparency: 1, TextXAlignment: "Left", ZIndex: 4 }},
       { action: "add", elementType: "TextLabel", name: "ItemPrice3", parent: "Item3", position: { X: 0.62, Y: 0.55 }, size: { X: 0.4, Y: 0.25 }, properties: { Text: "250 Gold", TextColor3: "#f59e0b", TextScaled: true, Font: "GothamBold", BackgroundTransparency: 1, TextXAlignment: "Left", ZIndex: 4 }},
       { action: "add", elementType: "TextButton", name: "BuyBtn3", parent: "Item3", position: { X: 0.82, Y: 0.75 }, size: { X: 0.25, Y: 0.35 }, properties: { Text: "BUY", TextColor3: "#ffffff", TextScaled: true, Font: "GothamBold", BackgroundColor3: "#10b981", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 6, ZIndex: 4 }},
       // Item 4
       { action: "add", elementType: "Frame", name: "Item4", parent: "ItemGrid", position: { X: 0.75, Y: 0.5 }, size: { X: 0.45, Y: 0.25 }, properties: { BackgroundColor3: "#1e293b", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 10, ZIndex: 3 }},
-      { action: "add", elementType: "ImageLabel", name: "ItemIcon4", parent: "Item4", position: { X: 0.2, Y: 0.45 }, size: { X: 0.3, Y: 0.65 }, properties: { BackgroundColor3: "#334155", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 8, Image: "https://picsum.photos/seed/gem/200/200", ZIndex: 4 }},
+      { action: "add", elementType: "ImageLabel", name: "ItemIcon4", parent: "Item4", position: { X: 0.2, Y: 0.45 }, size: { X: 0.3, Y: 0.65 }, properties: { BackgroundTransparency: 1, Image: "https://placehold.co/120x120/1e293b/a78bfa?text=%F0%9F%92%8E&font-size=50", ZIndex: 4 }},
       { action: "add", elementType: "TextLabel", name: "ItemName4", parent: "Item4", position: { X: 0.62, Y: 0.25 }, size: { X: 0.7, Y: 0.3 }, properties: { Text: "Magic Gem", TextColor3: "#f1f5f9", TextScaled: true, Font: "GothamBold", BackgroundTransparency: 1, TextXAlignment: "Left", ZIndex: 4 }},
       { action: "add", elementType: "TextLabel", name: "ItemPrice4", parent: "Item4", position: { X: 0.62, Y: 0.55 }, size: { X: 0.4, Y: 0.25 }, properties: { Text: "800 Gold", TextColor3: "#f59e0b", TextScaled: true, Font: "GothamBold", BackgroundTransparency: 1, TextXAlignment: "Left", ZIndex: 4 }},
       { action: "add", elementType: "TextButton", name: "BuyBtn4", parent: "Item4", position: { X: 0.82, Y: 0.75 }, size: { X: 0.25, Y: 0.35 }, properties: { Text: "BUY", TextColor3: "#ffffff", TextScaled: true, Font: "GothamBold", BackgroundColor3: "#10b981", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 6, ZIndex: 4 }},
@@ -72,8 +72,14 @@ function generateFromTemplate(prompt: string): { message: string; commands: any[
         const y = 0.3 + row * 0.22;
         cmds.push({ action: "add", elementType: "Frame", name: `Slot${idx}`, parent: "InvFrame", position: { X: x, Y: y }, size: { X: 0.18, Y: 0.18 }, properties: { BackgroundColor3: "#1e293b", BackgroundTransparency: idx > 12 ? 0.5 : 0, BorderSizePixel: 1, BorderColor3: "#334155", CornerRadius: 8, ZIndex: 3 }});
         if (idx <= 5) {
-          const icons = ["sword", "shield", "potion", "coin", "gem"];
-          cmds.push({ action: "add", elementType: "ImageLabel", name: `SlotIcon${idx}`, parent: `Slot${idx}`, position: { X: 0.5, Y: 0.45 }, size: { X: 0.6, Y: 0.6 }, properties: { BackgroundTransparency: 1, Image: `https://picsum.photos/seed/${icons[idx-1]}/100/100`, ZIndex: 4 }});
+          const icons = [
+            {url:"https://placehold.co/100x100/1e293b/ef4444?text=%E2%9A%94%EF%B8%8F&font-size=40"},
+            {url:"https://placehold.co/100x100/1e293b/3b82f6?text=%F0%9F%9E%A1%EF%B8%8F&font-size=40"},
+            {url:"https://placehold.co/100x100/1e293b/22c55e?text=%F0%9F%A7%A3&font-size=40"},
+            {url:"https://placehold.co/100x100/1e293b/f59e0b?text=%F0%9F%92%B0&font-size=40"},
+            {url:"https://placehold.co/100x100/1e293b/a78bfa?text=%F0%9F%92%8E&font-size=40"}
+          ];
+          cmds.push({ action: "add", elementType: "ImageLabel", name: `SlotIcon${idx}`, parent: `Slot${idx}`, position: { X: 0.5, Y: 0.45 }, size: { X: 0.6, Y: 0.6 }, properties: { BackgroundTransparency: 1, Image: icons[idx-1].url, ZIndex: 4 }});
           cmds.push({ action: "add", elementType: "TextLabel", name: `SlotCount${idx}`, parent: `Slot${idx}`, position: { X: 0.78, Y: 0.8 }, size: { X: 0.35, Y: 0.3 }, properties: { Text: `${Math.floor(Math.random()*10)+1}`, TextColor3: "#f1f5f9", TextScaled: true, Font: "GothamBold", BackgroundTransparency: 1, ZIndex: 5 }});
         }
       }
@@ -98,7 +104,7 @@ function generateFromTemplate(prompt: string): { message: string; commands: any[
   if (lower.includes("stats") || lower.includes("character") || lower.includes("rpg") || lower.includes("level")) {
     return { message: "Built a character stats panel with level and attribute bars", commands: [
       { action: "add", elementType: "Frame", name: "StatsFrame", parent: null, position: { X: 0.15, Y: 0.5 }, size: { X: 0.22, Y: 0.55 }, properties: { BackgroundColor3: "#0d1117", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 14, ZIndex: 1 }},
-      { action: "add", elementType: "ImageLabel", name: "Avatar", parent: "StatsFrame", position: { X: 0.5, Y: 0.12 }, size: { X: 0.35, Y: 0.2 }, properties: { BackgroundColor3: "#1e293b", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 50, Image: "https://picsum.photos/seed/avatar/200/200", ZIndex: 2 }},
+      { action: "add", elementType: "ImageLabel", name: "Avatar", parent: "StatsFrame", position: { X: 0.5, Y: 0.12 }, size: { X: 0.35, Y: 0.2 }, properties: { BackgroundColor3: "#1e293b", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 50, Image: "https://ui-avatars.com/api/?name=Hero&background=3b82f6&color=fff&bold=true&size=150", ZIndex: 2 }},
       { action: "add", elementType: "TextLabel", name: "PlayerName", parent: "StatsFrame", position: { X: 0.5, Y: 0.3 }, size: { X: 0.85, Y: 0.07 }, properties: { Text: "DragonSlayer99", TextColor3: "#f1f5f9", TextScaled: true, Font: "GothamBold", BackgroundTransparency: 1, ZIndex: 2 }},
       { action: "add", elementType: "TextLabel", name: "PlayerLevel", parent: "StatsFrame", position: { X: 0.5, Y: 0.37 }, size: { X: 0.5, Y: 0.05 }, properties: { Text: "Level 42 Warrior", TextColor3: "#8b5cf6", TextScaled: true, Font: "SourceSans", BackgroundTransparency: 1, ZIndex: 2 }},
       { action: "add", elementType: "Frame", name: "ExpBarBG", parent: "StatsFrame", position: { X: 0.5, Y: 0.44 }, size: { X: 0.8, Y: 0.04 }, properties: { BackgroundColor3: "#1e293b", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 3, ZIndex: 2 }},
@@ -188,7 +194,7 @@ function generateFromTemplate(prompt: string): { message: string; commands: any[
       { action: "add", elementType: "Frame", name: "GlowFrame", parent: "GachaFrame", position: { X: 0.5, Y: 0.5 }, size: { X: 1.02, Y: 1.02 }, properties: { BackgroundColor3: "#8b5cf6", BackgroundTransparency: 0.92, BorderSizePixel: 0, CornerRadius: 22, ZIndex: 0 }},
       { action: "add", elementType: "TextLabel", name: "GachaTitle", parent: "GachaFrame", position: { X: 0.5, Y: 0.06 }, size: { X: 0.8, Y: 0.08 }, properties: { Text: "✨ PET SPIN ✨", TextColor3: "#a78bfa", TextScaled: true, Font: "GothamBold", BackgroundTransparency: 1, ZIndex: 3 }},
       { action: "add", elementType: "Frame", name: "RevealArea", parent: "GachaFrame", position: { X: 0.5, Y: 0.38 }, size: { X: 0.75, Y: 0.4 }, properties: { BackgroundColor3: "#161b22", BackgroundTransparency: 0, BorderSizePixel: 2, BorderColor3: "#8b5cf6", CornerRadius: 16, ZIndex: 2 }},
-      { action: "add", elementType: "ImageLabel", name: "PetImage", parent: "RevealArea", position: { X: 0.5, Y: 0.45 }, size: { X: 0.6, Y: 0.6 }, properties: { Image: "https://picsum.photos/seed/mysticpet/200/200", BackgroundTransparency: 1, ImageColor3: "#a78bfa", ZIndex: 3 }},
+      { action: "add", elementType: "ImageLabel", name: "PetImage", parent: "RevealArea", position: { X: 0.5, Y: 0.45 }, size: { X: 0.6, Y: 0.6 }, properties: { Image: "https://placehold.co/200x200/1e293b/a78bfa?text=%F0%9F%90%9E&font-size=80", BackgroundTransparency: 1, ZIndex: 3 }},
       { action: "add", elementType: "TextLabel", name: "RarityLabel", parent: "RevealArea", position: { X: 0.5, Y: 0.85 }, size: { X: 0.5, Y: 0.12 }, properties: { Text: "⭐ LEGENDARY ⭐", TextColor3: "#f59e0b", TextScaled: true, Font: "GothamBold", BackgroundTransparency: 1, ZIndex: 3 }},
       { action: "add", elementType: "Frame", name: "CostBar", parent: "GachaFrame", position: { X: 0.5, Y: 0.65 }, size: { X: 0.8, Y: 0.06 }, properties: { BackgroundColor3: "#1e293b", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 8, ZIndex: 2 }},
       { action: "add", elementType: "TextLabel", name: "CostText", parent: "CostBar", position: { X: 0.5, Y: 0.5 }, size: { X: 0.6, Y: 0.8 }, properties: { Text: "💰 500 Coins", TextColor3: "#f59e0b", TextScaled: true, Font: "GothamBold", BackgroundTransparency: 1, ZIndex: 3 }},
@@ -203,17 +209,17 @@ function generateFromTemplate(prompt: string): { message: string; commands: any[
       { action: "add", elementType: "Frame", name: "TradeHeader", parent: "TradeFrame", position: { X: 0.5, Y: 0.06 }, size: { X: 0.92, Y: 0.08 }, properties: { BackgroundColor3: "#161b22", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 10, ZIndex: 2 }},
       { action: "add", elementType: "TextLabel", name: "TradeTitle", parent: "TradeHeader", position: { X: 0.5, Y: 0.5 }, size: { X: 0.8, Y: 0.8 }, properties: { Text: "🤝 TRADE", TextColor3: "#f1f5f9", TextScaled: true, Font: "GothamBold", BackgroundTransparency: 1, ZIndex: 3 }},
       { action: "add", elementType: "Frame", name: "LeftPlayer", parent: "TradeFrame", position: { X: 0.25, Y: 0.4 }, size: { X: 0.46, Y: 0.5 }, properties: { BackgroundColor3: "#161b22", BackgroundTransparency: 0, BorderSizePixel: 1, BorderColor3: "#22c55e", CornerRadius: 10, ZIndex: 2 }},
-      { action: "add", elementType: "ImageLabel", name: "LeftAvatar", parent: "LeftPlayer", position: { X: 0.5, Y: 0.12 }, size: { X: 0.2, Y: 0.18 }, properties: { Image: "https://picsum.photos/seed/trader1/150/150", BackgroundTransparency: 1, CornerRadius: 50, ZIndex: 3 }},
+      { action: "add", elementType: "ImageLabel", name: "LeftAvatar", parent: "LeftPlayer", position: { X: 0.5, Y: 0.12 }, size: { X: 0.2, Y: 0.18 }, properties: { Image: "https://ui-avatars.com/api/?name=P1&background=22c55e&color=fff&bold=true&size=150", BackgroundTransparency: 1, CornerRadius: 50, ZIndex: 3 }},
       { action: "add", elementType: "TextLabel", name: "LeftName", parent: "LeftPlayer", position: { X: 0.5, Y: 0.26 }, size: { X: 0.8, Y: 0.08 }, properties: { Text: "Player1", TextColor3: "#22c55e", TextScaled: true, Font: "GothamBold", BackgroundTransparency: 1, ZIndex: 3 }},
       { action: "add", elementType: "Frame", name: "LeftItems", parent: "LeftPlayer", position: { X: 0.5, Y: 0.62 }, size: { X: 0.9, Y: 0.55 }, properties: { BackgroundColor3: "#1e293b", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 6, ZIndex: 3 }},
-      { action: "add", elementType: "ImageLabel", name: "LeftItem1", parent: "LeftItems", position: { X: 0.25, Y: 0.35 }, size: { X: 0.35, Y: 0.55 }, properties: { Image: "https://picsum.photos/seed/tradesword/100/100", BackgroundTransparency: 1, ZIndex: 4 }},
-      { action: "add", elementType: "ImageLabel", name: "LeftItem2", parent: "LeftItems", position: { X: 0.75, Y: 0.35 }, size: { X: 0.35, Y: 0.55 }, properties: { Image: "https://picsum.photos/seed/tradegem/100/100", BackgroundTransparency: 1, ZIndex: 4 }},
+      { action: "add", elementType: "ImageLabel", name: "LeftItem1", parent: "LeftItems", position: { X: 0.25, Y: 0.35 }, size: { X: 0.35, Y: 0.55 }, properties: { Image: "https://placehold.co/100x100/1e293b/ef4444?text=%E2%9A%94%EF%B8%8F&font-size=40", BackgroundTransparency: 1, ZIndex: 4 }},
+      { action: "add", elementType: "ImageLabel", name: "LeftItem2", parent: "LeftItems", position: { X: 0.75, Y: 0.35 }, size: { X: 0.35, Y: 0.55 }, properties: { Image: "https://placehold.co/100x100/1e293b/a78bfa?text=%F0%9F%92%8E&font-size=40", BackgroundTransparency: 1, ZIndex: 4 }},
       { action: "add", elementType: "Frame", name: "RightPlayer", parent: "TradeFrame", position: { X: 0.75, Y: 0.4 }, size: { X: 0.46, Y: 0.5 }, properties: { BackgroundColor3: "#161b22", BackgroundTransparency: 0, BorderSizePixel: 1, BorderColor3: "#3b82f6", CornerRadius: 10, ZIndex: 2 }},
-      { action: "add", elementType: "ImageLabel", name: "RightAvatar", parent: "RightPlayer", position: { X: 0.5, Y: 0.12 }, size: { X: 0.2, Y: 0.18 }, properties: { Image: "https://picsum.photos/seed/trader2/150/150", BackgroundTransparency: 1, CornerRadius: 50, ZIndex: 3 }},
+      { action: "add", elementType: "ImageLabel", name: "RightAvatar", parent: "RightPlayer", position: { X: 0.5, Y: 0.12 }, size: { X: 0.2, Y: 0.18 }, properties: { Image: "https://ui-avatars.com/api/?name=P2&background=3b82f6&color=fff&bold=true&size=150", BackgroundTransparency: 1, CornerRadius: 50, ZIndex: 3 }},
       { action: "add", elementType: "TextLabel", name: "RightName", parent: "RightPlayer", position: { X: 0.5, Y: 0.26 }, size: { X: 0.8, Y: 0.08 }, properties: { Text: "Player2", TextColor3: "#3b82f6", TextScaled: true, Font: "GothamBold", BackgroundTransparency: 1, ZIndex: 3 }},
       { action: "add", elementType: "Frame", name: "RightItems", parent: "RightPlayer", position: { X: 0.5, Y: 0.62 }, size: { X: 0.9, Y: 0.55 }, properties: { BackgroundColor3: "#1e293b", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 6, ZIndex: 3 }},
-      { action: "add", elementType: "ImageLabel", name: "RightItem1", parent: "RightItems", position: { X: 0.25, Y: 0.35 }, size: { X: 0.35, Y: 0.55 }, properties: { Image: "https://picsum.photos/seed/tradearmor/100/100", BackgroundTransparency: 1, ZIndex: 4 }},
-      { action: "add", elementType: "ImageLabel", name: "RightItem2", parent: "RightItems", position: { X: 0.75, Y: 0.35 }, size: { X: 0.35, Y: 0.55 }, properties: { Image: "https://picsum.photos/seed/tradering/100/100", BackgroundTransparency: 1, ZIndex: 4 }},
+      { action: "add", elementType: "ImageLabel", name: "RightItem1", parent: "RightItems", position: { X: 0.25, Y: 0.35 }, size: { X: 0.35, Y: 0.55 }, properties: { Image: "https://placehold.co/100x100/1e293b/3b82f6?text=%F0%9F%9E%A1%EF%B8%8F&font-size=40", BackgroundTransparency: 1, ZIndex: 4 }},
+      { action: "add", elementType: "ImageLabel", name: "RightItem2", parent: "RightItems", position: { X: 0.75, Y: 0.35 }, size: { X: 0.35, Y: 0.55 }, properties: { Image: "https://placehold.co/100x100/1e293b/f59e0b?text=%F0%9F%92%B0&font-size=40", BackgroundTransparency: 1, ZIndex: 4 }},
       { action: "add", elementType: "TextLabel", name: "TradeStatus", parent: "TradeFrame", position: { X: 0.5, Y: 0.85 }, size: { X: 0.5, Y: 0.06 }, properties: { Text: "Waiting...", TextColor3: "#64748b", TextScaled: true, Font: "SourceSans", BackgroundTransparency: 1, ZIndex: 2 }},
       { action: "add", elementType: "TextButton", name: "AcceptBtn", parent: "TradeFrame", position: { X: 0.35, Y: 0.93 }, size: { X: 0.25, Y: 0.08 }, properties: { Text: "✅ ACCEPT", TextColor3: "#ffffff", TextScaled: true, Font: "GothamBold", BackgroundColor3: "#22c55e", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 10, ZIndex: 2 }},
       { action: "add", elementType: "TextButton", name: "DeclineBtn", parent: "TradeFrame", position: { X: 0.65, Y: 0.93 }, size: { X: 0.25, Y: 0.08 }, properties: { Text: "❌ DECLINE", TextColor3: "#ffffff", TextScaled: true, Font: "GothamBold", BackgroundColor3: "#ef4444", BackgroundTransparency: 0, BorderSizePixel: 0, CornerRadius: 10, ZIndex: 2 }},
@@ -223,7 +229,7 @@ function generateFromTemplate(prompt: string): { message: string; commands: any[
   if (lower.includes("minimap") || lower.includes("map") || lower.includes("radar")) {
     return { message: "Built a minimap frame in the corner", commands: [
       { action: "add", elementType: "Frame", name: "MinimapFrame", parent: null, position: { X: 0.92, Y: 0.12 }, size: { X: 0.15, Y: 0.2 }, properties: { BackgroundColor3: "#0d1117", BackgroundTransparency: 0.15, BorderSizePixel: 2, BorderColor3: "#334155", CornerRadius: 50, ZIndex: 1 }},
-      { action: "add", elementType: "ImageLabel", name: "MapImage", parent: "MinimapFrame", position: { X: 0.5, Y: 0.5 }, size: { X: 0.85, Y: 0.85 }, properties: { Image: "https://picsum.photos/seed/minimap/200/200", BackgroundTransparency: 1, CornerRadius: 50, ZIndex: 2 }},
+      { action: "add", elementType: "ImageLabel", name: "MapImage", parent: "MinimapFrame", position: { X: 0.5, Y: 0.5 }, size: { X: 0.85, Y: 0.85 }, properties: { Image: "https://picsum.photos/seed/darkforest/200/200", BackgroundTransparency: 1, CornerRadius: 50, ZIndex: 2 }},
       { action: "add", elementType: "Frame", name: "PlayerDot", parent: "MinimapFrame", position: { X: 0.5, Y: 0.5 }, size: { X: 0.06, Y: 0.06 }, properties: { BackgroundColor3: "#3b82f6", BackgroundTransparency: 0, BorderSizePixel: 1, BorderColor3: "#ffffff", CornerRadius: 50, ZIndex: 3 }},
     ]};
   }
@@ -431,15 +437,49 @@ Text (string), TextColor3 (#hex), TextScaled (bool), Font (GothamBold/Gotham), T
 TextXAlignment (Left/Center/Right), LayoutOrder (number)
 Image (URL), ImageTransparency (0-1)
 
-=== IMAGE AND ICON STRATEGY (IMPORTANT) ===
-Use these URL patterns for images — vary the seed for different images:
-- Game thumbnails: https://picsum.photos/seed/game1/200/200, https://picsum.photos/seed/game2/200/200
-- Weapon/item icons: https://picsum.photos/seed/sword1/100/100, https://picsum.photos/seed/shield1/100/100
-- Character avatars: https://picsum.photos/seed/avatar1/150/150
-- Background textures: https://picsum.photos/seed/darktech/400/400
-- Shop items: https://picsum.photos/seed/item1/200/200, https://picsum.photos/seed/item2/200/200
-- Coins/gems: https://picsum.photos/seed/goldcoin/80/80, https://picsum.photos/seed/ruby/80/80
-ALWAYS use ImageLabel for game thumbnails, item icons, avatars, and backgrounds.
+=== IMAGE AND ICON STRATEGY (CRITICAL — SELECT THE RIGHT IMAGE) ===
+
+Every element type needs a DIFFERENT kind of image. Never use random images.
+
+--- PLAYER AVATARS (circular character portraits) ---
+Use Roblox headshots: https://www.roblox.com/headshot-thumbnail/image?userId=1&width=150&height=150&format=png
+Or letter avatars: https://ui-avatars.com/api/?name=PlayerName&background=3b82f6&color=fff&bold=true&size=150
+Use CornerRadius: 50 to make circular.
+
+--- ITEM ICONS (swords, shields, potions, weapons) ---
+Use colored placeholder boxes with emoji — these look like actual game item icons:
+https://placehold.co/120x120/1e293b/ef4444?text=%E2%9A%94%EF%B8%8F&font-size=50 (sword)
+https://placehold.co/120x120/1e293b/3b82f6?text=%F0%9F%9E%A1%EF%B8%8F&font-size=50 (shield)
+https://placehold.co/120x120/1e293b/22c55e?text=%F0%9F%A7%A3&font-size=50 (potion)
+https://placehold.co/120x120/1e293b/a78bfa?text=%F0%9F%92%8E&font-size=50 (gem)
+https://placehold.co/120x120/1e293b/f59e0b?text=%F0%9F%92%B0&font-size=50 (coin)
+https://placehold.co/120x120/1e293b/f472b6?text=%F0%9F%8E%AF&font-size=50 (wand)
+https://placehold.co/120x120/1e293b/06b6d4?text=%F0%9F%94%A5&font-size=50 (fire)
+https://placehold.co/120x120/1e293b/fda4af?text=%E2%9C%A8&font-size=50 (star)
+Set BackgroundTransparency: 1 on the ImageLabel.
+
+--- CURRENCY ICONS (small, next to prices) ---
+Small emoji icons: https://placehold.co/40x40/f59e0b/000000?text=%F0%9F%92%B0&font-size=24 (gold)
+https://placehold.co/40x40/8b5cf6/000000?text=%F0%9F%92%8E&font-size=24 (gem)
+
+--- GAME THUMBNAILS / FEATURE IMAGES ---
+Use curated picsum seeds for dark/moody game-like images:
+https://picsum.photos/seed/darkforest/400/300, https://picsum.photos/seed/neoncity/400/300
+https://picsum.photos/seed/mountains/400/300, https://picsum.photos/seed/ocean/400/300
+https://picsum.photos/seed/night/400/300, https://picsum.photos/seed/fire/400/300
+https://picsum.photos/seed/gold/400/300, https://picsum.photos/seed/crystal/400/300
+
+--- BACKGROUNDS ---
+DO NOT use images for backgrounds. Use solid colored Frames:
+Dark gaming: #0d1117, Neon: #0a0a1a, Medieval: #1a0f0a, Colorful: #1e1e2e
+
+--- RULES ---
+1. Player avatars → Roblox headshots or ui-avatars.com (circular)
+2. Item icons → placehold.co with emoji text (colored squares)
+3. Currency → small placehold.co with coin emoji
+4. Feature images → curated picsum seeds (darkforest, neoncity, etc.)
+5. UI backgrounds → solid color Frames (no images)
+6. NEVER use random picsum for icons or avatars
 Use emojis IN Text property for icons: 🎮 ⚔️ 🛡️ 💰 🔥 ✨ 🏆 ⭐ 💎 🛒 👑 🗡️ 🏹 🛒 ❤️ 🎯 💜 🔵 ⚡ 🌟
 
 === POPULAR ROBLOX UI PATTERNS ===

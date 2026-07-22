@@ -44,13 +44,66 @@ Layout: Rotation, Visible
 7. SPACING: Use LayoutOrder on every element. Leave visual breathing room between elements
 8. HIERARCHY: Title → Subtitle → Content → Actions → Footer. Clear visual flow
 
-=== IMAGE URL STRATEGY (USE LOTS OF IMAGES) ===
-Item thumbnails: https://picsum.photos/seed/sword1/200/200, https://picsum.photos/seed/shield2/200/200, https://picsum.photos/seed/potion3/200/200, https://picsum.photos/seed/armor4/200/200, https://picsum.photos/seed/gem5/200/200, https://picsum.photos/seed/axe6/200/200, https://picsum.photos/seed/bow7/200/200, https://picsum.photos/seed/ring8/200/200
-Player avatars: https://picsum.photos/seed/player1/150/150, https://picsum.photos/seed/player2/150/150, https://picsum.photos/seed/player3/150/150, https://picsum.photos/seed/player4/150/150
-Game logos: https://picsum.photos/seed/gamelogo1/400/200
-Backgrounds: https://picsum.photos/seed/darkbg1/800/600, https://picsum.photos/seed/neonbg1/800/600
-Currency: https://picsum.photos/seed/goldcoin/80/80, https://picsum.photos/seed/diamond/80/80, https://picsum.photos/seed/rubygem/80/80, https://picsum.photos/seed/emerald/80/80
-ALWAYS use ImageLabel for: item icons, player avatars, game logos, background textures, currency icons
+=== IMAGE STRATEGY (CRITICAL — SELECT THE RIGHT IMAGE FOR EACH ELEMENT) ===
+
+Every element type needs a DIFFERENT kind of image. Never use random images. Follow these rules:
+
+--- PLAYER AVATARS (circular character portraits) ---
+Use Roblox headshots: https://www.roblox.com/headshot-thumbnail/image?userId=1&width=150&height=150&format=png
+Or use letter avatars: https://ui-avatars.com/api/?name=PlayerName&background=3b82f6&color=fff&bold=true&size=150
+Use CornerRadius: 50 to make them circular. Size: 150x150.
+NEVER use random photos for avatars.
+
+--- ITEM ICONS (swords, shields, potions, armor, weapons) ---
+Use colored placeholder boxes with emoji text — these look like actual game item icons:
+https://placehold.co/120x120/1e293b/ef4444?text=%E2%9A%94%EF%B8%8F&font-size=50  (sword icon)
+https://placehold.co/120x120/1e293b/3b82f6?text=%F0%9F%9E%A1%EF%B8%8F&font-size=50  (shield icon)
+https://placehold.co/120x120/1e293b/22c55e?text=%F0%9F%A7%A3&font-size=50  (potion icon)
+https://placehold.co/120x120/1e293b/a78bfa?text=%F0%9F%92%8E&font-size=50  (gem icon)
+https://placehold.co/120x120/1e293b/f59e0b?text=%F0%9F%92%B0&font-size=50  (coin icon)
+https://placehold.co/120x120/1e293b/f472b6?text=%F0%9F%8E%AF&font-size=50  (wand icon)
+https://placehold.co/120x120/1e293b/06b6d4?text=%F0%9F%94%A5&font-size=50  (fire icon)
+https://placehold.co/120x120/1e293b/fda4af?text=%E2%9C%A8&font-size=50  (star icon)
+Set BackgroundTransparency: 1 on the ImageLabel so only the icon shows.
+Size item icons: {"X":0.4,"Y":0.5} relative to the card.
+
+--- CURRENCY ICONS (coins, gems, diamonds next to prices) ---
+Small emoji-based icons: https://placehold.co/40x40/f59e0b/000000?text=%F0%9F%92%B0&font-size=24  (gold coin)
+https://placehold.co/40x40/8b5cf6/000000?text=%F0%9F%92%8E&font-size=24  (purple gem)
+https://placehold.co/40x40/ef4444/000000?text=%E2%9D%A4%EF%B8%8F&font-size=24  (red heart)
+Size: very small, about 0.1 width relative to parent.
+
+--- GAME THUMBNAILS / REVEAL IMAGES (large feature images) ---
+Use curated picsum seeds that produce dark/moody game-like images:
+https://picsum.photos/seed/darkforest/400/300  (dark forest — good for RPG)
+https://picsum.photos/seed/neoncity/400/300  (neon city — good for cyberpunk)
+https://picsum.photos/seed/mountains/400/300  (mountains — good for adventure)
+https://picsum.photos/seed/ocean/400/300  (ocean — good for underwater themes)
+https://picsum.photos/seed/night/400/300  (night sky — good for space)
+https://picsum.photos/seed/fire/400/300  (fire — good for battle themes)
+https://picsum.photos/seed/gold/400/300  (golden — good for treasure/loot)
+https://picsum.photos/seed/crystal/400/300  (crystal — good for fantasy)
+Size: large, about 0.6-0.8 width relative to parent.
+
+--- BACKGROUNDS (UI panel backgrounds) ---
+DO NOT use images for backgrounds. Use solid colored Frames instead:
+Dark gaming: BackgroundColor3="#0d1117"
+Neon cyber: BackgroundColor3="#0a0a1a"
+Medieval: BackgroundColor3="#1a0f0a"
+Colorful: BackgroundColor3="#1e1e2e"
+Only use background images for MAIN MENU full-screen backgrounds.
+
+--- PROGRESS BAR FILLS ---
+DO NOT use images. Use solid colored Frames with CornerRadius.
+
+--- RULE SUMMARY ---
+1. Player avatars → Roblox headshots or ui-avatars.com (circular)
+2. Item icons → placehold.co with emoji text (colored square icons)
+3. Currency icons → small placehold.co with coin emoji
+4. Feature images → curated picsum seeds (darkforest, neoncity, etc.)
+5. UI backgrounds → solid color Frames (no images)
+6. Progress bars → solid color Frames (no images)
+7. NEVER use random picsum photos for icons or avatars
 
 === ROBLOX UI PATTERNS (WITH DETAIL) ===
 1. SHOP: Dark bg → scrolling grid of item cards → each card has ImageLabel (item icon) + TextLabel (name) + TextLabel (price in 💰) + TextButton (BUY). Top bar has title + currency display. Close button top-right

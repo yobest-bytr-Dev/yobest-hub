@@ -18,15 +18,38 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     const sb = createClient(supabaseUrl, supabaseKey)
 
-    let geminiKey = Deno.env.get("GEMINI_API_KEY") ?? ""
+    let geminiKey = "";
+
+    // Try multi-key pool first
+    const { data: keysRow } = await sb
+      .from("bot_config")
+      .select("value")
+      .eq("key", "gemini_api_keys")
+      .maybeSingle();
+    if (keysRow?.value) {
+      try {
+        const parsed = typeof keysRow.value === "string" ? JSON.parse(keysRow.value) : keysRow.value;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const healthy = parsed.filter((k: any) => k.status !== "error");
+          const pool = healthy.length > 0 ? healthy : parsed;
+          const pick = pool[Math.floor(Math.random() * pool.length)];
+          if (pick?.key) geminiKey = pick.key;
+        }
+      } catch {}
+    }
+
+    // Fallback to single key
     if (!geminiKey) {
       const { data: row } = await sb
         .from("bot_config")
         .select("value")
         .eq("key", "gemini_api_key")
-        .maybeSingle()
-      if (row?.value) geminiKey = typeof row.value === "string" ? row.value.replace(/^"|"$/g, "") : String(row.value)
+        .maybeSingle();
+      if (row?.value) geminiKey = typeof row.value === "string" ? row.value.replace(/^"|"$/g, "") : String(row.value);
     }
+
+    // Env var
+    if (!geminiKey) geminiKey = Deno.env.get("GEMINI_API_KEY") ?? "";
 
     if (!geminiKey) {
       throw new Error("No Gemini API key configured. Ask admin to add one in Admin > Settings.")

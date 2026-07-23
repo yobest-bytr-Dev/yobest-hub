@@ -1017,26 +1017,123 @@ function SettingsTab() {
   const [stats, setStats] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [geminiKey, setGeminiKey] = useState('')
-  const [geminiKeyLoading, setGeminiKeyLoading] = useState(true)
-  const [geminiKeySaving, setGeminiKeySaving] = useState(false)
-  const [showGeminiKey, setShowGeminiKey] = useState(false)
+  const [apiKeys, setApiKeys] = useState<{ id: string; key: string; name: string; status: 'unknown' | 'ok' | 'error'; lastError?: string }[]>([])
+  const [keysLoading, setKeysLoading] = useState(true)
+  const [newKeyValue, setNewKeyValue] = useState('')
+  const [newKeyName, setNewKeyName] = useState('')
+  const [showKeyIdx, setShowKeyIdx] = useState<number | null>(null)
+  const [testing, setTesting] = useState<string | null>(null)
   const { toast } = useToast()
 
   useEffect(() => {
-    supabase.from('site_stats').select('*').then(({ data }) => {
-      setStats(data || [])
-    })
-    supabase.from('bot_config').select('value').eq('key', 'gemini_api_key').maybeSingle().then(({ data }) => {
-      if (data?.value) setGeminiKey(typeof data.value === 'string' ? data.value.replace(/^"|"$/g, '') : String(data.value))
-      setGeminiKeyLoading(false)
+    Promise.all([
+      supabase.from('site_stats').select('*'),
+      botApiCall('get_config'),
+    ]).then(([statsRes, configRes]) => {
+      setStats(statsRes.data || [])
+      setLoading(false)
+      const keysRaw = configRes?.config?.gemini_api_keys
+      if (keysRaw) {
+        try {
+          const parsed = typeof keysRaw === 'string' ? JSON.parse(keysRaw) : keysRaw
+          if (Array.isArray(parsed)) {
+            setApiKeys(parsed.map((k: any, i: number) => ({
+              id: k.id || `key-${i}`,
+              key: k.key || '',
+              name: k.name || `Key ${i + 1}`,
+              status: k.status || 'unknown',
+              lastError: k.lastError,
+            })))
+          }
+        } catch {}
+      }
+      setKeysLoading(false)
+    }).catch(() => {
+      setLoading(false)
+      setKeysLoading(false)
     })
   }, [])
+
+  const botApiCall = async (action: string, data: Record<string, any> = {}) => {
+    const { data: { session } } = await supabase.auth.getSession()
+    const r = await fetch(`${supabaseUrl}/functions/v1/bot-api`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session?.access_token || ''}`,
+        apikey: supabaseAnonKey,
+      },
+      body: JSON.stringify({ action, ...data }),
+    })
+    return r.json()
+  }
+
+  const saveKeys = async (keys: typeof apiKeys) => {
+    setApiKeys(keys)
+    try {
+      const data = await botApiCall('update_config', {
+        key: 'gemini_api_keys',
+        value: JSON.stringify(keys.map(k => ({ id: k.id, key: k.key, name: k.name, status: k.status, lastError: k.lastError }))),
+      })
+      if (data.error) throw new Error(data.error)
+    } catch (e: any) {
+      toast(`Save failed: ${e.message}`, 'error')
+    }
+  }
+
+  const addKey = async () => {
+    const trimmed = newKeyValue.trim()
+    if (!trimmed) { toast('Paste a Gemini API key', 'error'); return }
+    if (apiKeys.some(k => k.key === trimmed)) { toast('Key already added', 'error'); return }
+    const newKey = {
+      id: `key-${Date.now()}`,
+      key: trimmed,
+      name: newKeyName.trim() || `Key ${apiKeys.length + 1}`,
+      status: 'unknown' as const,
+    }
+    await saveKeys([...apiKeys, newKey])
+    setNewKeyValue('')
+    setNewKeyName('')
+    toast('Key added! Click Test to verify it works.', 'success')
+  }
+
+  const removeKey = async (id: string) => {
+    await saveKeys(apiKeys.filter(k => k.id !== id))
+    toast('Key removed', 'success')
+  }
+
+  const testKey = async (id: string) => {
+    const k = apiKeys.find(x => x.id === id)
+    if (!k) return
+    setTesting(id)
+    try {
+      const r = await fetch(`${supabaseUrl}/functions/v1/ai-proxy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: 'Say OK' }],
+          model: 'gemini-2.0-flash',
+          max_tokens: 10,
+          api_key: k.key,
+        }),
+      })
+      const data = await r.json()
+      if (data.error) throw new Error(data.error)
+      const updated = apiKeys.map(x => x.id === id ? { ...x, status: 'ok' as const, lastError: undefined } : x)
+      await saveKeys(updated)
+      toast(`"${k.name}" works!`, 'success')
+    } catch (e: any) {
+      const updated = apiKeys.map(x => x.id === id ? { ...x, status: 'error' as const, lastError: e.message?.slice(0, 80) } : x)
+      await saveKeys(updated)
+      toast(`"${k.name}" failed: ${e.message}`, 'error')
+    }
+    setTesting(null)
+  }
 
   const handleSave = async (name: string, value: number) => {
     setSaving(true)
     try {
-      const data = await apiCall('update_site_stats', { statName: name, value })
+      const data = await botApiCall('update_config', { key: `stat_${name}`, value: String(value) })
       if (data.error) throw new Error(data.error)
       setStats((prev) => {
         const existing = prev.find((s: any) => (s.key || s.name) === name)
@@ -1050,105 +1147,90 @@ function SettingsTab() {
     setSaving(false)
   }
 
-  const saveGeminiKey = async () => {
-    setGeminiKeySaving(true)
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const r = await fetch(`${supabaseUrl}/functions/v1/bot-api`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session?.access_token || ''}`,
-          apikey: supabaseAnonKey,
-        },
-        body: JSON.stringify({ action: 'update_config', key: 'gemini_api_key', value: geminiKey.trim() }),
-      })
-      const data = await r.json()
-      if (data.error) throw new Error(data.error)
-      toast('Gemini API key saved! All AI features will use this key.', 'success')
-    } catch (e: any) {
-      toast(e.message || 'Failed to save key', 'error')
-    }
-    setGeminiKeySaving(false)
-  }
-
-  const testGeminiKey = async () => {
-    if (!geminiKey.trim()) { toast('Enter a key first', 'error'); return }
-    setGeminiKeySaving(true)
-    try {
-      const r = await fetch(`${supabaseUrl}/functions/v1/ai-proxy`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: [{ role: 'user', content: 'Say "OK" in one word.' }],
-          model: 'gemini-2.0-flash',
-          max_tokens: 10,
-        }),
-      })
-      const data = await r.json()
-      if (data.error) throw new Error(data.error)
-      const reply = data.choices?.[0]?.message?.content || ''
-      toast(`Key works! Response: "${reply.trim().slice(0, 50)}"`, 'success')
-    } catch (e: any) {
-      toast(`Key test failed: ${e.message}`, 'error')
-    }
-    setGeminiKeySaving(false)
-  }
-
   if (loading) return <div className="flex items-center justify-center py-20"><Loader2 size={24} className="animate-spin text-accent-blue" /></div>
 
   const knownStats = ['visits', 'downloads', 'ai_sessions']
+  const workingKeys = apiKeys.filter(k => k.status === 'ok').length
 
   return (
     <div className="space-y-6">
       <h2 className="text-lg font-semibold text-text-primary">Site Settings</h2>
 
-      {/* Gemini API Key Section */}
+      {/* Gemini API Keys — BYOK */}
       <div className="rounded-xl bg-bg-secondary border border-border-primary p-5">
-        <div className="flex items-center gap-3 mb-4">
+        <div className="flex items-center gap-3 mb-2">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
             <Sparkles size={16} className="text-white" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-text-primary">Gemini API Key</h3>
-            <p className="text-[11px] text-text-dim">Bring Your Own Key — powers all AI features site-wide</p>
+            <h3 className="text-sm font-semibold text-text-primary">Gemini API Keys</h3>
+            <p className="text-[11px] text-text-dim">BYOK — add multiple keys, site uses them automatically</p>
           </div>
+          {apiKeys.length > 0 && (
+            <div className="ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-bg-elevated border border-border-primary text-[10px]">
+              <span className="text-text-muted">{apiKeys.length} key{apiKeys.length !== 1 ? 's' : ''}</span>
+              {workingKeys > 0 && <span className="text-green-400 ml-1">{workingKeys} active</span>}
+            </div>
+          )}
         </div>
-        {geminiKeyLoading ? (
-          <div className="flex items-center gap-2 py-3"><Loader2 size={16} className="animate-spin text-accent-blue" /><span className="text-xs text-text-muted">Loading...</span></div>
+
+        {keysLoading ? (
+          <div className="flex items-center gap-2 py-4"><Loader2 size={16} className="animate-spin text-accent-blue" /><span className="text-xs text-text-muted">Loading keys...</span></div>
         ) : (
           <>
-            <div className="flex items-center gap-2 mb-3">
-              <div className="relative flex-1">
-                <input
-                  type={showGeminiKey ? 'text' : 'password'}
-                  value={geminiKey}
-                  onChange={(e) => setGeminiKey(e.target.value)}
-                  placeholder="AIza..."
-                  className="w-full px-3 py-2.5 pr-16 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm font-mono focus:outline-none focus:border-accent-blue/50 transition-all"
-                />
-                <button onClick={() => setShowGeminiKey(!showGeminiKey)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] px-2 py-1 rounded bg-bg-secondary border border-border-primary text-text-muted hover:text-text-primary transition-colors">
-                  {showGeminiKey ? 'Hide' : 'Show'}
-                </button>
+            {/* Existing keys */}
+            {apiKeys.length > 0 && (
+              <div className="space-y-2 mb-4">
+                {apiKeys.map((k, i) => (
+                  <div key={k.id} className="flex items-center gap-2 p-3 rounded-lg bg-bg-elevated border border-border-primary group">
+                    <div className={cn('w-2.5 h-2.5 rounded-full shrink-0', k.status === 'ok' ? 'bg-green-400' : k.status === 'error' ? 'bg-red-400' : 'bg-yellow-400/60')} />
+                    <span className="text-xs font-medium text-text-primary min-w-[60px]">{k.name}</span>
+                    <span className="text-[11px] text-text-dim font-mono flex-1 truncate">
+                      {showKeyIdx === i ? k.key : k.key.slice(0, 8) + '...' + k.key.slice(-4)}
+                    </span>
+                    {k.status === 'error' && k.lastError && (
+                      <span className="text-[9px] text-red-400/80 max-w-[150px] truncate hidden sm:block" title={k.lastError}>{k.lastError}</span>
+                    )}
+                    <button onClick={() => setShowKeyIdx(showKeyIdx === i ? null : i)}
+                      className="text-[10px] px-2 py-1 rounded bg-bg-secondary text-text-muted hover:text-text-primary transition-colors">
+                      {showKeyIdx === i ? 'Hide' : 'Show'}
+                    </button>
+                    <button onClick={() => testKey(k.id)} disabled={testing === k.id}
+                      className="flex items-center gap-1 text-[10px] px-2 py-1 rounded bg-bg-secondary text-green-400 hover:bg-green-500/10 transition-colors disabled:opacity-50">
+                      {testing === k.id ? <Loader2 size={10} className="animate-spin" /> : <Zap size={10} />}
+                      Test
+                    </button>
+                    <button onClick={() => removeKey(k.id)}
+                      className="text-[10px] px-2 py-1 rounded bg-bg-secondary text-red-400 hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100">
+                      Remove
+                    </button>
+                  </div>
+                ))}
               </div>
-              <button onClick={saveGeminiKey} disabled={geminiKeySaving}
-                className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg bg-accent-blue/15 text-accent-blue text-sm font-medium hover:bg-accent-blue/25 transition-colors disabled:opacity-50">
-                {geminiKeySaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                Save
-              </button>
-              <button onClick={testGeminiKey} disabled={geminiKeySaving}
-                className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg bg-green-500/15 text-green-400 text-sm font-medium hover:bg-green-500/25 transition-colors disabled:opacity-50">
-                <Zap size={14} />
-                Test
+            )}
+
+            {/* Add new key */}
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input value={newKeyName} onChange={(e) => setNewKeyName(e.target.value)}
+                placeholder="Name (optional)"
+                className="sm:w-32 px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50 transition-all" />
+              <input value={newKeyValue} onChange={(e) => setNewKeyValue(e.target.value)}
+                placeholder="Paste Gemini API key (AIza...)"
+                type="password"
+                onKeyDown={(e) => e.key === 'Enter' && addKey()}
+                className="flex-1 px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm font-mono focus:outline-none focus:border-accent-blue/50 transition-all" />
+              <button onClick={addKey}
+                className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-accent-blue/15 text-accent-blue text-sm font-medium hover:bg-accent-blue/25 transition-colors whitespace-nowrap">
+                <Plus size={14} /> Add Key
               </button>
             </div>
-            <div className="flex items-start gap-2 p-3 rounded-lg bg-bg-elevated/50 border border-border-primary/50">
+
+            <div className="flex items-start gap-2 p-3 mt-3 rounded-lg bg-bg-elevated/50 border border-border-primary/50">
               <Sparkles size={14} className="text-accent-purple shrink-0 mt-0.5" />
               <div className="text-[11px] text-text-dim leading-relaxed">
-                <p>This key powers: <strong className="text-text-secondary">AI Chat</strong> (all modes), <strong className="text-text-secondary">UI Builder</strong> (visual canvas), and <strong className="text-text-secondary">3D Model Generator</strong>.</p>
-                <p className="mt-1">Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" className="text-accent-blue hover:underline">aistudio.google.com/apikey</a> — no credit card needed.</p>
-                <p className="mt-1 text-green-400/80">The key is stored encrypted in your database and never exposed to the browser.</p>
+                <p><strong className="text-text-secondary">How it works:</strong> Add one or more Gemini API keys. The site rotates between them automatically — if one key hits rate limits, the next one is used.</p>
+                <p className="mt-1">Get free keys at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" className="text-accent-blue hover:underline">aistudio.google.com/apikey</a> — no credit card needed.</p>
+                <p className="mt-1 text-green-400/80">Keys are stored in your Supabase database and never exposed to the browser.</p>
               </div>
             </div>
           </>
@@ -1171,20 +1253,6 @@ function SettingsTab() {
             )
           })}
         </div>
-        {stats.filter((s: any) => !knownStats.includes(s.key || s.name)).length > 0 && (
-          <div className="mt-4 pt-4 border-t border-border-primary space-y-3">
-            <h4 className="text-xs text-text-muted font-medium uppercase tracking-wider">Other Stats</h4>
-            {stats.filter((s: any) => !knownStats.includes(s.key || s.name)).map((s: any) => (
-              <div key={s.key || s.name} className="flex items-center gap-3">
-                <span className="text-xs text-text-muted w-28">{s.key || s.name}</span>
-                <input type="number" defaultValue={s.value || 0}
-                  onBlur={(e) => handleSave(s.key || s.name, parseInt(e.target.value) || 0)}
-                  className="flex-1 px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm focus:outline-none focus:border-accent-blue/50 transition-all"
-                />
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   )

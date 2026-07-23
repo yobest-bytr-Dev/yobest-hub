@@ -3,15 +3,31 @@ import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 const RODIN_KEY = "vibecoding";
 
 async function getGeminiKey(): Promise<string> {
-  let key = Deno.env.get("GEMINI_API_KEY") ?? "";
-  if (key) return key;
   try {
     const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2.39.3");
     const sb = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
-    const { data } = await sb.from("bot_config").select("value").eq("key", "gemini_api_key").maybeSingle();
-    if (data?.value) return typeof data.value === "string" ? data.value.replace(/^"|"$/g, "") : String(data.value);
+    // Try multi-key pool
+    const { data: keysRow } = await sb.from("bot_config").select("value").eq("key", "gemini_api_keys").maybeSingle();
+    if (keysRow?.value) {
+      try {
+        const parsed = typeof keysRow.value === "string" ? JSON.parse(keysRow.value) : keysRow.value;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const healthy = parsed.filter((k: any) => k.status !== "error");
+          const pool = healthy.length > 0 ? healthy : parsed;
+          const pick = pool[Math.floor(Math.random() * pool.length)];
+          if (pick?.key) return pick.key;
+        }
+      } catch {}
+    }
+    // Fallback to single key
+    const { data: singleRow } = await sb.from("bot_config").select("value").eq("key", "gemini_api_key").maybeSingle();
+    if (singleRow?.value) {
+      const v = typeof singleRow.value === "string" ? singleRow.value.replace(/^"|"$/g, "") : String(singleRow.value);
+      if (v) return v;
+    }
   } catch {}
-  return "";
+  // Env var
+  return Deno.env.get("GEMINI_API_KEY") ?? "";
 }
 
 async function callGemini(systemPrompt: string, userContent: string, maxTokens = 500, temperature = 0.7): Promise<string> {

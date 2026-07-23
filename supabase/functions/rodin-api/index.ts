@@ -797,6 +797,12 @@ Output ONLY the JSON. No markdown. No explanation.` + EDIT_INSTRUCTION;
 
     // Proxy: forward request to OpenRouter (keeps API key server-side)
     if (action === "proxy-openrouter") {
+      if (!OPENROUTER_KEY) {
+        return new Response(JSON.stringify({ error: "OPENROUTER_API_KEY not configured" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 500,
+        });
+      }
       const body = await req.json();
       const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",

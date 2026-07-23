@@ -63,40 +63,32 @@ async function fetchAvatarUrls(userIds: (string | number)[]): Promise<Record<str
   const toFetch = userIds.filter((id) => id && !avatarCache.has(String(id)))
   if (toFetch.length === 0) return {}
 
+  const supabaseUrl = 'https://pohslivolczprxacroje.supabase.co'
+  const supabaseKey = 'sb_publishable_zg1KBuWhnqVm8GM8q4siIA_M1BC1vyG'
+
   try {
-    const ids = toFetch.map(String)
+    const ids = toFetch.map(String).join(',')
     const res = await fetch(
-      `https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${ids.join(',')}&size=150x150&format=Png&isCircular=false`,
-      { signal: AbortSignal.timeout(10000) }
+      `${supabaseUrl}/functions/v1/roblox-avatar?userIds=${ids}`,
+      {
+        headers: { Authorization: `Bearer ${supabaseKey}` },
+        signal: AbortSignal.timeout(10000),
+      }
     )
     if (res.ok) {
       const data = await res.json()
-      if (data && Array.isArray(data.data)) {
-        for (const item of data.data) {
-          if (item.targetId && item.state === 'Completed' && item.imageUrl) {
-            avatarCache.set(String(item.targetId), item.imageUrl)
+      if (data && typeof data === 'object' && !data.error) {
+        for (const [id, url] of Object.entries(data)) {
+          if (typeof url === 'string' && url.startsWith('http')) {
+            avatarCache.set(id, url)
           }
         }
       }
     }
   } catch {}
 
-  // For any still missing, try the headshot endpoint individually
-  const stillMissing = toFetch.filter((id) => !avatarCache.has(String(id)))
-  for (const id of stillMissing) {
-    try {
-      const res = await fetch(
-        `https://www.roblox.com/headshot-thumbnail/image?userId=${id}&width=150&height=150&format=png`,
-        { signal: AbortSignal.timeout(5000) }
-      )
-      if (res.ok) {
-        avatarCache.set(String(id), res.url)
-      }
-    } catch {}
-  }
-
   return Object.fromEntries(
-    toFetch.filter((id) => avatarCache.has(String(id))).map((id) => [String(id), avatarCache.get(String(id))!])
+    toFetch.map(String).filter((id) => avatarCache.has(id)).map((id) => [id, avatarCache.get(id)!])
   )
 }
 

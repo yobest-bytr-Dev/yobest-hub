@@ -957,7 +957,7 @@ export default function UIGenerator() {
 
       // ── Step 1: Try AI — proxy through edge function (no CORS, key server-side) ──
       let parsed: any = null
-      const models = ['deepseek/deepseek-chat-v3-0324:free', 'qwen/qwen3-32b:free', 'meta-llama/llama-4-maverick:free', 'google/gemma-4-26b-a4b-it:free']
+      const models = ['google/gemma-4-26b-a4b-it:free', 'meta-llama/llama-4-maverick:free', 'qwen/qwen3-32b:free', 'deepseek/deepseek-r1:free']
 
       for (const model of models) {
         if (parsed) break

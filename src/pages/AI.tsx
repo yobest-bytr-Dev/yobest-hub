@@ -13,6 +13,7 @@ import {
 import { useStore } from '@/store/useStore'
 import { trackAiSession } from '@/lib/analytics'
 import { cn } from '@/lib/utils'
+import { supabaseUrl, supabaseAnonKey } from '@/config/supabase'
 import type { ChatMessage } from '@/lib/types'
 import AdBanner from '@/components/AdBanner'
 
@@ -594,12 +595,10 @@ function CodeBlock({ code, lang }: { code: string; lang: string }) {
     if (!studioConnected || !studioToken) return
     setInjecting(true)
     try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
-      if (supabaseUrl && supabaseKey && supabaseUrl !== 'https://placeholder.supabase.co') {
+      if (supabaseUrl && supabaseAnonKey && supabaseUrl !== 'https://placeholder.supabase.co') {
         await fetch(`${supabaseUrl}/functions/v1/studio-deploy`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseKey}` },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseAnonKey}` },
           body: JSON.stringify({ token: studioToken, code, name: 'YobestAI_Script' })
         })
         setInjected(true); setTimeout(() => setInjected(false), 3000)
@@ -919,13 +918,11 @@ export default function AI() {
     const assistantMsg: ChatMessage = { id: (Date.now() + 1).toString(), role: 'assistant', content: '', timestamp: Date.now() }
     addChatMessage(assistantMsg)
     try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
       let response: Response
       const systemPrompt = getSystemPrompt(aiMode)
-      const useEdge = supabaseUrl && supabaseUrl !== 'https://placeholder.supabase.co' && supabaseKey && supabaseKey !== 'placeholder-key'
+      const useEdge = supabaseUrl && supabaseUrl !== 'https://placeholder.supabase.co' && supabaseAnonKey && supabaseAnonKey !== 'placeholder-key'
       if (useEdge) {
-        response = await fetch(`${supabaseUrl}/functions/v1/chat-ai`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${supabaseKey}` }, body: JSON.stringify({ model: aiModel, messages: [{ role: 'system', content: systemPrompt }, ...history.map(m => ({ role: m.role, content: m.content })), { role: 'user', content: messageContent }] }) })
+        response = await fetch(`${supabaseUrl}/functions/v1/chat-ai`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${supabaseAnonKey}` }, body: JSON.stringify({ model: aiModel, messages: [{ role: 'system', content: systemPrompt }, ...history.map(m => ({ role: m.role, content: m.content })), { role: 'user', content: messageContent }] }) })
       } else {
         response = await fetch('https://openrouter.ai/api/v1/chat/completions', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${import.meta.env.VITE_OPENROUTER_API_KEY || ''}`, 'HTTP-Referer': window.location.origin, 'X-Title': 'Yobest AI Architect' }, body: JSON.stringify({ model: aiModel, stream: true, max_tokens: 16000, messages: [{ role: 'system', content: systemPrompt }, ...history.map(m => ({ role: m.role, content: m.content })), { role: 'user', content: messageContent }] }) })
       }

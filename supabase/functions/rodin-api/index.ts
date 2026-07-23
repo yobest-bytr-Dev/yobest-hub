@@ -431,6 +431,18 @@ Return ONLY: {"message":"description","commands":[...]}
 === ELEMENT TYPES ===
 Frame, TextLabel, TextButton, ImageLabel, ScrollingFrame, TextBox
 
+=== MODIFIER TYPES (child of an element, no position/size) ===
+UICorner: properties: Radius (number, corner radius in px)
+UIStroke: properties: Color (#hex), Thickness (number), Transparency (0-1)
+UIPadding: properties: Top, Bottom, Left, Right (numbers, inner padding)
+UIListLayout: properties: FillDirection ("Horizontal"/"Vertical"), Padding (number), HorizontalAlignment ("Left"/"Center"/"Right"), SortOrder ("LayoutOrder"/"Name")
+UIGridLayout: properties: CellPaddingX, CellPaddingY (numbers), CellSizeX, CellSizeY (numbers)
+UIScale: properties: Scale (number 0.5-2.0)
+UIAspectRatioConstraint: properties: AspectRatio (number), AspectType ("ScaleWithParentSize"), DominantAxis ("Width"/"Height")
+UIGradient: properties: Color (#hex), Transparency (0-1), Rotation (number degrees)
+
+Example modifier command: {"action":"add","elementType":"UICorner","name":"Corner1","parent":"Frame1","properties":{"Radius":12}}
+
 === PROPERTIES ===
 BackgroundColor3 (#hex), BackgroundTransparency (0-1), BorderSizePixel (0), CornerRadius (0-50)
 Text (string), TextColor3 (#hex), TextScaled (bool), Font (GothamBold/Gotham), TextSize (number)
@@ -525,6 +537,7 @@ Output ONLY the JSON. No markdown. No explanation.` + EDIT_INSTRUCTION;
         if (!Array.isArray(parsed.commands)) return parsed;
 
         const skipTypes = new Set(["ScreenGui", "ScreenGui", "LocalScript", "Script"]);
+        const modifierTypes = new Set(["UICorner", "UIStroke", "UIPadding", "UIListLayout", "UIGridLayout", "UIScale", "UIAspectRatioConstraint", "UIGradient"]);
         const nameMap = new Map<string, string>();
 
         // Pass 1: Build name map, filter wrappers
@@ -546,33 +559,38 @@ Output ONLY the JSON. No markdown. No explanation.` + EDIT_INSTRUCTION;
         // Pass 2: Fix each command
         for (const c of cleaned) {
           if (c.action === "add") {
-            // Fix position format variations
-            if (typeof c.position === "string") {
-              const parts = c.position.split(/[,\s]+/).map(Number);
-              c.position = { X: parts[0] || 0.5, Y: parts[1] || 0.5 };
-            }
-            if (!c.position || typeof c.position !== "object") c.position = { X: 0.5, Y: 0.5 };
-            if (c.position.x !== undefined) { c.position.X = c.position.x; c.position.Y = c.position.y; }
-            // Ensure X and Y exist and are valid numbers
-            if (typeof c.position.X !== "number" || isNaN(c.position.X)) c.position.X = 0.5;
-            if (typeof c.position.Y !== "number" || isNaN(c.position.Y)) c.position.Y = 0.5;
-            // Clamp to valid range (0-1 for position)
-            c.position.X = Math.max(0, Math.min(1, c.position.X));
-            c.position.Y = Math.max(0, Math.min(1, c.position.Y));
+            const isMod = modifierTypes.has(c.elementType);
 
-            // Fix size format variations
-            if (typeof c.size === "string") {
-              const parts = c.size.split(/[,\s]+/).map(Number);
-              c.size = { X: parts[0] || 0.4, Y: parts[1] || 0.5 };
+            if (isMod) {
+              // Modifiers don't need position/size
+              c.position = { X: 0.5, Y: 0.5 };
+              c.size = { X: 1, Y: 1 };
+              if (!c.properties || typeof c.properties !== "object") c.properties = {};
+            } else {
+              // Fix position format variations
+              if (typeof c.position === "string") {
+                const parts = c.position.split(/[,\s]+/).map(Number);
+                c.position = { X: parts[0] || 0.5, Y: parts[1] || 0.5 };
+              }
+              if (!c.position || typeof c.position !== "object") c.position = { X: 0.5, Y: 0.5 };
+              if (c.position.x !== undefined) { c.position.X = c.position.x; c.position.Y = c.position.y; }
+              if (typeof c.position.X !== "number" || isNaN(c.position.X)) c.position.X = 0.5;
+              if (typeof c.position.Y !== "number" || isNaN(c.position.Y)) c.position.Y = 0.5;
+              c.position.X = Math.max(0, Math.min(1, c.position.X));
+              c.position.Y = Math.max(0, Math.min(1, c.position.Y));
+
+              // Fix size format variations
+              if (typeof c.size === "string") {
+                const parts = c.size.split(/[,\s]+/).map(Number);
+                c.size = { X: parts[0] || 0.4, Y: parts[1] || 0.5 };
+              }
+              if (!c.size || typeof c.size !== "object") c.size = { X: 0.4, Y: 0.5 };
+              if (c.size.x !== undefined) { c.size.X = c.size.x; c.size.Y = c.size.y; }
+              if (typeof c.size.X !== "number" || isNaN(c.size.X)) c.size.X = 0.4;
+              if (typeof c.size.Y !== "number" || isNaN(c.size.Y)) c.size.Y = 0.5;
+              c.size.X = Math.max(0.02, Math.min(1.5, c.size.X));
+              c.size.Y = Math.max(0.02, Math.min(1.5, c.size.Y));
             }
-            if (!c.size || typeof c.size !== "object") c.size = { X: 0.4, Y: 0.5 };
-            if (c.size.x !== undefined) { c.size.X = c.size.x; c.size.Y = c.size.y; }
-            // Ensure X and Y exist and are valid numbers
-            if (typeof c.size.X !== "number" || isNaN(c.size.X)) c.size.X = 0.4;
-            if (typeof c.size.Y !== "number" || isNaN(c.size.Y)) c.size.Y = 0.5;
-            // Clamp size (must be positive, reasonable range)
-            c.size.X = Math.max(0.02, Math.min(1.5, c.size.X));
-            c.size.Y = Math.max(0.02, Math.min(1.5, c.size.Y));
 
             // Fix parent mapping from filtered wrappers
             if (c.parent && nameMap.has(c.parent)) {

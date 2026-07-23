@@ -128,12 +128,12 @@ export default function Admin() {
 function apiCall(action: string, data: Record<string, any> = {}) {
   const { data: { session } } = (supabase as any).auth?.getSession ? { data: { session: null } } : { data: { session: null } }
   return supabase.auth.getSession().then(({ data: { session } }) => {
-    return fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-ops`, {
+    return fetch(`${supabaseUrl}/functions/v1/admin-ops`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${session?.access_token || ''}`,
-        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+        apikey: supabaseAnonKey,
       },
       body: JSON.stringify({ action, ...data }),
     }).then((r) => r.json())

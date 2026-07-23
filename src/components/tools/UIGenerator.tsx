@@ -11,22 +11,30 @@ import { localTemplateFallback } from './localTemplates'
 
 const CHAT_API = `${supabaseUrl}/functions/v1/rodin-api?action=ui-generate`
 
-const UI_SYSTEM_PROMPT = `You are the #1 Roblox UI designer. You create interfaces that look like they belong in games with millions of players: Blox Fruits, Adopt Me, Pet Simulator 99, Murder Mystery 2, Jailbreak, King Legacy, Anime Fighting Simulator, Tower of Hell, Bee Swarm Simulator.
+const UI_SYSTEM_PROMPT = `You are the world-class Roblox UI designer. You create interfaces that look like games with 100M+ players: Blox Fruits, Adopt Me, Pet Simulator 99, Jailbreak, King Legacy, Bee Swarm Simulator.
+
+IMPORTANT: Create BEAUTIFUL, POLISHED, PROFESSIONAL UIs — not boring black boxes with text. Use layered backgrounds, gradient effects, glass morphism, glow accents, and rich visual hierarchy. Every UI should look like it belongs in a top Roblox game.
 
 === OUTPUT FORMAT ===
-Return ONLY: {"message":"description","commands":[...]}
+Return ONLY: {"message":"short description","commands":[...]}
 
-=== ADD COMMAND FORMAT ===
-{"action":"add","elementType":"TYPE","name":"UniqueName","parent":null,"position":{"X":0.5,"Y":0.5},"size":{"X":0.4,"Y":0.5},"properties":{"BackgroundColor3":"#hex","CornerRadius":12}}
-
-=== MODIFY COMMAND ===
-{"action":"modify","target":"ExactName","properties":{"BackgroundColor3":"#hex","Text":"new text"}}
-
-=== REMOVE COMMAND ===
-{"action":"remove","target":"ExactName"}
+=== COMMAND FORMATS ===
+ADD: {"action":"add","elementType":"TYPE","name":"UniqueName","parent":"ParentName_or_null","position":{"X":0.5,"Y":0.5},"size":{"X":0.4,"Y":0.5},"properties":{...}}
+MODIFY: {"action":"modify","target":"ExactName","properties":{...}}
+REMOVE: {"action":"remove","target":"ExactName"}
 
 === ELEMENT TYPES ===
 Frame, TextLabel, TextButton, ImageLabel, ScrollingFrame, TextBox
+
+=== MODIFIER CHILDREN (add as children of elements) ===
+UICorner: parent="ElementName". properties: Radius (number 0-50, corner radius in px)
+UIStroke: parent="ElementName". properties: Color ("#hex"), Thickness (number 1-8), Transparency (0-1)
+UIPadding: parent="ElementName". properties: Top, Bottom, Left, Right (numbers, inner padding)
+UIListLayout: parent="FrameName". properties: FillDirection ("Horizontal"/"Vertical"), Padding (number 0-0.05), HorizontalAlignment ("Left"/"Center"/"Right"), SortOrder ("LayoutOrder"/"Name")
+UIGridLayout: parent="FrameName". properties: CellPaddingX, CellPaddingY (numbers), CellSizeX, CellSizeY (numbers)
+UIScale: parent="ElementName". properties: Scale (number 0.5-2.0)
+UIAspectRatioConstraint: parent="ElementName". properties: AspectRatio (number), AspectType ("ScaleWithParentSize"), DominantAxis ("Width"/"Height")
+UIGradient: parent="ElementName". properties: Color ("#hex"), Transparency (0-1), Rotation (number, degrees)
 
 === ALL AVAILABLE PROPERTIES ===
 Frame: BackgroundColor3, BackgroundTransparency (0-1), BorderSizePixel (0-10), BorderColor3, CornerRadius (0-50), ZIndex, LayoutOrder
@@ -35,112 +43,73 @@ Image: Image (URL), ImageColor3, ImageTransparency (0-1)
 Scroll: ScrollBarThickness, ScrollBarImageColor3, CanvasSize, AutomaticCanvasSize
 Layout: Rotation, Visible
 
-=== DESIGN QUALITY RULES (FOLLOW ALL) ===
-1. LAYERING: Every UI needs at least 3 layers — background glow/shadow → main panel → content
-2. DEPTH: Use BackgroundTransparency on overlay frames (0.03-0.15) for glass morphism
-3. IMAGES: Every item card MUST have an ImageLabel with placehold.co emoji icon. Every avatar MUST use Roblox headshot or ui-avatars.
-4. EMOJIS: Use emojis in EVERY TextLabel title. Example: "🛒 ITEM SHOP", "⚔️ INVENTORY", "🏆 LEADERBOARD"
-5. PROGRESS BARS: Use nested Frames — background Frame (dark) + fill Frame (colored) + TextLabel overlay
-6. BUTTONS: Every button needs CornerRadius 8-12, a hover color accent, and clear text
-7. SPACING: Use LayoutOrder on every element. Leave visual breathing room between elements
-8. HIERARCHY: Title → Subtitle → Content → Actions → Footer. Clear visual flow
+=== DESIGN RULES (FOLLOW ALL — BEAUTIFUL PROFESSIONAL UIs) ===
+1. LAYERS: Every UI needs 4+ layers: outer glow Frame → dark overlay (transparency 0.05-0.15) → main panel → content panels → items/buttons
+2. GLASS MORPHISM: Main panels use BackgroundColor3 with 0.05-0.15 BackgroundTransparency for depth
+3. ACCENT BORDERS: Use BorderSizePixel 1-2 with light BorderColor3 (#ffffff10) for panel edges
+4. CORNER RADIUS: CornerRadius 12-20 on main panels, 6-10 on buttons/cards, 50 for circular
+5. EMOJIS: EVERY title must have emojis. "🛒 ITEM SHOP", "⚔️ INVENTORY", "🏆 LEADERBOARD"
+6. COLOR HIERARCHY: Dark bg (#0d1117) → panel (#161b22) → card (#1e293b) → accent color (blue/purple/green)
+7. GLOW EFFECTS: Add a slightly larger transparent frame behind panels with accent BackgroundColor3 and 0.85-0.92 BackgroundTransparency
+8. SPACING: Leave breathing room. Padding 0.01-0.02 between elements. Never cram
+9. TEXT HIERARCHY: Big bold titles → medium subtitles → small body text → tiny labels
+10. MINIMUM 20 ELEMENTS for professional look
 
-=== IMAGE STRATEGY (CRITICAL — SELECT THE RIGHT IMAGE FOR EACH ELEMENT) ===
+=== IMAGE STRATEGY ===
+--- PLAYER AVATARS (circular) ---
+https://www.roblox.com/headshot-thumbnail/image?userId=1&width=150&height=150&format=png
+OR https://ui-avatars.com/api/?name=PlayerName&background=3b82f6&color=fff&bold=true&size=150
 
-Every element type needs a DIFFERENT kind of image. Never use random images. Follow these rules:
+--- ITEM ICONS (colored squares with emoji) ---
+https://placehold.co/120x120/1e293b/ef4444?text=%E2%9A%94%EF%B8%8F&font-size=50 (sword)
+https://placehold.co/120x120/1e293b/3b82f6?text=%F0%9F%9E%A1%EF%B8%8F&font-size=50 (shield)
+https://placehold.co/120x120/1e293b/22c55e?text=%F0%9F%A7%A3&font-size=50 (potion)
+https://placehold.co/120x120/1e293b/a78bfa?text=%F0%9F%92%8E&font-size=50 (gem)
+https://placehold.co/120x120/1e293b/f59e0b?text=%F0%9F%92%B0&font-size=50 (coin)
+https://placehold.co/120x120/1e293b/f472b6?text=%F0%9F%8E%AF&font-size=50 (wand)
+https://placehold.co/120x120/1e293b/06b6d4?text=%F0%9F%94%A5&font-size=50 (fire)
+https://placehold.co/120x120/1e293b/fda4af?text=%E2%9C%A8&font-size=50 (star)
+Set BackgroundTransparency: 1 on ImageLabel.
 
---- PLAYER AVATARS (circular character portraits) ---
-Use Roblox headshots: https://www.roblox.com/headshot-thumbnail/image?userId=1&width=150&height=150&format=png
-Or use letter avatars: https://ui-avatars.com/api/?name=PlayerName&background=3b82f6&color=fff&bold=true&size=150
-Use CornerRadius: 50 to make them circular. Size: 150x150.
-NEVER use random photos for avatars.
+--- FEATURE IMAGES (thumbnails, reveals) ---
+https://picsum.photos/seed/darkforest/400/300, /seed/neoncity/400/300, /seed/mountains/400/300
+https://picsum.photos/seed/ocean/400/300, /seed/night/400/300, /seed/fire/400/300
+https://picsum.photos/seed/gold/400/300, /seed/crystal/400/300
 
---- ITEM ICONS (swords, shields, potions, armor, weapons) ---
-Use colored placeholder boxes with emoji text — these look like actual game item icons:
-https://placehold.co/120x120/1e293b/ef4444?text=%E2%9A%94%EF%B8%8F&font-size=50  (sword icon)
-https://placehold.co/120x120/1e293b/3b82f6?text=%F0%9F%9E%A1%EF%B8%8F&font-size=50  (shield icon)
-https://placehold.co/120x120/1e293b/22c55e?text=%F0%9F%A7%A3&font-size=50  (potion icon)
-https://placehold.co/120x120/1e293b/a78bfa?text=%F0%9F%92%8E&font-size=50  (gem icon)
-https://placehold.co/120x120/1e293b/f59e0b?text=%F0%9F%92%B0&font-size=50  (coin icon)
-https://placehold.co/120x120/1e293b/f472b6?text=%F0%9F%8E%AF&font-size=50  (wand icon)
-https://placehold.co/120x120/1e293b/06b6d4?text=%F0%9F%94%A5&font-size=50  (fire icon)
-https://placehold.co/120x120/1e293b/fda4af?text=%E2%9C%A8&font-size=50  (star icon)
-Set BackgroundTransparency: 1 on the ImageLabel so only the icon shows.
-Size item icons: {"X":0.4,"Y":0.5} relative to the card.
+--- BACKGROUNDS: Use solid color Frames, NOT images. Dark: #0d1117, Neon: #0a0a1a, Medieval: #1a0f0a
+--- PROGRESS BARS: Solid color Frames with CornerRadius, NOT images
 
---- CURRENCY ICONS (coins, gems, diamonds next to prices) ---
-Small emoji-based icons: https://placehold.co/40x40/f59e0b/000000?text=%F0%9F%92%B0&font-size=24  (gold coin)
-https://placehold.co/40x40/8b5cf6/000000?text=%F0%9F%92%8E&font-size=24  (purple gem)
-https://placehold.co/40x40/ef4444/000000?text=%E2%9D%A4%EF%B8%8F&font-size=24  (red heart)
-Size: very small, about 0.1 width relative to parent.
-
---- GAME THUMBNAILS / REVEAL IMAGES (large feature images) ---
-Use curated picsum seeds that produce dark/moody game-like images:
-https://picsum.photos/seed/darkforest/400/300  (dark forest — good for RPG)
-https://picsum.photos/seed/neoncity/400/300  (neon city — good for cyberpunk)
-https://picsum.photos/seed/mountains/400/300  (mountains — good for adventure)
-https://picsum.photos/seed/ocean/400/300  (ocean — good for underwater themes)
-https://picsum.photos/seed/night/400/300  (night sky — good for space)
-https://picsum.photos/seed/fire/400/300  (fire — good for battle themes)
-https://picsum.photos/seed/gold/400/300  (golden — good for treasure/loot)
-https://picsum.photos/seed/crystal/400/300  (crystal — good for fantasy)
-Size: large, about 0.6-0.8 width relative to parent.
-
---- BACKGROUNDS (UI panel backgrounds) ---
-DO NOT use images for backgrounds. Use solid colored Frames instead:
-Dark gaming: BackgroundColor3="#0d1117"
-Neon cyber: BackgroundColor3="#0a0a1a"
-Medieval: BackgroundColor3="#1a0f0a"
-Colorful: BackgroundColor3="#1e1e2e"
-Only use background images for MAIN MENU full-screen backgrounds.
-
---- PROGRESS BAR FILLS ---
-DO NOT use images. Use solid colored Frames with CornerRadius.
-
---- RULE SUMMARY ---
-1. Player avatars → Roblox headshots or ui-avatars.com (circular)
-2. Item icons → placehold.co with emoji text (colored square icons)
-3. Currency icons → small placehold.co with coin emoji
-4. Feature images → curated picsum seeds (darkforest, neoncity, etc.)
-5. UI backgrounds → solid color Frames (no images)
-6. Progress bars → solid color Frames (no images)
-7. NEVER use random picsum photos for icons or avatars
-
-=== ROBLOX UI PATTERNS (WITH DETAIL) ===
-1. SHOP: Dark bg → scrolling grid of item cards → each card has ImageLabel (item icon) + TextLabel (name) + TextLabel (price in 💰) + TextButton (BUY). Top bar has title + currency display. Close button top-right
-2. INVENTORY: ScrollingFrame with 4x3 grid of slots → each slot = Frame + ImageLabel (item) + TextLabel (quantity badge). Empty slots have dashed border
-3. HUD: Semi-transparent top bar with health bar (red fill), mana bar (blue fill), coin counter (💰), level badge. Bottom action bar with circular buttons
-4. QUEST LOG: Right-side panel → scrollable list of quest cards → each has icon ImageLabel + quest name + description + progress bar (0-100%)
-5. MAIN MENU: Full-screen bg ImageLabel → centered game title → large PLAY button (green) + smaller Settings/Shop/Inventory buttons below → version text at bottom
-6. STATS: Left panel with character avatar ImageLabel → stat bars (STR red, DEF blue, SPD green, INT purple) → each bar is background + fill + label
-7. BATTLE: Two player cards (top-left, bottom-right) → each with avatar + health bar → center area for effects → bottom ability buttons
-8. LEADERBOARD: Tabbed header (Daily/Weekly/All Time) → scrollable player rows → rank badge + avatar + name + score
-9. GACHA/PET: Center card reveal animation → pet/item ImageLabel (large) → rarity border color → spin/reveal button → currency cost display
-10. TRADING: Two player panels side by side → each with avatar + offered items grid → trade status → accept/decline buttons
+=== PROFESSIONAL UI PATTERNS ===
+1. SHOP: Layered dark bg → glow frame behind → title bar with coin counter → scrolling grid of item cards (each: bg frame + icon + name + price + BUY button) → close button
+2. HUD: Semi-transparent overlay → health bar (red fill + white text) → mana bar (blue) → XP bar (green) → coin/gem counters with icons → level badge
+3. MAIN MENU: Full-screen bg ImageLabel → large game title with glow → PLAY button (green, large) → Shop/Settings/Inventory buttons → version text
+4. INVENTORY: ScrollingFrame with grid → slots with item icons + quantity badges → empty slots with dashed border → header with slot counter
+5. QUEST LOG: Side panel → quest cards with icon + name + progress bar → color-coded by difficulty
+6. STATS: Character avatar → stat bars with labels → level badge → equipment slots
+7. GACHA/PET: Center reveal card with glow border → large pet image → rarity label → spin button → currency cost
+8. LEADERBOARD: Tabbed header → ranked rows with position + avatar + name + score → medal emojis for top 3
+9. TRADING: Two player panels → avatar + offered items → trade status → accept/decline
+10. BATTLE: Two fighter cards → health bars → ability buttons → VS divider
 
 === DESIGN STYLES ===
-- Dark Gaming: bg #0d1117/#111827, panels #161b22/#1e293b, accent #3b82f6, glass borders 0.1-0.2 transparency
-- Neon Cyberpunk: bg #0a0a1a, panels #0f172a, neon glow #06b6d4 + #8b5cf6, animated feel
-- Fantasy Medieval: bg #1a0f0a, panels #2a1f14, gold #d4a373, ornate borders #3d2b1a
-- Fun Colorful: bg #1e1e2e, panels #2a2a3e, pastels #f472b6/#a78bfa/#34d399, very rounded
-- Military HUD: bg #111318, panels #1a1f2e, green #22c55e, sharp 0px corner, tactical lines
-- Anime/Clean: bg #0f0f23, panels #1a1a2e, sakura #fda4af, ultra minimal
-- Toxic Gamer: bg #0a0a0a, panels #111111, neon green #22c55e, drip effects
-- Space Galaxy: bg #050510, panels #0a0a1f, purple #7c3aed + blue #3b82f6, cosmic feel
+- Dark Gaming: bg #0d1117, panels #161b22/#1e293b, accent #3b82f6, glass borders
+- Neon Cyberpunk: bg #0a0a1a, panels #0f172a, neon glow #06b6d4 + #8b5cf6
+- Fantasy Medieval: bg #1a0f0a, panels #2a1f14, gold #d4a373, ornate borders
+- Fun Colorful: bg #1e1e2e, panels #2a2a3e, pastels #f472b6/#a78bfa/#34d399
+- Space Galaxy: bg #050510, panels #0a0a1f, purple #7c3aed + blue #3b82f6
+- Anime/Clean: bg #0f0f23, panels #1a1a2e, sakura #fda4af
+- Military HUD: bg #111318, panels #1a1f2e, green #22c55e, sharp corners
 
 === LAYOUT RULES ===
-- 15-25 elements minimum. More elements = more professional
+- 20-35 elements minimum for professional look
 - Root Frame: parent null, position {"X":0.5,"Y":0.5}, size {"X":0.7,"Y":0.75}
-- Children position RELATIVE to parent (0.5,0.5 = center of parent)
-- Children size RELATIVE to parent (1.0,1.0 = full parent)
-- 3 cards: X = 0.17, 0.5, 0.83. 4 cards: X = 0.125, 0.375, 0.625, 0.875
-- Progress bars: bg Frame size {"X":0.8,"Y":0.04} + fill Frame inside with smaller width
+- Children position/size RELATIVE to parent (0.5,0.5 = center)
+- 3 cards: X=0.17, 0.5, 0.83. 4 cards: X=0.125, 0.375, 0.625, 0.875
 
-=== POSITION AND SIZE RULES (CRITICAL — ALL MUST HAVE BOTH X AND Y) ===
-- EVERY add: position={"X":N,"Y":N} AND size={"X":N,"Y":N} — BOTH fields required
-- NEVER: missing Y, negative values, strings, or null
-- Root: 0.5,0.5 center. Size 0.7,0.75 = 70% wide, 75% tall
-- Values: 0.0 to 1.0 (except size can go up to 1.2 for full-width panels)
+=== POSITION AND SIZE RULES (CRITICAL) ===
+- EVERY add MUST have: position={"X":N,"Y":N} AND size={"X":N,"Y":N}
+- NEVER: missing fields, negative values, strings, nulls, NaN
+- Values: 0.0 to 1.0 (size up to 1.2 for full panels)
 
 Output ONLY the JSON. No markdown fences. No text before or after.`
 
@@ -155,6 +124,22 @@ const ROBLOX_DEFAULTS: Record<string, any> = {
   ScrollBarThickness: 12, ScrollBarImageColor3: '#000000',
   CanvasSize: { X: 0, Y: 200 }, AutomaticCanvasSize: 'None',
   CornerRadius: 0, Padding: 0,
+  // UICorner
+  UICorner_Radius: 8,
+  // UIStroke
+  UIStroke_Color: '#ffffff', UIStroke_Thickness: 2, UIStroke_Transparency: 0.3,
+  // UIPadding
+  UIPadding_Top: 0.01, UIPadding_Bottom: 0.01, UIPadding_Left: 0.01, UIPadding_Right: 0.01,
+  // UIListLayout
+  UIListLayout_FillDirection: 'Vertical', UIListLayout_Padding: 0.01, UIListLayout_HorizontalAlignment: 'Left', UIListLayout_SortOrder: 'LayoutOrder',
+  // UIGridLayout
+  UIGridLayout_CellPadding_X: 0.02, UIGridLayout_CellPadding_Y: 0.02, UIGridLayout_CellSize_X: 0.3, UIGridLayout_CellSize_Y: 0.25,
+  // UIScale
+  UIScale_Scale: 1.0,
+  // UIAspectRatioConstraint
+  UIAspectRatio_AspectRatio: 1.0, UIAspectRatio_AspectType: 'ScaleWithParentSize', UIAspectRatio_DominantAxis: 'Width',
+  // UIGradient
+  UIGradient_Color: '#ffffff', UIGradient_Transparency: 0, UIGradient_Rotation: 45,
 }
 
 const DEVICES = [
@@ -172,6 +157,17 @@ const ELEMENT_TYPES = [
   { type: 'TextBox', label: 'TextBox', desc: 'Input' },
 ]
 
+const MODIFIER_TYPES = [
+  { type: 'UICorner', label: 'UICorner', desc: 'Rounded corners' },
+  { type: 'UIStroke', label: 'UIStroke', desc: 'Border stroke' },
+  { type: 'UIPadding', label: 'UIPadding', desc: 'Inner padding' },
+  { type: 'UIListLayout', label: 'UIListLayout', desc: 'List layout' },
+  { type: 'UIGridLayout', label: 'UIGridLayout', desc: 'Grid layout' },
+  { type: 'UIScale', label: 'UIScale', desc: 'Scale child' },
+  { type: 'UIAspectRatioConstraint', label: 'UIAspectRatio', desc: 'Aspect ratio' },
+  { type: 'UIGradient', label: 'UIGradient', desc: 'Gradient fill' },
+]
+
 const PROP_GROUPS: Record<string, string[]> = {
   'Data': ['Name', 'LayoutOrder', 'Visible'],
   'Appearance': ['BackgroundColor3', 'BackgroundTransparency', 'BorderColor3', 'BorderSizePixel', 'Image', 'ImageColor3', 'ImageTransparency'],
@@ -179,6 +175,14 @@ const PROP_GROUPS: Record<string, string[]> = {
   'Layout': ['Position', 'Size', 'AnchorPoint', 'Rotation', 'ZIndex'],
   'Corner': ['CornerRadius'],
   'Scroll': ['ScrollBarThickness', 'ScrollBarImageColor3', 'CanvasSize', 'AutomaticCanvasSize'],
+  // Modifier props
+  'UIStroke': ['UIStroke_Color', 'UIStroke_Thickness', 'UIStroke_Transparency'],
+  'UIPadding': ['UIPadding_Top', 'UIPadding_Bottom', 'UIPadding_Left', 'UIPadding_Right'],
+  'UIListLayout': ['UIListLayout_FillDirection', 'UIListLayout_Padding', 'UIListLayout_HorizontalAlignment', 'UIListLayout_SortOrder'],
+  'UIGridLayout': ['UIGridLayout_CellPadding_X', 'UIGridLayout_CellPadding_Y', 'UIGridLayout_CellSize_X', 'UIGridLayout_CellSize_Y'],
+  'UIScale': ['UIScale_Scale'],
+  'UIAspectRatioConstraint': ['UIAspectRatio_AspectRatio', 'UIAspectRatio_AspectType', 'UIAspectRatio_DominantAxis'],
+  'UIGradient': ['UIGradient_Color', 'UIGradient_Transparency', 'UIGradient_Rotation'],
 }
 
 const FONT_OPTIONS = ['Legacy', 'Gotham', 'GothamBold', 'GothamBlack', 'SourceSans', 'SourceSansBold', 'Arial', 'ArialBold', 'HighwayGothic', 'HighwayGothicBold', 'Cartoon', 'Code', 'FredokaOne', 'Granite', 'Jura', 'ShoppingCart']
@@ -190,6 +194,8 @@ const CONTAINER_TYPES = ['Frame', 'ScrollingFrame']
 
 const ELEMENT_TYPE_ICONS: Record<string, string> = {
   Frame: '▬', TextLabel: 'Aa', TextButton: '☐', ImageLabel: '🖼', ScrollingFrame: '☰', TextBox: '□',
+  UICorner: '◯', UIStroke: '▢', UIPadding: '⊞', UIListLayout: '☰', UIGridLayout: '▦',
+  UIScale: '⊕', UIAspectRatioConstraint: '▭', UIGradient: '🌈',
 }
 
 const LAYOUT_TYPE_ICONS: Record<string, string> = { none: '⊞', grid: '▦', list: '☰' }
@@ -302,34 +308,81 @@ function genLua(elements: UIEl[]): string {
 
   function emit(el: UIEl, parentVar: string, depth: number) {
     const v = genVarName(el)
-    lines.push(`${'  '.repeat(depth)}local ${v} = Instance.new("${el.type}")`)
-    lines.push(`${'  '.repeat(depth)}${v}.Name = "${el.name}"`)
+    const indent = '  '.repeat(depth)
+    const isModifier = el.type.startsWith('UI') && el.type !== 'UIScrollBar'
 
-    lines.push(`${'  '.repeat(depth)}${v}.Position = UDim2.new(${el.position.X}, 0, ${el.position.Y}, 0)`)
-    lines.push(`${'  '.repeat(depth)}${v}.Size = UDim2.new(${el.size.X}, 0, ${el.size.Y}, 0)`)
+    if (isModifier) {
+      // Modifiers only need Instance.new + properties + Parent
+      lines.push(`${indent}local ${v} = Instance.new("${el.type}")`)
+
+      // Modifier-specific properties
+      if (el.type === 'UICorner') {
+        const radius = el.props.UICorner_Radius ?? 8
+        lines.push(`${indent}${v}.CornerRadius = UDim.new(0, ${radius})`)
+      } else if (el.type === 'UIStroke') {
+        const color = parseColor(el.props.UIStroke_Color || '#ffffff')
+        lines.push(`${indent}${v}.Color = ${colorToRoblox(color)}`)
+        lines.push(`${indent}${v}.Thickness = ${el.props.UIStroke_Thickness ?? 2}`)
+        lines.push(`${indent}${v}.Transparency = ${el.props.UIStroke_Transparency ?? 0.3}`)
+      } else if (el.type === 'UIPadding') {
+        lines.push(`${indent}${v}.PaddingTop = UDim.new(0, ${el.props.UIPadding_Top ?? 0.01})`)
+        lines.push(`${indent}${v}.PaddingBottom = UDim.new(0, ${el.props.UIPadding_Bottom ?? 0.01})`)
+        lines.push(`${indent}${v}.PaddingLeft = UDim.new(0, ${el.props.UIPadding_Left ?? 0.01})`)
+        lines.push(`${indent}${v}.PaddingRight = UDim.new(0, ${el.props.UIPadding_Right ?? 0.01})`)
+      } else if (el.type === 'UIListLayout') {
+        lines.push(`${indent}${v}.FillDirection = Enum.FillDirection.${el.props.UIListLayout_FillDirection ?? 'Vertical'}`)
+        lines.push(`${indent}${v}.Padding = UDim.new(0, ${el.props.UIListLayout_Padding ?? 0.01})`)
+        lines.push(`${indent}${v}.HorizontalAlignment = Enum.HorizontalAlignment.${el.props.UIListLayout_HorizontalAlignment ?? 'Left'}`)
+        lines.push(`${indent}${v}.SortOrder = Enum.SortOrder.${el.props.UIListLayout_SortOrder ?? 'LayoutOrder'}`)
+      } else if (el.type === 'UIGridLayout') {
+        lines.push(`${indent}${v}.CellPadding = UDim2.new(${el.props.UIGridLayout_CellPadding_X ?? 0.02}, 0, ${el.props.UIGridLayout_CellPadding_Y ?? 0.02}, 0)`)
+        lines.push(`${indent}${v}.CellSize = UDim2.new(${el.props.UIGridLayout_CellSize_X ?? 0.3}, 0, ${el.props.UIGridLayout_CellSize_Y ?? 0.25}, 0)`)
+      } else if (el.type === 'UIScale') {
+        lines.push(`${indent}${v}.Scale = ${el.props.UIScale_Scale ?? 1.0}`)
+      } else if (el.type === 'UIAspectRatioConstraint') {
+        lines.push(`${indent}${v}.AspectRatio = ${el.props.UIAspectRatio_AspectRatio ?? 1.0}`)
+        lines.push(`${indent}${v}.AspectType = Enum.AspectType.${el.props.UIAspectRatio_AspectType ?? 'ScaleWithParentSize'}`)
+        lines.push(`${indent}${v}.DominantAxis = Enum.DominantAxis.${el.props.UIAspectRatio_DominantAxis ?? 'Width'}`)
+      } else if (el.type === 'UIGradient') {
+        const gColor = parseColor(el.props.UIGradient_Color || '#ffffff')
+        lines.push(`${indent}${v}.Color = ColorSequence.new(${colorToRoblox(gColor)})`)
+        lines.push(`${indent}${v}.Transparency = NumberSequence.new(${el.props.UIGradient_Transparency ?? 0})`)
+        lines.push(`${indent}${v}.Rotation = ${el.props.UIGradient_Rotation ?? 45}`)
+      }
+      lines.push(`${indent}${v}.Parent = ${parentVar}`)
+      lines.push('')
+      return
+    }
+
+    lines.push(`${indent}local ${v} = Instance.new("${el.type}")`)
+    lines.push(`${indent}${v}.Name = "${el.name}"`)
+
+    lines.push(`${indent}${v}.Position = UDim2.new(${el.position.X}, 0, ${el.position.Y}, 0)`)
+    lines.push(`${indent}${v}.Size = UDim2.new(${el.size.X}, 0, ${el.size.Y}, 0)`)
 
     for (const [k, val] of Object.entries(el.props)) {
       if (k === 'Position' || k === 'Size') continue
+      if (k.startsWith('UI') && (k.startsWith('UICorner') || k.startsWith('UIStroke') || k.startsWith('UIPadding') || k.startsWith('UIList') || k.startsWith('UIGrid') || k.startsWith('UIScale') || k.startsWith('UIAspect') || k.startsWith('UIGradient'))) continue
       if (!differsFromDefault(k, val)) continue
       if (val === undefined || val === null) continue
 
       if (k === 'BackgroundColor3' || k === 'TextColor3' || k === 'BorderColor3' || k === 'ImageColor3') {
-        lines.push(`${'  '.repeat(depth)}${v}.${k} = ${colorToRoblox(parseColor(val))}`)
+        lines.push(`${indent}${v}.${k} = ${colorToRoblox(parseColor(val))}`)
       } else if (k === 'CornerRadius') {
-        lines.push(`${'  '.repeat(depth)}${v}.CornerRadius = UDim.new(0, ${val})`)
+        lines.push(`${indent}${v}.CornerRadius = UDim.new(0, ${val})`)
       } else if (k === 'AnchorPoint' && typeof val === 'object') {
-        lines.push(`${'  '.repeat(depth)}${v}.AnchorPoint = Vector2.new(${val.X}, ${val.Y})`)
+        lines.push(`${indent}${v}.AnchorPoint = Vector2.new(${val.X}, ${val.Y})`)
       } else if (k === 'CanvasSize' && typeof val === 'object') {
-        lines.push(`${'  '.repeat(depth)}${v}.CanvasSize = UDim2.new(${val.X}, 0, ${val.Y}, 0)`)
+        lines.push(`${indent}${v}.CanvasSize = UDim2.new(${val.X}, 0, ${val.Y}, 0)`)
       } else if (typeof val === 'string') {
-        lines.push(`${'  '.repeat(depth)}${v}.${k} = "${val}"`)
+        lines.push(`${indent}${v}.${k} = "${val}"`)
       } else if (typeof val === 'boolean') {
-        lines.push(`${'  '.repeat(depth)}${v}.${k} = ${val ? 'true' : 'false'}`)
+        lines.push(`${indent}${v}.${k} = ${val ? 'true' : 'false'}`)
       } else if (typeof val === 'number') {
-        lines.push(`${'  '.repeat(depth)}${v}.${k} = ${val}`)
+        lines.push(`${indent}${v}.${k} = ${val}`)
       }
     }
-    lines.push(`${'  '.repeat(depth)}${v}.Parent = ${parentVar}`)
+    lines.push(`${indent}${v}.Parent = ${parentVar}`)
     lines.push('')
 
     for (const cid of el.children) {
@@ -479,6 +532,7 @@ export default function UIGenerator() {
   const [messages, setMessages] = useState<ChatMsg[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [aiStatus, setAiStatus] = useState('')
   const [showChat, setShowChat] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -541,13 +595,15 @@ export default function UIGenerator() {
   const addEl = useCallback((type: string, parentId?: string | null) => {
     const id = uid()
     const count = elements.filter(e => e.type === type).length + 1
-    // Only add as child if parent is a container
+    const isMod = ['UICorner', 'UIStroke', 'UIPadding', 'UIListLayout', 'UIGridLayout', 'UIScale', 'UIAspectRatioConstraint', 'UIGradient'].includes(type)
     const parentEl = parentId ? elements.find(e => e.id === parentId) : null
-    const actualParent = parentEl && CONTAINER_TYPES.includes(parentEl.type) ? parentId : null
+    // Modifiers can be added to any element; regular elements only to containers
+    const actualParent = isMod ? (parentEl?.id || null) : (parentEl && CONTAINER_TYPES.includes(parentEl.type) ? parentId : null)
     const el: UIEl = {
       id, type, name: `${type}${count}`, parentId: actualParent,
-      position: { X: 0.5, Y: 0.5 }, size: { X: 0.3, Y: 0.2 },
-      props: {
+      position: isMod ? { X: 0.5, Y: 0.5 } : { X: 0.5, Y: 0.5 },
+      size: isMod ? { X: 1, Y: 1 } : { X: 0.3, Y: 0.2 },
+      props: isMod ? {} : {
         BackgroundColor3: type === 'TextLabel' || type === 'TextButton' || type === 'TextBox' ? '#2a2a3e' : '#1a1a2e',
         TextColor3: '#ffffff', Text: type.includes('Text') || type === 'TextBox' ? (type === 'TextBox' ? '' : 'Text') : '',
         Font: 'GothamBold', TextScaled: true, TextSize: 14,
@@ -725,11 +781,13 @@ export default function UIGenerator() {
         const id = uid()
         zCounter++
         const resolvedParent = cmd.parent ? (nameToId.get(cmd.parent) || null) : null
+        const isMod = cmd.elementType?.startsWith('UI') && cmd.elementType !== 'UIScrollBar'
         const el: UIEl = {
           id, type: cmd.elementType || 'Frame', name: cmd.name || `Element${zCounter}`,
           parentId: resolvedParent,
-          position: cmd.position || { X: 0.5, Y: 0.5 }, size: cmd.size || { X: 0.3, Y: 0.2 },
-          props: { BackgroundColor3: '#1a1a2e', TextColor3: '#ffffff', Text: '', Font: 'GothamBold', TextScaled: true, TextSize: 14, ...cmd.properties },
+          position: isMod ? { X: 0.5, Y: 0.5 } : (cmd.position || { X: 0.5, Y: 0.5 }),
+          size: isMod ? { X: 1, Y: 1 } : (cmd.size || { X: 0.3, Y: 0.2 }),
+          props: isMod ? { ...cmd.properties } : { BackgroundColor3: '#1a1a2e', TextColor3: '#ffffff', Text: '', Font: 'GothamBold', TextScaled: true, TextSize: 14, ...cmd.properties },
           children: [], zIndex: zCounter, locked: false, visible: true,
         }
         nameToId.set(el.name, id)
@@ -769,12 +827,14 @@ export default function UIGenerator() {
     setBuilding(false)
     buildingRef.current = false
     setIsLoading(false)
+    setAiStatus('')
   }, [])
 
   // Client-side normalizer — fixes common AI output variations
   const normalizeCommands = useCallback((parsed: any): any => {
     if (!parsed || !Array.isArray(parsed.commands)) return parsed
     const skipTypes = new Set(['ScreenGui', 'LocalScript', 'Script'])
+    const modifierTypes = new Set(['UICorner', 'UIStroke', 'UIPadding', 'UIListLayout', 'UIGridLayout', 'UIScale', 'UIAspectRatioConstraint', 'UIGradient'])
     const nameMap = new Map<string, string>()
 
     const cleaned = parsed.commands.filter((c: any) => {
@@ -791,29 +851,38 @@ export default function UIGenerator() {
 
     for (const c of cleaned) {
       if (c.action === 'add') {
-        // Position normalization
-        if (typeof c.position === 'string') {
-          const parts = c.position.split(/[,\s]+/).map(Number)
-          c.position = { X: parts[0] || 0.5, Y: parts[1] || 0.5 }
-        }
-        if (!c.position || typeof c.position !== 'object') c.position = { X: 0.5, Y: 0.5 }
-        if (c.position.x !== undefined) { c.position.X = c.position.x; c.position.Y = c.position.y }
-        if (typeof c.position.X !== 'number' || isNaN(c.position.X)) c.position.X = 0.5
-        if (typeof c.position.Y !== 'number' || isNaN(c.position.Y)) c.position.Y = 0.5
-        c.position.X = Math.max(0, Math.min(1, c.position.X))
-        c.position.Y = Math.max(0, Math.min(1, c.position.Y))
+        const isMod = modifierTypes.has(c.elementType)
 
-        // Size normalization
-        if (typeof c.size === 'string') {
-          const parts = c.size.split(/[,\s]+/).map(Number)
-          c.size = { X: parts[0] || 0.4, Y: parts[1] || 0.5 }
+        // Modifier elements don't need position/size
+        if (!isMod) {
+          // Position normalization
+          if (typeof c.position === 'string') {
+            const parts = c.position.split(/[,\s]+/).map(Number)
+            c.position = { X: parts[0] || 0.5, Y: parts[1] || 0.5 }
+          }
+          if (!c.position || typeof c.position !== 'object') c.position = { X: 0.5, Y: 0.5 }
+          if (c.position.x !== undefined) { c.position.X = c.position.x; c.position.Y = c.position.y }
+          if (typeof c.position.X !== 'number' || isNaN(c.position.X)) c.position.X = 0.5
+          if (typeof c.position.Y !== 'number' || isNaN(c.position.Y)) c.position.Y = 0.5
+          c.position.X = Math.max(0, Math.min(1, c.position.X))
+          c.position.Y = Math.max(0, Math.min(1, c.position.Y))
+
+          // Size normalization
+          if (typeof c.size === 'string') {
+            const parts = c.size.split(/[,\s]+/).map(Number)
+            c.size = { X: parts[0] || 0.4, Y: parts[1] || 0.5 }
+          }
+          if (!c.size || typeof c.size !== 'object') c.size = { X: 0.4, Y: 0.5 }
+          if (c.size.x !== undefined) { c.size.X = c.size.x; c.size.Y = c.size.y }
+          if (typeof c.size.X !== 'number' || isNaN(c.size.X)) c.size.X = 0.4
+          if (typeof c.size.Y !== 'number' || isNaN(c.size.Y)) c.size.Y = 0.5
+          c.size.X = Math.max(0.02, Math.min(1.5, c.size.X))
+          c.size.Y = Math.max(0.02, Math.min(1.5, c.size.Y))
+        } else {
+          // Modifiers: normalize properties only
+          c.position = { X: 0.5, Y: 0.5 }
+          c.size = { X: 1, Y: 1 }
         }
-        if (!c.size || typeof c.size !== 'object') c.size = { X: 0.4, Y: 0.5 }
-        if (c.size.x !== undefined) { c.size.X = c.size.x; c.size.Y = c.size.y }
-        if (typeof c.size.X !== 'number' || isNaN(c.size.X)) c.size.X = 0.4
-        if (typeof c.size.Y !== 'number' || isNaN(c.size.Y)) c.size.Y = 0.5
-        c.size.X = Math.max(0.02, Math.min(1.5, c.size.X))
-        c.size.Y = Math.max(0.02, Math.min(1.5, c.size.Y))
 
         // Parent fixes
         if (c.parent && nameMap.has(c.parent)) c.parent = null
@@ -877,24 +946,25 @@ export default function UIGenerator() {
 
       const systemMsg = UI_SYSTEM_PROMPT + canvasContext + editInstruction
       const userPayload = {
-        model: 'nvidia/nemotron-nano-9b-v2:free',
+        model: 'google/gemini-2.5-flash',
         messages: [
           { role: 'system', content: systemMsg },
           { role: 'user', content: msg },
         ],
-        temperature: 0.2,
-        max_tokens: 2000,
+        temperature: 0.3,
+        max_tokens: 4000,
       }
 
       // ── Step 1: Try AI — proxy through edge function (no CORS, key server-side) ──
       let parsed: any = null
-      const models = ['nvidia/nemotron-nano-9b-v2:free', 'google/gemma-4-26b-a4b-it:free']
+      const models = ['google/gemini-2.5-flash', 'nvidia/nemotron-nano-9b-v2:free', 'google/gemma-4-26b-a4b-it:free']
 
       for (const model of models) {
         if (parsed) break
+        setAiStatus(`Trying ${model.split('/').pop()?.split(':')[0]}...`)
         try {
           const controller = new AbortController()
-          const timeout = setTimeout(() => controller.abort(), 55000)
+          const timeout = setTimeout(() => controller.abort(), 45000)
           const body = { ...userPayload, model }
           const r = await fetch(`${CHAT_API.replace('action=ui-generate', 'action=proxy-openrouter')}`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -949,10 +1019,12 @@ export default function UIGenerator() {
       } else {
         setMessages(p => [...p, { role: 'assistant', content: 'No UI elements generated. Try describing what you want, like "shop with 4 items" or "health bar HUD".' }])
         setIsLoading(false)
+        setAiStatus('')
       }
     } catch (e) {
       console.error('UI Builder error:', e)
       setIsLoading(false)
+      setAiStatus('')
       const errMsg = e instanceof Error ? e.message : 'Unknown error'
       const isNetwork = errMsg.includes('fetch') || errMsg.includes('network') || errMsg.includes('Failed to')
       setMessages(p => [...p, { role: 'assistant', content: isNetwork
@@ -1406,6 +1478,13 @@ export default function UIGenerator() {
               + {et.desc}
             </button>
           ))}
+          <div className="h-4 w-px bg-border-primary mx-1" />
+          {MODIFIER_TYPES.map(mt => (
+            <button key={mt.type} onClick={() => addEl(mt.type, selectedId || undefined)} title={`Add ${mt.label}`}
+              className="px-2 py-1 rounded-md text-[10px] text-accent-purple/70 hover:text-accent-purple hover:bg-accent-purple/10 border border-transparent hover:border-accent-purple/20 transition-all">
+              + {mt.desc}
+            </button>
+          ))}
         </div>
 
         <button onClick={() => setShowImageSearch(true)} className="p-1.5 rounded-md text-text-dim hover:text-text-muted hover:bg-bg-secondary transition-all"><ImageIcon size={12} /></button>
@@ -1459,12 +1538,26 @@ export default function UIGenerator() {
               {(() => {
                 const renderEl = (el: UIEl, isChild = false): React.ReactNode => {
                   if (!el.visible) return null
+                  const isModifier = el.type.startsWith('UI') && el.type !== 'UIScrollBar'
+                  if (isModifier) return null // Modifiers are applied to parent, not rendered directly
                   const childEls = el.children.map(cid => elements.find(e => e.id === cid)).filter(Boolean) as UIEl[]
                   const isBuilding = buildingId === el.id
                   const isContainer = CONTAINER_TYPES.includes(el.type)
                   const isSelectedContainer = selectedId === el.id && isContainer
 
+                  // Gather modifier props from children
+                  const uiCorner = childEls.find(c => c.type === 'UICorner')
+                  const uiStroke = childEls.find(c => c.type === 'UIStroke')
+
                   const style = isChild ? childStyle(el) : elStyle(el)
+
+                  // Apply UIStroke to style
+                  if (uiStroke) {
+                    const strokeColor = parseColor(uiStroke.props.UIStroke_Color || '#ffffff')
+                    const thickness = (uiStroke.props.UIStroke_Thickness ?? 2) * 1.5
+                    const transparency = uiStroke.props.UIStroke_Transparency ?? 0.3
+                    style.border = `${thickness}px solid ${strokeColor}${Math.round((1 - transparency) * 255).toString(16).padStart(2, '0')}`
+                  }
 
                   // Add dashed border on hover for containers
                   const containerBorderClass = isContainer && !isSelectedContainer ? 'hover:border-2 hover:border-dashed hover:border-white/20' : ''
@@ -1593,6 +1686,8 @@ export default function UIGenerator() {
                   className="w-full px-2 py-1 rounded bg-bg-secondary border border-border-primary text-[10px] text-text-primary focus:outline-none focus:border-accent-blue/50" />
               </div>
               {/* Position */}
+              {!['UICorner', 'UIStroke', 'UIPadding', 'UIListLayout', 'UIGridLayout', 'UIScale', 'UIAspectRatioConstraint', 'UIGradient'].includes(selected.type) && (
+              <>
               <div className="px-3 py-1.5 border-b border-border-primary/50 flex gap-2">
                 <div className="flex-1">
                   <label className="text-[9px] text-text-dim block mb-0.5">Pos X</label>
@@ -1622,13 +1717,28 @@ export default function UIGenerator() {
                     className="w-full px-2 py-1 rounded bg-bg-secondary border border-border-primary text-[10px] text-text-primary font-mono focus:outline-none focus:border-accent-blue/50" />
                 </div>
               </div>
+              </>
+              )}
               {/* Property Groups */}
               {Object.entries(PROP_GROUPS).map(([group, keys]) => {
                 const relevant = keys.filter(k => {
+                  // Modifier-specific props: only show for matching modifier type
+                  if (group === 'UIStroke' && selected.type !== 'UIStroke') return false
+                  if (group === 'UIPadding' && selected.type !== 'UIPadding') return false
+                  if (group === 'UIListLayout' && selected.type !== 'UIListLayout') return false
+                  if (group === 'UIGridLayout' && selected.type !== 'UIGridLayout') return false
+                  if (group === 'UIScale' && selected.type !== 'UIScale') return false
+                  if (group === 'UIAspectRatioConstraint' && selected.type !== 'UIAspectRatioConstraint') return false
+                  if (group === 'UIGradient' && selected.type !== 'UIGradient') return false
+                  // Regular element props: skip modifier groups
+                  if (['UIStroke', 'UIPadding', 'UIListLayout', 'UIGridLayout', 'UIScale', 'UIAspectRatioConstraint', 'UIGradient'].includes(group) && !k.startsWith('UI')) return false
+                  // Standard element prop filters
                   if (['Text', 'TextColor3', 'TextTransparency', 'TextScaled', 'Font', 'TextSize', 'TextWrapped', 'TextXAlignment', 'TextYAlignment', 'RichText'].includes(k) && !selected.type.includes('Text') && selected.type !== 'TextBox') return false
                   if (['Image', 'ImageColor3', 'ImageTransparency'].includes(k) && !['ImageLabel', 'ImageButton'].includes(selected.type)) return false
                   if (['CornerRadius'].includes(k) && !['Frame', 'TextLabel', 'TextButton', 'ImageLabel', 'ScrollingFrame', 'TextBox'].includes(selected.type)) return false
                   if (['ScrollBarThickness', 'ScrollBarImageColor3', 'CanvasSize', 'AutomaticCanvasSize'].includes(k) && selected.type !== 'ScrollingFrame') return false
+                  // Skip regular groups for modifier elements
+                  if (['Data', 'Appearance', 'Text', 'Layout', 'Corner', 'Scroll'].includes(group) && ['UICorner', 'UIStroke', 'UIPadding', 'UIListLayout', 'UIGridLayout', 'UIScale', 'UIAspectRatioConstraint', 'UIGradient'].includes(selected.type)) return false
                   return true
                 })
                 if (relevant.length === 0) return null
@@ -1777,7 +1887,25 @@ export default function UIGenerator() {
                     </div>
                   ))}
                   {isLoading && (
-                    <div className="flex justify-start"><div className="bg-bg-elevated border border-border-primary rounded-lg px-3 py-1.5"><div className="flex gap-1"><span className="w-1 h-1 rounded-full bg-accent-purple animate-bounce" /><span className="w-1 h-1 rounded-full bg-accent-purple animate-bounce" style={{ animationDelay: '150ms' }} /><span className="w-1 h-1 rounded-full bg-accent-purple animate-bounce" style={{ animationDelay: '300ms' }} /></div></div></div>
+                    <div className="flex justify-start">
+                      <div className="bg-gradient-to-br from-accent-purple/10 to-accent-blue/10 border border-accent-purple/20 rounded-xl px-3 py-2 max-w-[80%]">
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className="relative">
+                            <Sparkles size={12} className="text-accent-purple animate-pulse" />
+                            <div className="absolute inset-0 animate-ping"><Sparkles size={12} className="text-accent-purple opacity-30" /></div>
+                          </div>
+                          <span className="text-[9px] font-bold text-accent-purple">{aiStatus || 'AI is designing...'}</span>
+                        </div>
+                        <div className="flex gap-1.5 items-center">
+                          <div className="flex gap-0.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-accent-purple animate-bounce" />
+                            <span className="w-1.5 h-1.5 rounded-full bg-accent-blue animate-bounce" style={{ animationDelay: '150ms' }} />
+                            <span className="w-1.5 h-1.5 rounded-full bg-accent-pink animate-bounce" style={{ animationDelay: '300ms' }} />
+                          </div>
+                          <span className="text-[8px] text-text-dim">generating UI elements...</span>
+                        </div>
+                      </div>
+                    </div>
                   )}
                   <div ref={messagesEndRef} />
                 </div>

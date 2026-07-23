@@ -55,6 +55,7 @@ function isRealUrl(url?: string): boolean {
   if (!url) return false
   if (url.includes('ui-avatars.com')) return false
   if (url.includes('thumbnails.roblox.com')) return false
+  if (url.startsWith('data:')) return false
   return url.startsWith('http')
 }
 
@@ -62,33 +63,40 @@ async function fetchAvatarUrls(userIds: (string | number)[]): Promise<Record<str
   const toFetch = userIds.filter((id) => id && !avatarCache.has(String(id)))
   if (toFetch.length === 0) return {}
 
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-  const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
-  if (!supabaseUrl || !supabaseKey) return {}
-
   try {
-    const ids = toFetch.map(String).join(',')
+    const ids = toFetch.map(String)
     const res = await fetch(
-      `${supabaseUrl}/functions/v1/roblox-avatar?userIds=${ids}`,
-      {
-        headers: { Authorization: `Bearer ${supabaseKey}` },
-        signal: AbortSignal.timeout(10000),
-      }
+      `https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${ids.join(',')}&size=150x150&format=Png&isCircular=false`,
+      { signal: AbortSignal.timeout(10000) }
     )
     if (res.ok) {
       const data = await res.json()
-      if (data && typeof data === 'object' && !data.error) {
-        for (const [id, url] of Object.entries(data)) {
-          if (typeof url === 'string' && url.startsWith('http')) {
-            avatarCache.set(id, url)
+      if (data && Array.isArray(data.data)) {
+        for (const item of data.data) {
+          if (item.targetId && item.state === 'Completed' && item.imageUrl) {
+            avatarCache.set(String(item.targetId), item.imageUrl)
           }
         }
       }
     }
   } catch {}
 
+  // For any still missing, try the headshot endpoint individually
+  const stillMissing = toFetch.filter((id) => !avatarCache.has(String(id)))
+  for (const id of stillMissing) {
+    try {
+      const res = await fetch(
+        `https://www.roblox.com/headshot-thumbnail/image?userId=${id}&width=150&height=150&format=png`,
+        { signal: AbortSignal.timeout(5000) }
+      )
+      if (res.ok) {
+        avatarCache.set(String(id), res.url)
+      }
+    } catch {}
+  }
+
   return Object.fromEntries(
-    toFetch.map(String).filter((id) => avatarCache.has(id)).map((id) => [id, avatarCache.get(id)!])
+    toFetch.filter((id) => avatarCache.has(String(id))).map((id) => [String(id), avatarCache.get(String(id))!])
   )
 }
 

@@ -957,14 +957,14 @@ export default function UIGenerator() {
 
       // ── Step 1: Try AI — proxy through edge function (no CORS, key server-side) ──
       let parsed: any = null
-      const models = ['google/gemini-2.5-flash', 'nvidia/nemotron-nano-9b-v2:free', 'google/gemma-4-26b-a4b-it:free']
+      const models = ['deepseek/deepseek-chat-v3-0324:free', 'qwen/qwen3-32b:free', 'meta-llama/llama-4-maverick:free', 'google/gemma-4-26b-a4b-it:free']
 
       for (const model of models) {
         if (parsed) break
         setAiStatus(`Trying ${model.split('/').pop()?.split(':')[0]}...`)
         try {
           const controller = new AbortController()
-          const timeout = setTimeout(() => controller.abort(), 45000)
+          const timeout = setTimeout(() => controller.abort(), 60000)
           const body = { ...userPayload, model }
           const r = await fetch(`${CHAT_API.replace('action=ui-generate', 'action=proxy-openrouter')}`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },

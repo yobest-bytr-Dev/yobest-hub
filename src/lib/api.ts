@@ -137,12 +137,11 @@ export async function getCurrentProfile(): Promise<UserProfile | null> {
       profile.discord_user_id = discordId
       profile.discord_username = discordUsername
       profile.discord_avatar = discordAvatar
-      supabase.from('profiles').upsert({
-        id: user.id,
+      supabase.from('profiles').update({
         discord_user_id: discordId,
         discord_username: discordUsername || profile.username || 'User',
         discord_avatar: discordAvatar,
-      }, { onConflict: 'id' }).then(({ error }) => {
+      }).eq('id', user.id).then(({ error }) => {
         if (error) console.warn('Backfill discord data (non-fatal):', error.message)
       })
     }

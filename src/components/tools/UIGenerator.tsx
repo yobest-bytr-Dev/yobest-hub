@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { supabaseUrl } from '@/config/supabase'
+import { localTemplateFallback } from './localTemplates'
 
 const CHAT_API = `${supabaseUrl}/functions/v1/rodin-api?action=ui-generate`
 
@@ -37,7 +38,7 @@ Layout: Rotation, Visible
 === DESIGN QUALITY RULES (FOLLOW ALL) ===
 1. LAYERING: Every UI needs at least 3 layers — background glow/shadow → main panel → content
 2. DEPTH: Use BackgroundTransparency on overlay frames (0.03-0.15) for glass morphism
-3. IMAGES: Every item card MUST have an ImageLabel with a picsum URL. Every avatar MUST use ImageLabel.
+3. IMAGES: Every item card MUST have an ImageLabel with placehold.co emoji icon. Every avatar MUST use Roblox headshot or ui-avatars.
 4. EMOJIS: Use emojis in EVERY TextLabel title. Example: "🛒 ITEM SHOP", "⚔️ INVENTORY", "🏆 LEADERBOARD"
 5. PROGRESS BARS: Use nested Frames — background Frame (dark) + fill Frame (colored) + TextLabel overlay
 6. BUTTONS: Every button needs CornerRadius 8-12, a hover color accent, and clear text
@@ -918,17 +919,29 @@ export default function UIGenerator() {
         }
       }
 
-      // ── Step 2: If AI failed, use edge function template fallback ──
+      // ── Step 2: If AI failed, try edge function template fallback ──
       if (!parsed || !parsed.commands?.length) {
-        console.log('AI failed, using template fallback')
-        const tmplResp = await fetch(CHAT_API, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: [{ role: 'user', content: msg }], canvas_state: cs, force_template: true }),
-        })
-        parsed = await tmplResp.json()
+        console.log('AI failed, trying edge template fallback')
+        try {
+          const tmplResp = await fetch(CHAT_API, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ messages: [{ role: 'user', content: msg }], canvas_state: cs, force_template: true }),
+          })
+          if (tmplResp.ok) {
+            parsed = await tmplResp.json()
+          }
+        } catch (e) {
+          console.log('Edge template fallback failed:', e instanceof Error ? e.message : e)
+        }
       }
 
-      // ── Step 3: Apply commands ──
+      // ── Step 3: If edge function also failed, use LOCAL client-side template ──
+      if (!parsed || !parsed.commands?.length) {
+        console.log('Using local template fallback')
+        parsed = localTemplateFallback(msg)
+      }
+
+      // ── Step 4: Apply commands ──
       if (parsed?.commands?.length) {
         const am: ChatMsg = { role: 'assistant', content: parsed.message || 'Built your UI', commands: parsed.commands }
         setMessages(p => [...p, am])
@@ -940,7 +953,11 @@ export default function UIGenerator() {
     } catch (e) {
       console.error('UI Builder error:', e)
       setIsLoading(false)
-      setMessages(p => [...p, { role: 'assistant', content: 'Connection error. Try again.' }])
+      const errMsg = e instanceof Error ? e.message : 'Unknown error'
+      const isNetwork = errMsg.includes('fetch') || errMsg.includes('network') || errMsg.includes('Failed to')
+      setMessages(p => [...p, { role: 'assistant', content: isNetwork
+        ? 'Connection error — AI is unreachable. A local template has been applied as backup. You can also try the Templates tab for pre-built components.'
+        : `Error: ${errMsg}. Try again or use the Templates tab.` }])
     }
   }
 

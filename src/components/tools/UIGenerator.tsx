@@ -10,6 +10,7 @@ import { supabaseUrl } from '@/config/supabase'
 import { localTemplateFallback } from './localTemplates'
 
 const CHAT_API = `${supabaseUrl}/functions/v1/rodin-api?action=ui-generate`
+const AI_PROXY = `${supabaseUrl}/functions/v1/ai-proxy`
 
 const UI_SYSTEM_PROMPT = `You are the world-class Roblox UI designer. You create interfaces that look like games with 100M+ players: Blox Fruits, Adopt Me, Pet Simulator 99, Jailbreak, King Legacy, Bee Swarm Simulator.
 
@@ -945,34 +946,41 @@ export default function UIGenerator() {
       }
 
       const systemMsg = UI_SYSTEM_PROMPT + canvasContext + editInstruction
-      const userPayload = {
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: systemMsg },
-          { role: 'user', content: msg },
-        ],
-        temperature: 0.3,
-        max_tokens: 4000,
-      }
 
-      // ── Step 1: Try AI — proxy through edge function (no CORS, key server-side) ──
+      // ── Step 1: Try AI — proxy through ai-proxy edge function (Gemini BYOK) ──
       let parsed: any = null
-      const models = ['google/gemma-4-26b-a4b-it:free', 'meta-llama/llama-4-maverick:free', 'qwen/qwen3-32b:free', 'deepseek/deepseek-r1:free']
+      const models = [
+        'gemini-2.5-flash',
+        'gemini-2.0-flash',
+        'gemini-1.5-flash',
+      ]
 
       for (const model of models) {
         if (parsed) break
-        setAiStatus(`Trying ${model.split('/').pop()?.split(':')[0]}...`)
+        setAiStatus(`Trying ${model}...`)
         try {
           const controller = new AbortController()
           const timeout = setTimeout(() => controller.abort(), 60000)
-          const body = { ...userPayload, model }
-          const r = await fetch(`${CHAT_API.replace('action=ui-generate', 'action=proxy-openrouter')}`, {
+          const payload = {
+            messages: [
+              { role: 'system', content: systemMsg },
+              { role: 'user', content: msg },
+            ],
+            model,
+            temperature: 0.3,
+            max_tokens: 4000,
+          }
+          const r = await fetch(AI_PROXY, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
+            body: JSON.stringify(payload),
             signal: controller.signal,
           })
           clearTimeout(timeout)
           const data = await r.json()
+          if (data.error) {
+            console.log(`AI proxy ${model} returned error:`, data.error)
+            continue
+          }
           const content = data.choices?.[0]?.message?.content || ''
           if (content) {
             try { parsed = JSON.parse(content) } catch {
@@ -982,7 +990,7 @@ export default function UIGenerator() {
           }
           if (parsed) {
             parsed = normalizeCommands(parsed)
-            console.log(`AI model ${model} succeeded via proxy`)
+            console.log(`Gemini model ${model} succeeded`)
           }
         } catch (e) {
           console.log(`AI proxy model ${model} failed:`, e instanceof Error ? e.message : e)

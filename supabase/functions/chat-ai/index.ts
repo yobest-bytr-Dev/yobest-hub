@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3"
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,11 +12,24 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, model = "google/gemini-2.5-flash" } = await req.json()
+    const { messages, model = "gemini-2.5-flash" } = await req.json()
 
-    const openrouterKey = Deno.env.get("OPENROUTER_API_KEY")
-    if (!openrouterKey) {
-      throw new Error("OPENROUTER_API_KEY not configured. Add it in Supabase Dashboard > Edge Functions > Secrets.")
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? ""
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    const sb = createClient(supabaseUrl, supabaseKey)
+
+    let geminiKey = Deno.env.get("GEMINI_API_KEY") ?? ""
+    if (!geminiKey) {
+      const { data: row } = await sb
+        .from("bot_config")
+        .select("value")
+        .eq("key", "gemini_api_key")
+        .maybeSingle()
+      if (row?.value) geminiKey = typeof row.value === "string" ? row.value.replace(/^"|"$/g, "") : String(row.value)
+    }
+
+    if (!geminiKey) {
+      throw new Error("No Gemini API key configured. Ask admin to add one in Admin > Settings.")
     }
 
     const systemPrompt = `You are Yobest AI, a Roblox Studio Luau coding assistant. Your ONLY job is to produce complete, working, copy-paste-ready Luau scripts.
@@ -69,39 +83,97 @@ local DataStoreService = game:GetService("DataStoreService")
 
 That is the ONLY acceptable format. No headers. No separators. No bold. Just plain text and code blocks.`
 
-    const apiMessages = [
-      { role: "system", content: systemPrompt },
-      ...messages,
-    ]
-
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${openrouterKey}`,
-        "HTTP-Referer": "https://yobest.app",
-        "X-Title": "Yobest AI Architect",
-      },
-      body: JSON.stringify({
-        model,
-        stream: true,
-        messages: apiMessages,
-      }),
-    })
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`OpenRouter API error ${response.status}: ${errorText}`)
+    const contents: any[] = []
+    for (const msg of messages || []) {
+      if (msg.role === "user" || msg.role === "assistant") {
+        contents.push({ role: msg.role === "assistant" ? "model" : "user", parts: [{ text: msg.content }] })
+      }
     }
 
-    return new Response(response.body, {
-      headers: {
-        ...corsHeaders,
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-      },
-    })
+    if (contents.length === 0) {
+      throw new Error("No user message provided")
+    }
+
+    const geminiModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+    const modelsToTry = [model, ...geminiModels.filter((m) => m !== model)]
+    let lastError = ""
+
+    for (const modelName of modelsToTry) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:streamGenerateContent?alt=sse&key=${geminiKey}`
+
+        const payload = {
+          contents,
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          generationConfig: { temperature: 0.7, maxOutputTokens: 8192 },
+        }
+
+        const resp = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        })
+
+        if (!resp.ok) {
+          const errText = await resp.text()
+          lastError = `HTTP ${resp.status}: ${errText}`
+          console.log(`Gemini ${modelName} failed: ${lastError}`)
+          continue
+        }
+
+        // Transform Gemini SSE stream to OpenAI-compatible SSE stream
+        const encoder = new TextEncoder()
+        const decoder = new TextDecoder()
+        const stream = new ReadableStream({
+          async start(controller) {
+            try {
+              const reader = resp.body?.getReader()
+              if (!reader) { controller.close(); return }
+
+              let buffer = ""
+              while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+                buffer += decoder.decode(value, { stream: true })
+                const lines = buffer.split("\n")
+                buffer = lines.pop() || ""
+
+                for (const line of lines) {
+                  if (line.startsWith("data: ")) {
+                    try {
+                      const data = JSON.parse(line.slice(6))
+                      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text
+                      if (text) {
+                        const chunk = JSON.stringify({ choices: [{ delta: { content: text } }] })
+                        controller.enqueue(encoder.encode(`data: ${chunk}\n\n`))
+                      }
+                    } catch {}
+                  }
+                }
+              }
+              controller.enqueue(encoder.encode("data: [DONE]\n\n"))
+              controller.close()
+            } catch (e) {
+              controller.error(e)
+            }
+          },
+        })
+
+        return new Response(stream, {
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            Connection: "keep-alive",
+          },
+        })
+      } catch (e) {
+        lastError = e instanceof Error ? e.message : "Unknown error"
+        console.log(`Gemini ${modelName} error: ${lastError}`)
+      }
+    }
+
+    throw new Error(`All Gemini models failed. Last error: ${lastError}`)
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error"
     return new Response(

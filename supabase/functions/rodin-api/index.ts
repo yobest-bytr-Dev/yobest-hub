@@ -1,7 +1,35 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 
 const RODIN_KEY = "vibecoding";
-const OPENROUTER_KEY = Deno.env.get("OPENROUTER_API_KEY") ?? "";
+
+async function getGeminiKey(): Promise<string> {
+  let key = Deno.env.get("GEMINI_API_KEY") ?? "";
+  if (key) return key;
+  try {
+    const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2.39.3");
+    const sb = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
+    const { data } = await sb.from("bot_config").select("value").eq("key", "gemini_api_key").maybeSingle();
+    if (data?.value) return typeof data.value === "string" ? data.value.replace(/^"|"$/g, "") : String(data.value);
+  } catch {}
+  return "";
+}
+
+async function callGemini(systemPrompt: string, userContent: string, maxTokens = 500, temperature = 0.7): Promise<string> {
+  const key = await getGeminiKey();
+  if (!key) throw new Error("No Gemini API key configured");
+  const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ role: "user", parts: [{ text: userContent }] }],
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      generationConfig: { temperature, maxOutputTokens: maxTokens },
+    }),
+  });
+  const data = await resp.json();
+  if (!resp.ok) throw new Error(data?.error?.message || `HTTP ${resp.status}`);
+  return data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -341,23 +369,7 @@ Rules:
 - Do NOT use markdown formatting
 - Write in plain text only`;
 
-      const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${OPENROUTER_KEY}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": "https://yobest-bytr.vercel.app",
-          "X-Title": "Yobest 3D Generator",
-        },
-        body: JSON.stringify({
-            model: "google/gemma-4-26b-a4b-it:free",
-            messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
-            temperature: 0.7,
-            max_tokens: 500,
-          }),
-      });
-      const data = await resp.json();
-      const content = data.choices?.[0]?.message?.content || "";
+      const content = await callGemini(SYSTEM_PROMPT, messages.map((m: any) => m.content).join("\n"), 500, 0.7);
       return new Response(JSON.stringify({ content }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -667,55 +679,23 @@ Output ONLY the JSON. No markdown. No explanation.` + EDIT_INSTRUCTION;
       } else {
         // Try AI model — single model with generous timeout
         // Free OpenRouter models can take 30-90s. Edge function limit is 150s.
-        // We try 2 models max to stay under the limit.
-        const models = [
-          "nvidia/nemotron-nano-9b-v2:free",    // fastest free model
-          "google/gemma-4-26b-a4b-it:free",      // best quality fallback
-        ];
-
-        for (const model of models) {
-          if (parsed) break;
+        // We try Gemini models for server-side AI fallback
+        const geminiKey = await getGeminiKey();
+        if (geminiKey) {
           try {
-            console.log(`Trying AI model: ${model}`);
-            const controller = new AbortController();
-            // 45s per model — enough for slow free models, leaves room for 2nd attempt
-            const timeout = setTimeout(() => controller.abort(), 45000);
-            const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${OPENROUTER_KEY}`,
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://yobest-bytr.vercel.app",
-                "X-Title": "Yobest UI Builder",
-              },
-              body: JSON.stringify({
-                model,
-                messages: [
-                  { role: "system", content: SYSTEM_PROMPT + canvasContext },
-                  { role: "user", content: userMsg }
-                ],
-                temperature: 0.2,
-                max_tokens: 2000,
-              }),
-              signal: controller.signal,
-            });
-            clearTimeout(timeout);
-            const data = await resp.json();
-            console.log(`Model ${model} responded:`, resp.status, data.error ? data.error.message : "ok");
-            const content = data.choices?.[0]?.message?.content || "";
-
-            // Try parse — extract JSON from response
-            try { parsed = JSON.parse(content); } catch {
-              const m = content.match(/\{[\s\S]*\}/);
-              if (m) try { parsed = JSON.parse(m[0]); } catch {}
-            }
-
-            if (parsed) {
-              parsed = normalizeCommands(parsed);
+            const aiContent = await callGemini(SYSTEM_PROMPT + canvasContext, userMsg, 2000, 0.2);
+            if (aiContent) {
+              try { parsed = JSON.parse(aiContent); } catch {
+                const m = aiContent.match(/\{[\s\S]*\}/);
+                if (m) try { parsed = JSON.parse(m[0]); } catch {}
+              }
+              if (parsed) parsed = normalizeCommands(parsed);
             }
           } catch (e) {
-            console.log(`Model ${model} failed:`, e instanceof Error ? e.message : e);
+            console.log("Gemini server-side AI failed:", e instanceof Error ? e.message : e);
           }
+        } else {
+          console.log("No Gemini key configured, skipping server-side AI");
         }
       } // end else (AI attempt)
 
@@ -792,34 +772,6 @@ Output ONLY the JSON. No markdown. No explanation.` + EDIT_INSTRUCTION;
       }));
       return new Response(JSON.stringify({ images, source: "picsum" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Proxy: forward request to OpenRouter (keeps API key server-side)
-    if (action === "proxy-openrouter") {
-      if (!OPENROUTER_KEY) {
-        console.error("OPENROUTER_API_KEY is not set");
-        return new Response(JSON.stringify({ error: "OpenRouter API key not configured" }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 500,
-        });
-      }
-      console.log("Proxying request to OpenRouter...");
-      const body = await req.json();
-      const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${OPENROUTER_KEY}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": "https://yobest-bytr.vercel.app",
-          "X-Title": "Yobest UI Builder",
-        },
-        body: JSON.stringify(body),
-      });
-      const data = await resp.json();
-      return new Response(JSON.stringify(data), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: resp.status,
       });
     }
 

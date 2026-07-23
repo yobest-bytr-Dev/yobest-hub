@@ -18,12 +18,10 @@ import type { ChatMessage } from '@/lib/types'
 import AdBanner from '@/components/AdBanner'
 
 const models = [
-  { id: 'google/gemini-2.5-flash', label: 'Gemini 2.5 Flash', badge: 'Fast', color: 'text-green-400', bg: 'bg-green-400', desc: 'Lightning-fast responses', emoji: '⚡' },
-  { id: 'google/gemini-2.5-pro', label: 'Gemini 2.5 Pro', badge: 'Smart', color: 'text-blue-400', bg: 'bg-blue-400', desc: 'Deep reasoning & analysis', emoji: '🧠' },
-  { id: 'google/gemini-3-flash-preview', label: 'Gemini 3 Flash', badge: 'New', color: 'text-cyan-400', bg: 'bg-cyan-400', desc: 'Next-gen speed', emoji: '🚀' },
-  { id: 'google/gemini-3-pro-preview', label: 'Gemini 3 Pro', badge: 'New', color: 'text-purple-400', bg: 'bg-purple-400', desc: 'Most capable model', emoji: '💎' },
-  { id: 'openai/gpt-4o', label: 'GPT-4o', badge: '', color: 'text-emerald-400', bg: 'bg-emerald-400', desc: 'Versatile & reliable', emoji: '🤖' },
-  { id: 'anthropic/claude-sonnet-4', label: 'Claude Sonnet 4', badge: '', color: 'text-orange-400', bg: 'bg-orange-400', desc: 'Detailed & creative', emoji: '✨' },
+  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', badge: 'Fast', color: 'text-green-400', bg: 'bg-green-400', desc: 'Lightning-fast responses', emoji: '⚡' },
+  { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', badge: 'Smart', color: 'text-blue-400', bg: 'bg-blue-400', desc: 'Deep reasoning & analysis', emoji: '🧠' },
+  { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', badge: '', color: 'text-cyan-400', bg: 'bg-cyan-400', desc: 'Fast & capable', emoji: '🚀' },
+  { id: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro', badge: '', color: 'text-purple-400', bg: 'bg-purple-400', desc: 'Most capable model', emoji: '💎' },
 ]
 
 const aiModes = [
@@ -920,12 +918,7 @@ export default function AI() {
     try {
       let response: Response
       const systemPrompt = getSystemPrompt(aiMode)
-      const useEdge = supabaseUrl && supabaseUrl !== 'https://placeholder.supabase.co' && supabaseAnonKey && supabaseAnonKey !== 'placeholder-key'
-      if (useEdge) {
-        response = await fetch(`${supabaseUrl}/functions/v1/chat-ai`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${supabaseAnonKey}` }, body: JSON.stringify({ model: aiModel, messages: [{ role: 'system', content: systemPrompt }, ...history.map(m => ({ role: m.role, content: m.content })), { role: 'user', content: messageContent }] }) })
-      } else {
-        response = await fetch('https://openrouter.ai/api/v1/chat/completions', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${import.meta.env.VITE_OPENROUTER_API_KEY || ''}`, 'HTTP-Referer': window.location.origin, 'X-Title': 'Yobest AI Architect' }, body: JSON.stringify({ model: aiModel, stream: true, max_tokens: 16000, messages: [{ role: 'system', content: systemPrompt }, ...history.map(m => ({ role: m.role, content: m.content })), { role: 'user', content: messageContent }] }) })
-      }
+      response = await fetch(`${supabaseUrl}/functions/v1/chat-ai`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${supabaseAnonKey}` }, body: JSON.stringify({ model: aiModel, messages: [{ role: 'system', content: systemPrompt }, ...history.map(m => ({ role: m.role, content: m.content })), { role: 'user', content: messageContent }] }) })
       if (!response.ok) { const t = await response.text(); throw new Error(`API error ${response.status}: ${t}`) }
       const reader = response.body?.getReader(); if (!reader) throw new Error('No reader available')
       const decoder = new TextDecoder(); let accumulated = ''; let buffer = ''; let flushTimer: ReturnType<typeof setInterval> | null = null

@@ -1017,12 +1017,19 @@ function SettingsTab() {
   const [stats, setStats] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [geminiKey, setGeminiKey] = useState('')
+  const [geminiKeyLoading, setGeminiKeyLoading] = useState(true)
+  const [geminiKeySaving, setGeminiKeySaving] = useState(false)
+  const [showGeminiKey, setShowGeminiKey] = useState(false)
   const { toast } = useToast()
 
   useEffect(() => {
     supabase.from('site_stats').select('*').then(({ data }) => {
       setStats(data || [])
-      setLoading(false)
+    })
+    supabase.from('bot_config').select('value').eq('key', 'gemini_api_key').maybeSingle().then(({ data }) => {
+      if (data?.value) setGeminiKey(typeof data.value === 'string' ? data.value.replace(/^"|"$/g, '') : String(data.value))
+      setGeminiKeyLoading(false)
     })
   }, [])
 
@@ -1043,6 +1050,51 @@ function SettingsTab() {
     setSaving(false)
   }
 
+  const saveGeminiKey = async () => {
+    setGeminiKeySaving(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const r = await fetch(`${supabaseUrl}/functions/v1/bot-api`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token || ''}`,
+          apikey: supabaseAnonKey,
+        },
+        body: JSON.stringify({ action: 'update_config', key: 'gemini_api_key', value: geminiKey.trim() }),
+      })
+      const data = await r.json()
+      if (data.error) throw new Error(data.error)
+      toast('Gemini API key saved! All AI features will use this key.', 'success')
+    } catch (e: any) {
+      toast(e.message || 'Failed to save key', 'error')
+    }
+    setGeminiKeySaving(false)
+  }
+
+  const testGeminiKey = async () => {
+    if (!geminiKey.trim()) { toast('Enter a key first', 'error'); return }
+    setGeminiKeySaving(true)
+    try {
+      const r = await fetch(`${supabaseUrl}/functions/v1/ai-proxy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: 'Say "OK" in one word.' }],
+          model: 'gemini-2.0-flash',
+          max_tokens: 10,
+        }),
+      })
+      const data = await r.json()
+      if (data.error) throw new Error(data.error)
+      const reply = data.choices?.[0]?.message?.content || ''
+      toast(`Key works! Response: "${reply.trim().slice(0, 50)}"`, 'success')
+    } catch (e: any) {
+      toast(`Key test failed: ${e.message}`, 'error')
+    }
+    setGeminiKeySaving(false)
+  }
+
   if (loading) return <div className="flex items-center justify-center py-20"><Loader2 size={24} className="animate-spin text-accent-blue" /></div>
 
   const knownStats = ['visits', 'downloads', 'ai_sessions']
@@ -1050,6 +1102,59 @@ function SettingsTab() {
   return (
     <div className="space-y-6">
       <h2 className="text-lg font-semibold text-text-primary">Site Settings</h2>
+
+      {/* Gemini API Key Section */}
+      <div className="rounded-xl bg-bg-secondary border border-border-primary p-5">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
+            <Sparkles size={16} className="text-white" />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-text-primary">Gemini API Key</h3>
+            <p className="text-[11px] text-text-dim">Bring Your Own Key — powers all AI features site-wide</p>
+          </div>
+        </div>
+        {geminiKeyLoading ? (
+          <div className="flex items-center gap-2 py-3"><Loader2 size={16} className="animate-spin text-accent-blue" /><span className="text-xs text-text-muted">Loading...</span></div>
+        ) : (
+          <>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="relative flex-1">
+                <input
+                  type={showGeminiKey ? 'text' : 'password'}
+                  value={geminiKey}
+                  onChange={(e) => setGeminiKey(e.target.value)}
+                  placeholder="AIza..."
+                  className="w-full px-3 py-2.5 pr-16 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-sm font-mono focus:outline-none focus:border-accent-blue/50 transition-all"
+                />
+                <button onClick={() => setShowGeminiKey(!showGeminiKey)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] px-2 py-1 rounded bg-bg-secondary border border-border-primary text-text-muted hover:text-text-primary transition-colors">
+                  {showGeminiKey ? 'Hide' : 'Show'}
+                </button>
+              </div>
+              <button onClick={saveGeminiKey} disabled={geminiKeySaving}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg bg-accent-blue/15 text-accent-blue text-sm font-medium hover:bg-accent-blue/25 transition-colors disabled:opacity-50">
+                {geminiKeySaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                Save
+              </button>
+              <button onClick={testGeminiKey} disabled={geminiKeySaving}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg bg-green-500/15 text-green-400 text-sm font-medium hover:bg-green-500/25 transition-colors disabled:opacity-50">
+                <Zap size={14} />
+                Test
+              </button>
+            </div>
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-bg-elevated/50 border border-border-primary/50">
+              <Sparkles size={14} className="text-accent-purple shrink-0 mt-0.5" />
+              <div className="text-[11px] text-text-dim leading-relaxed">
+                <p>This key powers: <strong className="text-text-secondary">AI Chat</strong> (all modes), <strong className="text-text-secondary">UI Builder</strong> (visual canvas), and <strong className="text-text-secondary">3D Model Generator</strong>.</p>
+                <p className="mt-1">Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" className="text-accent-blue hover:underline">aistudio.google.com/apikey</a> — no credit card needed.</p>
+                <p className="mt-1 text-green-400/80">The key is stored encrypted in your database and never exposed to the browser.</p>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
       <div className="rounded-xl bg-bg-secondary border border-border-primary p-5">
         <h3 className="text-sm font-semibold text-text-primary mb-4">Site Statistics</h3>
         <div className="space-y-3">

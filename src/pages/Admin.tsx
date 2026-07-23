@@ -1023,38 +1023,11 @@ function SettingsTab() {
   const [newKeyName, setNewKeyName] = useState('')
   const [showKeyIdx, setShowKeyIdx] = useState<number | null>(null)
   const [testing, setTesting] = useState<string | null>(null)
+  const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash')
+  const [modelSaving, setModelSaving] = useState(false)
   const { toast } = useToast()
 
-  useEffect(() => {
-    Promise.all([
-      supabase.from('site_stats').select('*'),
-      botApiCall('get_config'),
-    ]).then(([statsRes, configRes]) => {
-      setStats(statsRes.data || [])
-      setLoading(false)
-      const keysRaw = configRes?.config?.gemini_api_keys
-      if (keysRaw) {
-        try {
-          const parsed = typeof keysRaw === 'string' ? JSON.parse(keysRaw) : keysRaw
-          if (Array.isArray(parsed)) {
-            setApiKeys(parsed.map((k: any, i: number) => ({
-              id: k.id || `key-${i}`,
-              key: k.key || '',
-              name: k.name || `Key ${i + 1}`,
-              status: k.status || 'unknown',
-              lastError: k.lastError,
-            })))
-          }
-        } catch {}
-      }
-      setKeysLoading(false)
-    }).catch(() => {
-      setLoading(false)
-      setKeysLoading(false)
-    })
-  }, [])
-
-  const botApiCall = async (action: string, data: Record<string, any> = {}) => {
+  const botApiCall = useCallback(async (action: string, data: Record<string, any> = {}) => {
     const { data: { session } } = await supabase.auth.getSession()
     const r = await fetch(`${supabaseUrl}/functions/v1/bot-api`, {
       method: 'POST',
@@ -1066,7 +1039,43 @@ function SettingsTab() {
       body: JSON.stringify({ action, ...data }),
     })
     return r.json()
-  }
+  }, [])
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [statsRes, configRes] = await Promise.all([
+          supabase.from('site_stats').select('*'),
+          botApiCall('get_config'),
+        ])
+        setStats(statsRes.data || [])
+
+        const cfg = configRes?.config || {}
+        if (cfg.gemini_api_model) setSelectedModel(cfg.gemini_api_model)
+
+        const keysRaw = cfg.gemini_api_keys
+        if (keysRaw) {
+          try {
+            const parsed = typeof keysRaw === 'string' ? JSON.parse(keysRaw) : keysRaw
+            if (Array.isArray(parsed)) {
+              setApiKeys(parsed.map((k: any, i: number) => ({
+                id: k.id || `key-${i}`,
+                key: k.key || '',
+                name: k.name || `Key ${i + 1}`,
+                status: k.status || 'unknown',
+                lastError: k.lastError,
+              })))
+            }
+          } catch {}
+        }
+      } catch (e) {
+        console.error('Settings load error:', e)
+      }
+      setLoading(false)
+      setKeysLoading(false)
+    }
+    load()
+  }, [botApiCall])
 
   const saveKeys = async (keys: typeof apiKeys) => {
     setApiKeys(keys)
@@ -1128,6 +1137,19 @@ function SettingsTab() {
       toast(`"${k.name}" failed: ${e.message}`, 'error')
     }
     setTesting(null)
+  }
+
+  const saveModel = async (model: string) => {
+    setModelSaving(true)
+    setSelectedModel(model)
+    try {
+      const data = await botApiCall('update_config', { key: 'gemini_api_model', value: model })
+      if (data.error) throw new Error(data.error)
+      toast(`AI model set to ${model}`, 'success')
+    } catch (e: any) {
+      toast(e.message || 'Failed', 'error')
+    }
+    setModelSaving(false)
   }
 
   const handleSave = async (name: string, value: number) => {
@@ -1235,6 +1257,46 @@ function SettingsTab() {
             </div>
           </>
         )}
+      </div>
+
+      {/* AI Model Selection */}
+      <div className="rounded-xl bg-bg-secondary border border-border-primary p-5">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center">
+            <Bot size={16} className="text-white" />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-text-primary">AI Model</h3>
+            <p className="text-[11px] text-text-dim">Choose which Gemini model powers all AI features</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {[
+            { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', desc: 'Best balance of speed & quality', badge: 'Recommended' },
+            { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', desc: 'Best quality, slower', badge: 'Smart' },
+            { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', desc: 'Fast, reliable', badge: '' },
+            { id: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash Lite', desc: 'Ultra-fast, basic quality', badge: '' },
+          ].map((m) => (
+            <button key={m.id} onClick={() => saveModel(m.id)} disabled={modelSaving}
+              className={cn(
+                'flex items-center gap-3 p-3 rounded-lg border text-left transition-all',
+                selectedModel === m.id
+                  ? 'bg-accent-blue/10 border-accent-blue/30 text-accent-blue'
+                  : 'bg-bg-elevated border-border-primary text-text-secondary hover:border-border-hover'
+              )}>
+              <div className={cn('w-3 h-3 rounded-full border-2 shrink-0',
+                selectedModel === m.id ? 'border-accent-blue bg-accent-blue' : 'border-text-dim'
+              )} />
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-medium flex items-center gap-1.5">
+                  {m.label}
+                  {m.badge && <span className="text-[8px] px-1 py-0.5 rounded bg-accent-blue/15 text-accent-blue font-bold">{m.badge}</span>}
+                </div>
+                <div className="text-[10px] text-text-dim">{m.desc}</div>
+              </div>
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="rounded-xl bg-bg-secondary border border-border-primary p-5">

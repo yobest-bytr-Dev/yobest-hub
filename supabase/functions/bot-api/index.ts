@@ -252,6 +252,16 @@ serve(async (req) => {
         break;
       }
 
+      case "get_config": {
+        const { data: config } = await sb.from("bot_config").select("key, value").order("key");
+        const configMap: Record<string, any> = {};
+        (config || []).forEach((c: any) => {
+          try { configMap[c.key] = JSON.parse(c.value); } catch { configMap[c.key] = c.value; }
+        });
+        result = { config: configMap };
+        break;
+      }
+
       case "update_config": {
         const { key, value } = body;
         if (!key || value === undefined) return new Response(JSON.stringify({ error: "key and value required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });

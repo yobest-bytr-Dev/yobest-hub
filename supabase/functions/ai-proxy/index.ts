@@ -6,7 +6,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const FALLBACK_MODELS = ["gemini-2.0-flash", "gemini-1.5-flash"];
+const FALLBACK_MODELS = ["gemini-2.0-flash", "gemini-2.0-flash-lite"];
 
 async function getRandomKey(sb: any): Promise<string> {
   // 1. Check if a direct key was passed in the request (for admin test)
@@ -58,7 +58,7 @@ serve(async (req: Request): Promise<Response> => {
     const sb = createClient(supabaseUrl, supabaseKey);
 
     const body = await req.json();
-    const { messages, model, temperature = 0.3, max_tokens = 4000, api_key: directKey } = body;
+    const { messages, model: reqModel, temperature = 0.3, max_tokens = 4000, api_key: directKey } = body;
 
     // Use direct key if provided (admin test), otherwise pick from pool
     let geminiKey = directKey || "";
@@ -71,6 +71,17 @@ serve(async (req: Request): Promise<Response> => {
         JSON.stringify({ error: "No Gemini API key configured. Add keys in Admin > Settings." }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
       );
+    }
+
+    // If no model specified, read from admin config
+    let model = reqModel || "";
+    if (!model) {
+      const { data: modelRow } = await sb
+        .from("bot_config")
+        .select("value")
+        .eq("key", "gemini_api_model")
+        .maybeSingle();
+      if (modelRow?.value) model = typeof modelRow.value === "string" ? modelRow.value.replace(/^"|"$/g, "") : String(modelRow.value);
     }
 
     // Convert OpenAI-style messages to Gemini format

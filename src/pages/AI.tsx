@@ -21,7 +21,7 @@ const models = [
   { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', badge: 'Fast', color: 'text-green-400', bg: 'bg-green-400', desc: 'Lightning-fast responses', emoji: '⚡' },
   { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', badge: 'Smart', color: 'text-blue-400', bg: 'bg-blue-400', desc: 'Deep reasoning & analysis', emoji: '🧠' },
   { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', badge: '', color: 'text-cyan-400', bg: 'bg-cyan-400', desc: 'Fast & capable', emoji: '🚀' },
-  { id: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro', badge: '', color: 'text-purple-400', bg: 'bg-purple-400', desc: 'Most capable model', emoji: '💎' },
+  { id: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash Lite', badge: 'Light', color: 'text-purple-400', bg: 'bg-purple-400', desc: 'Ultra-lightweight & fast', emoji: '⚡' },
 ]
 
 const aiModes = [

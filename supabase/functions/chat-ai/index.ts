@@ -12,11 +12,19 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, model = "gemini-2.5-flash" } = await req.json()
+    const { messages, model: reqModel } = await req.json()
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? ""
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     const sb = createClient(supabaseUrl, supabaseKey)
+
+    // Read admin-selected model from config
+    let model = reqModel || ""
+    if (!model) {
+      const { data: modelRow } = await sb.from("bot_config").select("value").eq("key", "gemini_api_model").maybeSingle()
+      if (modelRow?.value) model = typeof modelRow.value === "string" ? modelRow.value.replace(/^"|"$/g, "") : String(modelRow.value)
+    }
+    if (!model) model = "gemini-2.5-flash"
 
     let geminiKey = "";
 
@@ -117,7 +125,7 @@ That is the ONLY acceptable format. No headers. No separators. No bold. Just pla
       throw new Error("No user message provided")
     }
 
-    const geminiModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+    const geminiModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"]
     const modelsToTry = [model, ...geminiModels.filter((m) => m !== model)]
     let lastError = ""
 

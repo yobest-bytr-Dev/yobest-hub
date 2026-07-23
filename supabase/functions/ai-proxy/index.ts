@@ -6,13 +6,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const FALLBACK_MODELS = ["gemini-2.0-flash", "gemini-2.0-flash-lite"];
+const FALLBACK_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
 
 async function getRandomKey(sb: any): Promise<string> {
-  // 1. Check if a direct key was passed in the request (for admin test)
-  // 2. Try gemini_api_keys from bot_config (array)
-  // 3. Try gemini_api_key from bot_config (single)
-  // 4. Try env var GEMINI_API_KEY
   const { data: keysRow } = await sb
     .from("bot_config")
     .select("value")
@@ -23,7 +19,6 @@ async function getRandomKey(sb: any): Promise<string> {
     try {
       const parsed = typeof keysRow.value === "string" ? JSON.parse(keysRow.value) : keysRow.value;
       if (Array.isArray(parsed) && parsed.length > 0) {
-        // Filter to only keys that aren't known-broken
         const healthy = parsed.filter((k: any) => k.status !== "error");
         const pool = healthy.length > 0 ? healthy : parsed;
         const pick = pool[Math.floor(Math.random() * pool.length)];
@@ -32,7 +27,6 @@ async function getRandomKey(sb: any): Promise<string> {
     } catch {}
   }
 
-  // Fallback to single key
   const { data: singleRow } = await sb
     .from("bot_config")
     .select("value")
@@ -43,8 +37,41 @@ async function getRandomKey(sb: any): Promise<string> {
     if (v) return v;
   }
 
-  // Env var
   return Deno.env.get("GEMINI_API_KEY") ?? "";
+}
+
+async function testSingleKey(key: string): Promise<{ ok: boolean; error?: string; models?: string }> {
+  const testModels = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-2.0-flash-lite"];
+  for (const model of testModels) {
+    try {
+      const resp = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ role: "user", parts: [{ text: "Say OK" }] }],
+            generationConfig: { maxOutputTokens: 5 },
+          }),
+        }
+      );
+      const data = await resp.json();
+      if (resp.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+        return { ok: true, models: model };
+      }
+      const errMsg = data?.error?.message || `HTTP ${resp.status}`;
+      if (errMsg.includes("quota") || errMsg.includes("rate")) {
+        return { ok: false, error: "Quota/rate limit exceeded" };
+      }
+      if (errMsg.includes("API_KEY_INVALID") || errMsg.includes("invalid")) {
+        return { ok: false, error: "Invalid API key" };
+      }
+      return { ok: false, error: errMsg.slice(0, 100) };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : "Network error" };
+    }
+  }
+  return { ok: false, error: "All test models failed" };
 }
 
 serve(async (req: Request): Promise<Response> => {
@@ -58,9 +85,33 @@ serve(async (req: Request): Promise<Response> => {
     const sb = createClient(supabaseUrl, supabaseKey);
 
     const body = await req.json();
+
+    // ── ACTION: test-all-keys ──────────────────────────────────────
+    if (body.action === "test-all-keys") {
+      const keys: string[] = body.keys || [];
+      if (keys.length === 0) {
+        return new Response(
+          JSON.stringify({ error: "No keys provided" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+        );
+      }
+
+      const results = await Promise.all(
+        keys.map(async (key) => {
+          const result = await testSingleKey(key);
+          return { key: key.slice(0, 8) + "..." + key.slice(-4), fullKey: key, ...result };
+        })
+      );
+
+      return new Response(
+        JSON.stringify({ results }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // ── Normal chat completion request ──────────────────────────────
     const { messages, model: reqModel, temperature = 0.3, max_tokens = 4000, api_key: directKey } = body;
 
-    // Use direct key if provided (admin test), otherwise pick from pool
     let geminiKey = directKey || "";
     if (!geminiKey) {
       geminiKey = await getRandomKey(sb);
@@ -73,7 +124,6 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // If no model specified, read from admin config
     let model = reqModel || "";
     if (!model) {
       const { data: modelRow } = await sb
@@ -84,7 +134,6 @@ serve(async (req: Request): Promise<Response> => {
       if (modelRow?.value) model = typeof modelRow.value === "string" ? modelRow.value.replace(/^"|"$/g, "") : String(modelRow.value);
     }
 
-    // Convert OpenAI-style messages to Gemini format
     let systemInstruction = "";
     const contents: any[] = [];
 
@@ -106,8 +155,7 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // Try models in order
-    const modelsToTry = model ? [model, ...FALLBACK_MODELS.filter((m) => m !== model)] : ["gemini-2.5-flash", ...FALLBACK_MODELS];
+    const modelsToTry = model ? [model, ...FALLBACK_MODELS.filter((m) => m !== model)] : FALLBACK_MODELS;
     let lastError = "";
 
     for (const modelName of modelsToTry) {

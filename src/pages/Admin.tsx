@@ -1139,6 +1139,54 @@ function SettingsTab() {
     setTesting(null)
   }
 
+  const [bulkText, setBulkText] = useState('')
+  const [checkingAll, setCheckingAll] = useState(false)
+
+  const bulkImport = async () => {
+    const lines = bulkText.split('\n').map(l => l.trim()).filter(l => l.length > 10)
+    if (!lines.length) { toast('Paste keys (one per line)', 'error'); return }
+    const newKeys = lines.map((key, i) => ({
+      id: `key-${Date.now()}-${i}`,
+      key,
+      name: `Key ${apiKeys.length + i + 1}`,
+      status: 'unknown' as const,
+    }))
+    const deduped = newKeys.filter(nk => !apiKeys.some(ek => ek.key === nk.key))
+    if (!deduped.length) { toast('All keys already added', 'error'); return }
+    await saveKeys([...apiKeys, ...deduped])
+    setBulkText('')
+    toast(`Added ${deduped.length} key(s)`, 'success')
+  }
+
+  const checkAllKeys = async () => {
+    if (!apiKeys.length) { toast('No keys to check', 'error'); return }
+    setCheckingAll(true)
+    try {
+      const r = await fetch(`${supabaseUrl}/functions/v1/ai-proxy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'test-all-keys', keys: apiKeys.map(k => k.key) }),
+      })
+      const data = await r.json()
+      if (data.error) throw new Error(data.error)
+      const results: any[] = data.results || []
+      const updated = apiKeys.map(k => {
+        const match = results.find((r: any) => r.fullKey === k.key)
+        if (match) {
+          return { ...k, status: match.ok ? 'ok' as const : 'error' as const, lastError: match.ok ? undefined : match.error }
+        }
+        return k
+      })
+      await saveKeys(updated)
+      const working = updated.filter(k => k.status === 'ok').length
+      const broken = updated.filter(k => k.status === 'error').length
+      toast(`${working} working, ${broken} broken out of ${updated.length} keys`, 'success')
+    } catch (e: any) {
+      toast(`Check failed: ${e.message}`, 'error')
+    }
+    setCheckingAll(false)
+  }
+
   const saveModel = async (model: string) => {
     setModelSaving(true)
     setSelectedModel(model)
@@ -1189,9 +1237,16 @@ function SettingsTab() {
             <p className="text-[11px] text-text-dim">BYOK — add multiple keys, site uses them automatically</p>
           </div>
           {apiKeys.length > 0 && (
-            <div className="ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-bg-elevated border border-border-primary text-[10px]">
-              <span className="text-text-muted">{apiKeys.length} key{apiKeys.length !== 1 ? 's' : ''}</span>
-              {workingKeys > 0 && <span className="text-green-400 ml-1">{workingKeys} active</span>}
+            <div className="ml-auto flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-bg-elevated border border-border-primary text-[10px]">
+                <span className="text-text-muted">{apiKeys.length} key{apiKeys.length !== 1 ? 's' : ''}</span>
+                {workingKeys > 0 && <span className="text-green-400 ml-1">{workingKeys} active</span>}
+              </div>
+              <button onClick={checkAllKeys} disabled={checkingAll}
+                className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-500/15 text-green-400 text-[10px] font-medium hover:bg-green-500/25 transition-colors disabled:opacity-50 border border-green-500/20">
+                {checkingAll ? <Loader2 size={10} className="animate-spin" /> : <Zap size={10} />}
+                Check All Keys
+              </button>
             </div>
           )}
         </div>
@@ -1245,6 +1300,23 @@ function SettingsTab() {
                 className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-accent-blue/15 text-accent-blue text-sm font-medium hover:bg-accent-blue/25 transition-colors whitespace-nowrap">
                 <Plus size={14} /> Add Key
               </button>
+            </div>
+
+            {/* Bulk import */}
+            <div className="mt-3">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] text-text-dim uppercase tracking-wider font-medium">Bulk Import</span>
+              </div>
+              <div className="flex gap-2">
+                <textarea value={bulkText} onChange={(e) => setBulkText(e.target.value)}
+                  placeholder={"Paste multiple keys (one per line):\nAIzaSy...\nAIzaSy...\nAQ.Ab..."}
+                  rows={3}
+                  className="flex-1 px-3 py-2 rounded-lg bg-bg-elevated border border-border-primary text-text-primary text-[11px] font-mono focus:outline-none focus:border-accent-blue/50 transition-all resize-none" />
+                <button onClick={bulkImport}
+                  className="self-end flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-accent-purple/15 text-accent-purple text-sm font-medium hover:bg-accent-purple/25 transition-colors whitespace-nowrap">
+                  <Upload size={14} /> Import All
+                </button>
+              </div>
             </div>
 
             <div className="flex items-start gap-2 p-3 mt-3 rounded-lg bg-bg-elevated/50 border border-border-primary/50">

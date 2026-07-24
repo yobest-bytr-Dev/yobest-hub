@@ -119,35 +119,57 @@ serve(async (req: Request): Promise<Response> => {
     // ── Normal chat completion request ──────────────────────────────
     const { messages, model: reqModel, temperature = 0.3, max_tokens = 4000, api_key: directKey } = body;
 
-    let keysToTry: string[] = [];
+    // Load ALL keys from DB, split into healthy + broken
+    let healthyKeys: string[] = [];
+    let brokenKeys: string[] = [];
     if (directKey) {
-      keysToTry = [directKey];
+      healthyKeys = [directKey];
     } else {
-      keysToTry = await getHealthyKeys(sb);
-    }
-
-    if (keysToTry.length === 0) {
-      // Last resort: try ALL keys including broken ones
-      const { data: allKeysRow } = await sb
+      const { data: keysRow } = await sb
         .from("bot_config")
         .select("value")
         .eq("key", "gemini_api_keys")
         .maybeSingle();
-      if (allKeysRow?.value) {
+
+      if (keysRow?.value) {
         try {
-          const parsed = typeof allKeysRow.value === "string" ? JSON.parse(allKeysRow.value) : allKeysRow.value;
-          if (Array.isArray(parsed)) {
-            keysToTry = [...parsed].sort(() => Math.random() - 0.5).map((k: any) => k.key).filter(Boolean);
+          const parsed = typeof keysRow.value === "string" ? JSON.parse(keysRow.value) : keysRow.value;
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const validKeys = parsed.filter((k: any) => k.key);
+            healthyKeys = validKeys.filter((k: any) => k.status !== "error").sort(() => Math.random() - 0.5).map((k: any) => k.key);
+            brokenKeys = validKeys.filter((k: any) => k.status === "error").sort(() => Math.random() - 0.5).map((k: any) => k.key);
           }
         } catch {}
       }
-      if (keysToTry.length === 0) {
-        return new Response(
-          JSON.stringify({ error: "No Gemini API key configured. Add keys in Admin > Settings." }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
-        );
+
+      // Fallback to single key
+      if (healthyKeys.length === 0 && brokenKeys.length === 0) {
+        const { data: singleRow } = await sb
+          .from("bot_config")
+          .select("value")
+          .eq("key", "gemini_api_key")
+          .maybeSingle();
+        if (singleRow?.value) {
+          const v = typeof singleRow.value === "string" ? singleRow.value.replace(/^"|"$/g, "") : String(singleRow.value);
+          if (v) healthyKeys = [v];
+        }
+      }
+      if (healthyKeys.length === 0 && brokenKeys.length === 0) {
+        const envKey = Deno.env.get("GEMINI_API_KEY") ?? "";
+        if (envKey) healthyKeys = [envKey];
       }
     }
+
+    if (healthyKeys.length === 0 && brokenKeys.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "No Gemini API key configured. Add keys in Admin > Settings." }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+      );
+    }
+
+    // Combine: try healthy keys first, then broken keys as fallback
+    const keysToTry = [...healthyKeys, ...brokenKeys];
+    console.log(`AI proxy: ${healthyKeys.length} healthy + ${brokenKeys.length} broken keys to try`);
 
     let model = reqModel || "";
     if (!model) {

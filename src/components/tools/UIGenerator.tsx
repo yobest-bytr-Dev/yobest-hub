@@ -794,7 +794,7 @@ export default function UIGenerator() {
   const [dragging, setDragging] = useState(false)
   const [dragData, setDragData] = useState<{ sx: number; sy: number; ox: number; oy: number; startX: number; startY: number } | null>(null)
   const [resizing, setResizing] = useState(false)
-  const [resizeData, setResizeData] = useState<{ sx: number; sy: number; ow: number; oh: number; corner: string } | null>(null)
+  const [resizeData, setResizeData] = useState<{ sx: number; sy: number; ox: number; oy: number; ow: number; oh: number; corner: string } | null>(null)
   const [canvasDragOver, setCanvasDragOver] = useState(false)
 
   // History
@@ -1421,14 +1421,16 @@ export default function UIGenerator() {
       if (resizeData.corner.includes('s')) nh = Math.max(0.01, resizeData.oh + dy)
       if (resizeData.corner.includes('w')) nw = Math.max(0.01, resizeData.ow - dx)
       if (resizeData.corner.includes('n')) nh = Math.max(0.01, resizeData.oh - dy)
-      setElements(prev => prev.map(el => el.id === selectedId ? { ...el, size: { X: snap(nw), Y: snap(nh) } } : el))
+      const np = Math.max(0, Math.min(1, snap(resizeData.ox + dx / 2)))
+      const nq = Math.max(0, Math.min(1, snap(resizeData.oy + dy / 2)))
+      setElements(prev => prev.map(el => el.id === selectedId ? { ...el, position: { X: np, Y: nq }, size: { X: snap(nw), Y: snap(nh) } } : el))
     }
   }, [isPanning, panStart, dragData, resizing, resizeData, selectedId, zoom, snap, dragThreshold])
 
   const handleCanvasUp = useCallback(() => {
-    if (dragging) pushHist(elements)
+    if (dragging || resizing) pushHist(elements)
     setIsPanning(false); setDragging(false); setResizing(false); setDragData(null); setResizeData(null); setDragThreshold(false)
-  }, [dragging, elements, pushHist])
+  }, [dragging, resizing, elements, pushHist])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -1917,7 +1919,7 @@ export default function UIGenerator() {
             <div className="absolute inset-0 rounded-xl shadow-2xl" style={{ backgroundColor: canvasBg, boxShadow: '0 0 60px rgba(99,102,241,0.08), 0 25px 50px rgba(0,0,0,0.5)' }}>
               {/* Recursive element renderer */}
               {(() => {
-                const renderEl = (el: UIEl, isChild = false): React.ReactNode => {
+                const renderEl = (el: UIEl, isChild = false, parentHasLayout = false): React.ReactNode => {
                   if (!el.visible) return null
                   const isModifier = el.type.startsWith('UI') && el.type !== 'UIScrollBar'
                   if (isModifier) return null // Modifiers are applied to parent, not rendered directly
@@ -1936,7 +1938,7 @@ export default function UIGenerator() {
                   const uiGridLayout = childEls.find(c => c.type === 'UIGridLayout')
                   const uiAspectRatio = childEls.find(c => c.type === 'UIAspectRatioConstraint')
 
-                  const style = isChild ? childStyle(el, !!uiListLayout || !!uiGridLayout) : elStyle(el)
+                  const style = isChild ? childStyle(el, parentHasLayout) : elStyle(el)
 
                   // Apply UICorner to style (border-radius from modifier overrides prop)
                   if (uiCorner) {
@@ -2037,7 +2039,7 @@ export default function UIGenerator() {
                       onClick={(e) => { e.stopPropagation(); setSelectedId(el.id) }}
                       onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedId(el.id); setCtxMenu({ x: e.clientX, y: e.clientY, elId: el.id }) }}
                       onMouseDown={(e) => { e.stopPropagation(); if (buildMode && !el.locked) { setSelectedId(el.id); handleCanvasDown(e) } }}>
-                      {childEls.map(child => renderEl(child, true))}
+                      {childEls.map(child => renderEl(child, true, !!uiListLayout || !!uiGridLayout))}
                       {/* Hover label */}
                       {selectedId !== el.id && (
                         <div className="absolute -top-5 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded-md text-[8px] font-mono bg-black/80 backdrop-blur-sm text-white/70 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 border border-white/5">
@@ -2138,7 +2140,7 @@ export default function UIGenerator() {
                       isEdge && c === 'e' && '-translate-y-1/2',
                       isEdge && c === 'w' && '-translate-y-1/2',
                     )} style={{ left, right, top, bottom, position: 'absolute' }}
-                      onMouseDown={(e) => { e.stopPropagation(); setResizing(true); setResizeData({ sx: e.clientX, sy: e.clientY, ow: selected.size.X, oh: selected.size.Y, corner: c }) }} />
+                      onMouseDown={(e) => { e.stopPropagation(); setResizing(true); setResizeData({ sx: e.clientX, sy: e.clientY, ox: selected.position.X, oy: selected.position.Y, ow: selected.size.X, oh: selected.size.Y, corner: c }) }} />
                   )
                 })}
               </>

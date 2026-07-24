@@ -410,6 +410,25 @@ function parseColor(c: any): string {
   return String(c)
 }
 
+function robloxFont(font?: string): string {
+  if (!font) return 'inherit'
+  const f = font.toLowerCase()
+  if (f.includes('gotham') && f.includes('bold')) return '"GothamBold", "Inter", sans-serif'
+  if (f.includes('gotham') && f.includes('medium')) return '"GothamMedium", "Inter", sans-serif'
+  if (f.includes('gotham')) return '"Gotham", "Inter", sans-serif'
+  if (f.includes('sourcesans') && f.includes('bold')) return '"SourceSansBold", "Inter", sans-serif'
+  if (f.includes('sourcesans')) return '"SourceSans", "Inter", sans-serif'
+  if (f.includes('cartoon')) return '"Fredoka", "Inter", sans-serif'
+  if (f.includes('code')) return '"JetBrains Mono", "Fira Code", monospace'
+  if (f.includes('arial') && f.includes('bold')) return '"ArialBold", "Inter", sans-serif'
+  if (f.includes('arial')) return '"Arial", "Inter", sans-serif'
+  if (f.includes('highway')) return '"Highway Gothic", "Inter", sans-serif'
+  if (f.includes('ubuntu') && f.includes('bold')) return '"UbuntuBold", "Inter", sans-serif'
+  if (f.includes('ubuntu')) return '"Ubuntu", "Inter", sans-serif'
+  if (f.includes('fantasy') || f.includes('comic')) return '"Fredoka", "Inter", sans-serif'
+  return '"Inter", sans-serif'
+}
+
 function colorToRoblox(hex: string): string {
   const h = hex.replace('#', '')
   if (h.length !== 6) return 'Color3.new(0.78, 0.78, 0.78)'
@@ -2005,8 +2024,14 @@ export default function UIGenerator() {
                         borderStyle: isContainer ? 'dashed' : style.borderStyle,
                         outline: selectedId === el.id ? '2px solid #3b82f6' : style.outline,
                         outlineOffset: '2px',
-                        boxShadow: selectedId === el.id ? '0 0 12px rgba(59,130,246,0.2)' : (el.type === 'TextButton' ? '0 2px 8px rgba(0,0,0,0.3)' : undefined),
-                        transition: 'box-shadow 0.15s ease',
+                        boxShadow: selectedId === el.id
+                          ? '0 0 16px rgba(59,130,246,0.3), 0 0 4px rgba(59,130,246,0.15)'
+                          : el.type === 'TextButton'
+                            ? '0 2px 10px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.2)'
+                            : isContainer && (el.props.BackgroundTransparency ?? 0) < 0.5
+                              ? '0 2px 8px rgba(0,0,0,0.12), 0 1px 3px rgba(0,0,0,0.08)'
+                              : undefined,
+                        transition: 'box-shadow 0.15s ease, outline 0.1s ease',
                       }}
                       className={cn('cursor-pointer select-none group', isBuilding && 'el-building', isContainer && 'hover:ring-1 hover:ring-white/10')}
                       onClick={(e) => { e.stopPropagation(); setSelectedId(el.id) }}
@@ -2048,10 +2073,27 @@ export default function UIGenerator() {
                         </div>
                       )}
                       {(el.type === 'TextLabel' || el.type === 'TextButton' || el.type === 'TextBox') && childEls.length === 0 && (
-                        <span style={{ color: parseColor(el.props.TextColor3), fontSize: el.props.TextScaled ? undefined : (el.props.TextSize || 14), textAlign: el.props.TextXAlignment === 'Left' ? 'left' : el.props.TextXAlignment === 'Right' ? 'right' : 'center', textShadow: el.type === 'TextButton' ? '0 1px 3px rgba(0,0,0,0.4)' : undefined }} className="px-2 font-bold truncate w-full block">{el.props.Text || (el.type === 'TextBox' ? 'Input...' : 'Text')}</span>
+                        <span style={{
+                          color: parseColor(el.props.TextColor3),
+                          fontFamily: robloxFont(el.props.Font),
+                          fontSize: el.props.TextScaled ? undefined : (el.props.TextSize || 14),
+                          transform: el.props.TextScaled ? 'scale(0.85)' : undefined,
+                          transformOrigin: 'center',
+                          textAlign: el.props.TextXAlignment === 'Left' ? 'left' : el.props.TextXAlignment === 'Right' ? 'right' : 'center',
+                          fontWeight: el.props.Font?.includes('Bold') ? 'bold' : '600',
+                          textShadow: '0 1px 4px rgba(0,0,0,0.5), 0 0 8px rgba(0,0,0,0.15)',
+                          letterSpacing: '0.01em',
+                          lineHeight: '1.2',
+                          opacity: (el.props.TextTransparency || 0) >= 1 ? 0 : 1 - (el.props.TextTransparency || 0) * 0.7,
+                        }} className="px-1.5 truncate w-full block">{el.props.Text || (el.type === 'TextBox' ? 'Input...' : 'Text')}</span>
                       )}
                       {el.type === 'ImageLabel' && el.props.Image && childEls.length === 0 && (
-                        <img src={el.props.Image} alt="" className="w-full h-full object-cover" style={{ opacity: 1 - (el.props.ImageTransparency || 0) }} />
+                        <img src={el.props.Image} alt="" style={{
+                          width: '100%', height: '100%',
+                          objectFit: el.props.ImageRectOffset ? 'cover' : 'contain',
+                          borderRadius: uiCorner ? `${uiCorner.props.UICorner_Radius ?? uiCorner.props.Radius ?? 0}px` : undefined,
+                          opacity: 1 - (el.props.ImageTransparency || 0),
+                        }} />
                       )}
                       {el.type === 'ScrollingFrame' && childEls.length === 0 && (
                         <div className="absolute inset-0 flex items-center justify-center text-white/10 text-[9px]">Scroll Area</div>
@@ -2069,16 +2111,36 @@ export default function UIGenerator() {
                 </div>
               )}
             </div>
-            {/* Resize handles */}
+            {/* Resize handles — 4 corners + 4 edge midpoints */}
             {selected && buildMode && !selected.locked && !planeMode && (
               <>
-                {['nw', 'ne', 'sw', 'se'].map(c => (
-                  <div key={c} className={cn('absolute w-3 h-3 bg-white border-2 border-accent-blue rounded-full z-50 shadow-lg',
-                    c === 'nw' && '-top-1.5 -left-1.5 cursor-nw-resize', c === 'ne' && '-top-1.5 -right-1.5 cursor-ne-resize',
-                    c === 'sw' && '-bottom-1.5 -left-1.5 cursor-sw-resize', c === 'se' && '-bottom-1.5 -right-1.5 cursor-se-resize'
-                  )} style={{ left: c.includes('w') ? `${selected.position.X * 100 - 1}%` : undefined, right: c.includes('e') ? `${(1 - selected.position.X) * 100 - 1}%` : undefined, top: c.includes('n') ? `${selected.position.Y * 100 - 1}%` : undefined, bottom: c.includes('s') ? `${(1 - selected.position.Y) * 100 - 1}%` : undefined, position: 'absolute' }}
-                    onMouseDown={(e) => { e.stopPropagation(); setResizing(true); setResizeData({ sx: e.clientX, sy: e.clientY, ow: selected.size.X, oh: selected.size.Y, corner: c }) }} />
-                ))}
+                {(['nw', 'ne', 'sw', 'se', 'n', 's', 'e', 'w'] as const).map(c => {
+                  const isEdge = c.length === 1
+                  const leftPct = selected.position.X * 100
+                  const topPct = selected.position.Y * 100
+                  const halfW = selected.size.X * 50
+                  const halfH = selected.size.Y * 50
+                  let left: string | undefined, right: string | undefined, top: string | undefined, bottom: string | undefined
+                  if (c.includes('w')) left = `${leftPct - halfW - 0.5}%`
+                  else if (c.includes('e')) right = `${(1 - selected.position.X) * 100 - halfW - 0.5}%`
+                  else if (c === 'n' || c === 's') left = `${leftPct}%`
+                  if (c.includes('n')) top = `${topPct - halfH - 0.5}%`
+                  else if (c.includes('s')) bottom = `${(1 - selected.position.Y) * 100 - halfH - 0.5}%`
+                  else if (c === 'e' || c === 'w') top = `${topPct}%`
+                  const cursorClass = c === 'nw' ? 'cursor-nw-resize' : c === 'ne' ? 'cursor-ne-resize' : c === 'sw' ? 'cursor-sw-resize' : c === 'se' ? 'cursor-se-resize' : c === 'n' ? 'cursor-n-resize' : c === 's' ? 'cursor-s-resize' : c === 'e' ? 'cursor-e-resize' : 'cursor-w-resize'
+                  return (
+                    <div key={c} className={cn(
+                      'absolute bg-white border-2 border-accent-blue z-50 shadow-lg transition-transform hover:scale-125',
+                      isEdge ? 'w-2 h-2 rounded-sm' : 'w-3 h-3 rounded-full',
+                      cursorClass,
+                      isEdge && c === 'n' && '-translate-x-1/2',
+                      isEdge && c === 's' && '-translate-x-1/2',
+                      isEdge && c === 'e' && '-translate-y-1/2',
+                      isEdge && c === 'w' && '-translate-y-1/2',
+                    )} style={{ left, right, top, bottom, position: 'absolute' }}
+                      onMouseDown={(e) => { e.stopPropagation(); setResizing(true); setResizeData({ sx: e.clientX, sy: e.clientY, ow: selected.size.X, oh: selected.size.Y, corner: c }) }} />
+                  )
+                })}
               </>
             )}
           </div>
@@ -2414,6 +2476,7 @@ export default function UIGenerator() {
                 const renderPreviewEl = (el: UIEl): React.ReactNode => {
                   if (!el.visible) return null
                   const childEls = el.children.map(cid => elements.find(e => e.id === cid)).filter(Boolean) as UIEl[]
+                  const isContainer = CONTAINER_TYPES.includes(el.type)
                   const p = el.props
                   const style: React.CSSProperties = {
                     position: 'absolute', left: `${el.position.X * 100}%`, top: `${el.position.Y * 100}%`,
@@ -2423,17 +2486,89 @@ export default function UIGenerator() {
                     borderRadius: p.CornerRadius || 0, zIndex: el.zIndex || 1,
                     overflow: el.type === 'ScrollingFrame' ? 'auto' : 'hidden',
                     border: p.BorderSizePixel > 0 ? `${p.BorderSizePixel}px solid ${parseColor(p.BorderColor3)}` : undefined,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }
+                  const uiCorner = childEls.find(c => c.type === 'UICorner')
+                  const uiStroke = childEls.find(c => c.type === 'UIStroke')
+                  const uiPadding = childEls.find(c => c.type === 'UIPadding')
+                  const uiGradient = childEls.find(c => c.type === 'UIGradient')
+                  const uiScale = childEls.find(c => c.type === 'UIScale')
+                  const uiListLayout = childEls.find(c => c.type === 'UIListLayout')
+                  const uiGridLayout = childEls.find(c => c.type === 'UIGridLayout')
+                  const uiAspectRatio = childEls.find(c => c.type === 'UIAspectRatioConstraint')
+                  if (uiCorner) style.borderRadius = uiCorner.props.UICorner_Radius ?? uiCorner.props.Radius ?? 8
+                  if (uiStroke) {
+                    const sc = parseColor(uiStroke.props.UIStroke_Color || '#ffffff')
+                    const th = (uiStroke.props.UIStroke_Thickness ?? 2) * 1.5
+                    const tr = uiStroke.props.UIStroke_Transparency ?? 0.3
+                    style.border = `${th}px solid ${sc}${Math.round((1 - tr) * 255).toString(16).padStart(2, '0')}`
+                  }
+                  if (uiPadding) {
+                    const pt = uiPadding.props.UIPadding_Top ?? uiPadding.props.PaddingTop ?? 8
+                    const pb = uiPadding.props.UIPadding_Bottom ?? uiPadding.props.PaddingBottom ?? 8
+                    const pl = uiPadding.props.UIPadding_Left ?? uiPadding.props.PaddingLeft ?? 8
+                    const pr = uiPadding.props.UIPadding_Right ?? uiPadding.props.PaddingRight ?? 8
+                    style.padding = `${pt}px ${pr}px ${pb}px ${pl}px`
+                  }
+                  if (uiGradient) {
+                    const gc = parseColor(uiGradient.props.UIGradient_Color || '#ffffff')
+                    const rot = uiGradient.props.UIGradient_Rotation ?? uiGradient.props.Rotation ?? 45
+                    const tr = uiGradient.props.UIGradient_Transparency ?? 0.3
+                    style.background = `linear-gradient(${rot}deg, ${gc}${Math.round((1 - tr) * 255).toString(16).padStart(2, '0')}, transparent)`
+                  }
+                  if (uiScale) {
+                    const sv = uiScale.props.UIScale_Scale ?? uiScale.props.Scale ?? 1
+                    style.transform = `${style.transform || ''} scale(${sv})`.trim()
+                  }
+                  if (uiAspectRatio) {
+                    const ar = uiAspectRatio.props.UIAspectRatio_AspectRatio ?? uiAspectRatio.props.AspectRatio ?? 1
+                    style.aspectRatio = `${ar} / 1`
+                  }
+                  if (uiListLayout && isContainer) {
+                    const dir = uiListLayout.props.UIListLayout_FillDirection ?? 'Vertical'
+                    const hAlign = uiListLayout.props.UIListLayout_HorizontalAlignment ?? 'Left'
+                    const vAlign = uiListLayout.props.UIListLayout_VerticalAlignment ?? 'Top'
+                    const pad = uiListLayout.props.UIListLayout_Padding ?? 4
+                    style.display = 'flex'
+                    style.flexDirection = dir === 'Horizontal' ? 'row' : 'column'
+                    style.alignItems = hAlign === 'Center' ? 'center' : hAlign === 'Right' ? 'flex-end' : 'flex-start'
+                    style.justifyContent = vAlign === 'Center' ? 'center' : vAlign === 'Bottom' ? 'flex-end' : 'flex-start'
+                    style.gap = `${pad}px`
+                    style.flexWrap = 'wrap'
+                  }
+                  if (uiGridLayout && isContainer) {
+                    const cw2 = uiGridLayout.props.UIGridLayout_CellSize_X ?? 0.3
+                    const ch2 = uiGridLayout.props.UIGridLayout_CellSize_Y ?? 0.25
+                    const cx = uiGridLayout.props.UIGridLayout_CellPadding_X ?? 0.02
+                    const cy = uiGridLayout.props.UIGridLayout_CellPadding_Y ?? 0.02
+                    style.display = 'grid'
+                    style.gridTemplateColumns = `repeat(auto-fill, minmax(${cw2 * 100}%, 1fr))`
+                    style.gap = `${cy * 100}% ${cx * 100}%`
+                  }
+                  const hasLayout = !!uiListLayout || !!uiGridLayout
                   return (
                     <div key={el.id} style={style} className="select-none">
-                      {childEls.map(child => renderPreviewEl(child))}
-                      {(el.type === 'TextLabel' || el.type === 'TextButton' || el.type === 'TextBox') && childEls.length === 0 && (
-                        <span style={{ color: parseColor(p.TextColor3), fontSize: p.TextScaled ? undefined : (p.TextSize || 14), textAlign: p.TextXAlignment === 'Left' ? 'left' : p.TextXAlignment === 'Right' ? 'right' : 'center', fontWeight: p.Font?.includes('Bold') ? 'bold' : undefined }} className="px-2 truncate w-full block">{p.Text || (el.type === 'TextBox' ? 'Input...' : 'Text')}</span>
+                      {childEls.filter(c => !c.type.startsWith('UI') || c.type === 'UIScrollBar').map(child => {
+                        if (hasLayout) {
+                          return <div key={child.id} style={{ position: 'relative', left: 'auto', top: 'auto', width: 'auto', height: 'auto', transform: 'none', backgroundColor: (child.props.BackgroundTransparency ?? 0) >= 1 ? 'transparent' : parseColor(child.props.BackgroundColor3), borderRadius: child.props.CornerRadius || 0, zIndex: child.zIndex || 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flex: child.props.FlexMode === 'Fill' || child.props.FlexMode === 'Grow' ? '1' : undefined, minWidth: 0, minHeight: 0 }} className="select-none">
+                            {child.children.map((cid: string) => { const gc = elements.find(e => e.id === cid); return gc ? renderPreviewEl(gc) : null })}
+                            {(child.type === 'TextLabel' || child.type === 'TextButton' || child.type === 'TextBox') && child.children.length === 0 && (
+                              <span style={{ color: parseColor(child.props.TextColor3), fontFamily: robloxFont(child.props.Font), fontSize: child.props.TextScaled ? undefined : (child.props.TextSize || 14), transform: child.props.TextScaled ? 'scale(0.85)' : undefined, transformOrigin: 'center', textAlign: child.props.TextXAlignment === 'Left' ? 'left' : child.props.TextXAlignment === 'Right' ? 'right' : 'center', fontWeight: child.props.Font?.includes('Bold') ? 'bold' : '600', textShadow: '0 1px 4px rgba(0,0,0,0.5)', opacity: (child.props.TextTransparency || 0) >= 1 ? 0 : 1 - (child.props.TextTransparency || 0) * 0.7 }} className="px-1.5 truncate w-full block">{child.props.Text || (child.type === 'TextBox' ? 'Input...' : 'Text')}</span>
+                            )}
+                            {child.type === 'ImageLabel' && child.props.Image && child.children.length === 0 && (
+                              <img src={child.props.Image} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: child.props.CornerRadius || 0, opacity: 1 - (child.props.ImageTransparency || 0) }} />
+                            )}
+                          </div>
+                        }
+                        return renderPreviewEl(child)
+                      })}
+                      {(el.type === 'TextLabel' || el.type === 'TextButton' || el.type === 'TextBox') && childEls.filter(c => !c.type.startsWith('UI')).length === 0 && (
+                        <span style={{ color: parseColor(p.TextColor3), fontFamily: robloxFont(p.Font), fontSize: p.TextScaled ? undefined : (p.TextSize || 14), transform: p.TextScaled ? 'scale(0.85)' : undefined, transformOrigin: 'center', textAlign: p.TextXAlignment === 'Left' ? 'left' : p.TextXAlignment === 'Right' ? 'right' : 'center', fontWeight: p.Font?.includes('Bold') ? 'bold' : '600', textShadow: '0 1px 4px rgba(0,0,0,0.5), 0 0 8px rgba(0,0,0,0.15)', letterSpacing: '0.01em', lineHeight: '1.2', opacity: (p.TextTransparency || 0) >= 1 ? 0 : 1 - (p.TextTransparency || 0) * 0.7 }} className="px-1.5 truncate w-full block">{p.Text || (el.type === 'TextBox' ? 'Input...' : 'Text')}</span>
                       )}
-                      {el.type === 'ImageLabel' && p.Image && childEls.length === 0 && (
-                        <img src={p.Image} alt="" className="w-full h-full object-cover" style={{ opacity: 1 - (p.ImageTransparency || 0) }} />
+                      {el.type === 'ImageLabel' && p.Image && childEls.filter(c => !c.type.startsWith('UI')).length === 0 && (
+                        <img src={p.Image} alt="" style={{ width: '100%', height: '100%', objectFit: p.ImageRectOffset ? 'cover' : 'contain', borderRadius: uiCorner ? `${uiCorner.props.UICorner_Radius ?? uiCorner.props.Radius ?? 0}px` : undefined, opacity: 1 - (p.ImageTransparency || 0) }} />
                       )}
-                      {el.type === 'ScrollingFrame' && childEls.length === 0 && (
+                      {el.type === 'ScrollingFrame' && childEls.filter(c => !c.type.startsWith('UI')).length === 0 && (
                         <div className="absolute inset-0 flex items-center justify-center text-white/10 text-[9px]">Scroll Area</div>
                       )}
                     </div>

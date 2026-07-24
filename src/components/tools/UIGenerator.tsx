@@ -599,6 +599,7 @@ export default function UIGenerator() {
   // Chat
   const [messages, setMessages] = useState<ChatMsg[]>([])
   const [input, setInput] = useState('')
+  const [attachedImage, setAttachedImage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [aiStatus, setAiStatus] = useState('')
   const [showChat, setShowChat] = useState(true)
@@ -890,6 +891,38 @@ export default function UIGenerator() {
       }
     }
 
+    // ── Normalize ZIndex: parents must render behind children ──
+    setElements(prev => {
+      const elMap = new Map(prev.map(e => [e.id, { ...e }]))
+      const depthCache = new Map<string, number>()
+      const getDepth = (id: string): number => {
+        if (depthCache.has(id)) return depthCache.get(id)!
+        const el = elMap.get(id)
+        if (!el || !el.parentId) { depthCache.set(id, 0); return 0 }
+        const d = 1 + getDepth(el.parentId)
+        depthCache.set(id, d)
+        return d
+      }
+      // Compute depth for all elements
+      for (const id of elMap.keys()) getDepth(id)
+      // Assign ZIndex: depth determines base, siblings get sequential offsets
+      const depthCounters = new Map<number, number>()
+      const sorted = [...prev].sort((a, b) => {
+        const da = getDepth(a.id), db = getDepth(b.id)
+        if (da !== db) return da - db
+        const pa = a.parentId || '', pb = b.parentId || ''
+        if (pa !== pb) return pa.localeCompare(pb)
+        return (a.props.LayoutOrder || 0) - (b.props.LayoutOrder || 0)
+      })
+      for (const el of sorted) {
+        const depth = getDepth(el.id)
+        const counter = (depthCounters.get(depth) || 0) + 1
+        depthCounters.set(depth, counter)
+        elMap.get(el.id)!.zIndex = depth * 100 + counter
+      }
+      return [...elMap.values()]
+    })
+
     setBuildingId(null)
     setBuildingMsg('')
     setBuilding(false)
@@ -991,8 +1024,9 @@ export default function UIGenerator() {
 
   const sendMsg = async (text?: string) => {
     const msg = (text || input).trim(); if (!msg || isLoading || building) return
-    const um: ChatMsg = { role: 'user', content: msg }
-    setMessages(p => [...p, um]); setInput(''); setIsLoading(true)
+    const userContent = attachedImage ? `${msg}\n\n[USER PROVIDED IMAGE: ${attachedImage} — Use this image URL for any ImageLabel elements in the UI]` : msg
+    const um: ChatMsg = { role: 'user', content: userContent }
+    setMessages(p => [...p, um]); setInput(''); setAttachedImage(''); setIsLoading(true)
 
     const editKeywords = ['change', 'make', 'edit', 'update', 'modify', 'alter', 'adjust', 'tweak', 'better', 'improve', 'fix', 'remove', 'delete', 'add', 'move', 'resize', 'recolor', 'replace', 'swap']
     const lowerMsg = msg.toLowerCase()
@@ -1026,7 +1060,7 @@ export default function UIGenerator() {
           const payload = {
             messages: [
               { role: 'system', content: systemMsg },
-              { role: 'user', content: msg },
+              { role: 'user', content: userContent },
             ],
             temperature: 0.3,
             max_tokens: 8192,
@@ -1070,7 +1104,7 @@ export default function UIGenerator() {
           const backupTimeout = setTimeout(() => backupController.abort(), 120000)
           const backupResp = await fetch(CHAT_API, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ messages: [{ role: 'user', content: msg }], canvas_state: cs }),
+            body: JSON.stringify({ messages: [{ role: 'user', content: userContent }], canvas_state: cs }),
             signal: backupController.signal,
           })
           clearTimeout(backupTimeout)
@@ -2009,7 +2043,19 @@ export default function UIGenerator() {
                   <div ref={messagesEndRef} />
                 </div>
                 <div className="px-3 pb-2 pt-1 border-t border-border-primary">
+                  {attachedImage && (
+                    <div className="mb-1.5 flex items-center gap-2 bg-bg-tertiary rounded-md px-2 py-1">
+                      <img src={attachedImage} alt="Attached" className="h-8 w-8 rounded object-cover border border-border-primary" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                      <span className="text-[9px] text-text-dim truncate flex-1">{attachedImage}</span>
+                      <button onClick={() => setAttachedImage('')} className="text-text-dim hover:text-red-400"><X className="h-3 w-3" /></button>
+                    </div>
+                  )}
                   <div className="flex items-end gap-1.5 bg-bg-elevated rounded-lg px-2.5 py-1.5 border border-border-primary focus-within:border-accent-purple/50 transition-colors">
+                    <button onClick={() => { const url = prompt('Paste image URL:'); if (url) setAttachedImage(url.trim()) }}
+                      className="h-6 w-6 rounded-md flex-shrink-0 flex items-center justify-center bg-bg-tertiary text-text-dim hover:text-accent-blue hover:bg-accent-blue/10 transition-all"
+                      title="Attach image URL">
+                      <ImageIcon className="h-3 w-3" />
+                    </button>
                     <textarea value={input} onChange={e => setInput(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg() } }}
                       placeholder={elements.length > 0 ? "Edit existing elements or add new ones..." : "Describe your UI and AI builds it..."} rows={1}

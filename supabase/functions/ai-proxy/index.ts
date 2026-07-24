@@ -166,10 +166,12 @@ serve(async (req: Request): Promise<Response> => {
 
     const modelsToTry = model ? [model, ...FALLBACK_MODELS.filter((m) => m !== model)] : FALLBACK_MODELS;
     let lastError = "";
+    const exhaustedModels = new Set<string>();
 
     // Try every key × every model combination
     for (const key of keysToTry) {
       for (const modelName of modelsToTry) {
+        if (exhaustedModels.has(modelName)) continue;
         try {
           const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`;
 
@@ -195,12 +197,11 @@ serve(async (req: Request): Promise<Response> => {
 
           if (!resp.ok) {
             lastError = data?.error?.message || `HTTP ${resp.status}`;
-            // If rate limited or quota exceeded, try next key
             if (lastError.includes("quota") || lastError.includes("rate")) {
-              console.log(`Key ...${key.slice(-4)} + ${modelName} rate limited, trying next...`);
-              break; // break inner loop, try next key
+              console.log(`Key ...${key.slice(-4)} + ${modelName} rate limited, skipping model for all keys`);
+              exhaustedModels.add(modelName);
+              break;
             }
-            // For other errors (invalid key, etc.), try next model with same key
             console.log(`Gemini ${modelName} failed: ${lastError}`);
             continue;
           }

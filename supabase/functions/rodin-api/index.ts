@@ -33,8 +33,10 @@ async function callGemini(systemPrompt: string, userContent: string, maxTokens =
   if (keys.length === 0) throw new Error("No Gemini API key configured");
   const models = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
   let lastError = "";
+  const exhaustedModels = new Set<string>();
   for (const key of keys) {
     for (const model of models) {
+      if (exhaustedModels.has(model)) continue;
       try {
         const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
           method: "POST",
@@ -48,8 +50,11 @@ async function callGemini(systemPrompt: string, userContent: string, maxTokens =
         const data = await resp.json();
         if (!resp.ok) {
           lastError = data?.error?.message || `HTTP ${resp.status}`;
-          if (lastError.includes("quota") || lastError.includes("rate")) break; // try next key
-          continue; // try next model
+          if (lastError.includes("quota") || lastError.includes("rate")) {
+            exhaustedModels.add(model);
+            break;
+          }
+          continue;
         }
         const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
         if (text) return text;

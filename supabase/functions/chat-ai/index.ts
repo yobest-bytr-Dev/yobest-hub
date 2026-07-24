@@ -131,10 +131,12 @@ That is the ONLY acceptable format. No headers. No separators. No bold. Just pla
     const geminiModels = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-2.0-flash-lite"]
     const modelsToTry = [model, ...geminiModels.filter((m) => m !== model)]
     let lastError = ""
+    const exhaustedModels = new Set<string>()
 
     // Try every key × every model
     for (const geminiKey of allKeys) {
       for (const modelName of modelsToTry) {
+        if (exhaustedModels.has(modelName)) continue
         try {
           const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:streamGenerateContent?alt=sse&key=${geminiKey}`
 
@@ -156,6 +158,7 @@ That is the ONLY acceptable format. No headers. No separators. No bold. Just pla
             console.log(`Key ...${geminiKey.slice(-4)} + ${modelName} failed: ${lastError}`)
             // Rate limited or quota exceeded → try next key
             if (lastError.includes("quota") || lastError.includes("rate")) {
+              exhaustedModels.add(modelName)
               break
             }
             // Other error → try next model same key

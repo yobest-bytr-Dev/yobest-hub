@@ -1479,13 +1479,29 @@ export default function UIGenerator() {
     }
   }
 
-  function childStyle(el: UIEl): React.CSSProperties {
+  function childStyle(el: UIEl, parentHasLayout = false): React.CSSProperties {
     const p = el.props
     // Children always render above their parent
     let depth = 0
     let cur: UIEl | undefined = el
     while (cur?.parentId) { depth++; cur = elements.find(e => e.id === cur!.parentId) }
     const depthZ = depth * 100 + (el.zIndex || 1)
+
+    if (parentHasLayout) {
+      // When parent has UIListLayout/UIGridLayout, children use relative positioning
+      return {
+        position: 'relative', left: 'auto', top: 'auto',
+        width: 'auto', height: 'auto',
+        transform: 'none',
+        backgroundColor: (p.BackgroundTransparency ?? 0) >= 1 ? 'transparent' : parseColor(p.BackgroundColor3),
+        borderRadius: p.CornerRadius || 0, zIndex: depthZ, overflow: 'visible',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        border: p.BorderSizePixel > 0 ? `${p.BorderSizePixel}px solid ${parseColor(p.BorderColor3)}` : undefined,
+        flex: p.FlexMode === 'Fill' || p.FlexMode === 'Grow' ? '1' : undefined,
+        minWidth: 0, minHeight: 0,
+      }
+    }
+
     return {
       position: 'absolute', left: `${el.position.X * 100}%`, top: `${el.position.Y * 100}%`,
       width: `${el.size.X * 100}%`, height: `${el.size.Y * 100}%`,
@@ -1901,7 +1917,7 @@ export default function UIGenerator() {
                   const uiGridLayout = childEls.find(c => c.type === 'UIGridLayout')
                   const uiAspectRatio = childEls.find(c => c.type === 'UIAspectRatioConstraint')
 
-                  const style = isChild ? childStyle(el) : elStyle(el)
+                  const style = isChild ? childStyle(el, !!uiListLayout || !!uiGridLayout) : elStyle(el)
 
                   // Apply UICorner to style (border-radius from modifier overrides prop)
                   if (uiCorner) {

@@ -406,7 +406,28 @@ Rules:
 - Do NOT use markdown formatting
 - Write in plain text only`;
 
-      const content = await callGemini(SYSTEM_PROMPT, messages.map((m: any) => m.content).join("\n"), 500, 0.7);
+      // Use a single fast model for chat to avoid timeout
+      const keys = await getGeminiKeys();
+      let content = "";
+      if (keys.length > 0) {
+        try {
+          const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${keys[0]}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ role: "user", parts: [{ text: messages.map((m: any) => m.content).join("\n") }] }],
+              systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+              generationConfig: { temperature: 0.7, maxOutputTokens: 500 },
+            }),
+          });
+          const data = await resp.json();
+          content = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        } catch {}
+      }
+      if (!content) {
+        // Fallback: simple template response
+        content = "[PROMPT]A detailed 3D model with clean geometry, realistic materials, and proper UV mapping[/PROMPT]";
+      }
       return new Response(JSON.stringify({ content }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

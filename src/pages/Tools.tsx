@@ -224,7 +224,7 @@ export default function Tools() {
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-1">
                     <h2 className="text-lg font-bold text-text-primary">3D Model Generator</h2>
-                    <button onClick={() => { navigator.clipboard.writeText('https://yobest.app/tools/3d-generator'); toast('Link copied!', 'success') }}
+                    <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/tools/3d-generator`); toast('Link copied!', 'success') }}
                       className="text-[10px] text-text-dim hover:text-accent-blue px-2 py-0.5 rounded-md bg-bg-secondary border border-border-primary hover:border-accent-blue/30 transition-all">
                       📋 Copy Share Link
                     </button>
@@ -247,7 +247,7 @@ export default function Tools() {
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-1">
                     <h2 className="text-lg font-bold text-text-primary">Roblox UI Generator</h2>
-                    <button onClick={() => { navigator.clipboard.writeText('https://yobest.app/tools/ui-generator'); toast('Link copied!', 'success') }}
+                    <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/tools/ui-generator`); toast('Link copied!', 'success') }}
                       className="text-[10px] text-text-dim hover:text-accent-purple px-2 py-0.5 rounded-md bg-bg-secondary border border-border-primary hover:border-accent-purple/30 transition-all">
                       📋 Copy Share Link
                     </button>

@@ -8,13 +8,37 @@ import StatusIndicator from './StatusIndicator'
 import OptionsDialog from './OptionsDialog'
 import type { ModelStats, AnimationInfo, DetectedMesh, MeshAssignment } from './ModelComponent'
 
-const SAMPLE_MODELS = [
-  { name: 'PBR Sphere', file: '/models/base_basic_pbr.glb', desc: 'Standard PBR material sphere', icon: '🔵', color: 'from-blue-500/20 to-cyan-500/20' },
-  { name: 'PBR Variant A', file: '/models/base_basic_pbr%20(3).glb', desc: 'PBR material with scratches', icon: '🟠', color: 'from-orange-500/20 to-amber-500/20' },
-  { name: 'PBR Variant B', file: '/models/base_basic_pbr%20(6).glb', desc: 'PBR material with wear', icon: '🟤', color: 'from-amber-600/20 to-yellow-600/20' },
-  { name: 'PBR Variant C', file: '/models/base_basic_pbr%20(9).glb', desc: 'PBR material polished', icon: '⚪', color: 'from-gray-400/20 to-gray-600/20' },
-  { name: 'Cyber Car', file: '/models/floating_futuristic_cyber_car_jfg.glb', desc: 'Futuristic floating cyber car', icon: '🚗', color: 'from-violet-500/20 to-purple-500/20' },
+const SAMPLE_PROMPTS = [
+  { name: 'Sci-Fi Helmet', prompt: 'A futuristic sci-fi helmet with glowing blue accents, metallic finish', icon: '🪖', color: 'from-blue-500/20 to-cyan-500/20' },
+  { name: 'Fantasy Sword', prompt: 'A medieval fantasy sword with gem-encrusted handle and glowing blade', icon: '⚔️', color: 'from-orange-500/20 to-amber-500/20' },
+  { name: 'Cartoon Cat', prompt: 'A cute cartoon cat character, low poly style, pastel colors', icon: '🐱', color: 'from-amber-600/20 to-yellow-600/20' },
+  { name: 'Modern Lamp', prompt: 'A modern minimalist desk lamp, matte white finish, geometric design', icon: '💡', color: 'from-gray-400/20 to-gray-600/20' },
+  { name: 'Greek Statue', prompt: 'An ancient Greek marble statue bust, classical style, weathered stone', icon: '🏛️', color: 'from-violet-500/20 to-purple-500/20' },
 ]
+
+const GENERATED_MODELS_KEY = 'yobest_3d_generated_models'
+
+interface GeneratedModel {
+  prompt: string
+  timestamp: number
+  downloadUrl: string
+}
+
+function getGeneratedModels(): GeneratedModel[] {
+  try {
+    const data = localStorage.getItem(GENERATED_MODELS_KEY)
+    return data ? JSON.parse(data) : []
+  } catch { return [] }
+}
+
+function saveGeneratedModel(model: GeneratedModel) {
+  try {
+    const models = getGeneratedModels()
+    models.unshift(model)
+    if (models.length > 20) models.pop()
+    localStorage.setItem(GENERATED_MODELS_KEY, JSON.stringify(models))
+  } catch {}
+}
 
 const RODIN_API = `${supabaseUrl}/functions/v1/rodin-api`
 
@@ -29,6 +53,7 @@ export default function ThreeDGenerator() {
   const [showPrompt, setShowPrompt] = useState(true)
   const [prompt, setPrompt] = useState('')
   const [previewImages, setPreviewImages] = useState<string[]>([])
+  const [generatedModels, setGeneratedModels] = useState<GeneratedModel[]>([])
   const pollingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isMountedRef = useRef(true)
   const [modelStats, setModelStats] = useState<ModelStats | null>(null)
@@ -61,7 +86,7 @@ export default function ThreeDGenerator() {
   const [assistantLoading, setAssistantLoading] = useState(false)
   const assistantEndRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => { isMountedRef.current = true; return () => { isMountedRef.current = false; if (pollingTimerRef.current) clearTimeout(pollingTimerRef.current) } }, [])
+  useEffect(() => { isMountedRef.current = true; setGeneratedModels(getGeneratedModels()); return () => { isMountedRef.current = false; if (pollingTimerRef.current) clearTimeout(pollingTimerRef.current) } }, [])
   useEffect(() => { assistantEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [assistantMessages])
 
   const handleStatusCheck = useCallback(async (subscriptionKey: string, taskUuid: string) => {
@@ -94,6 +119,9 @@ export default function ThreeDGenerator() {
             setModelUrl(proxyUrl)
             setDownloadUrl(glb.url)
             setShowPrompt(false)
+            const newModel: GeneratedModel = { prompt: prompt.trim() || 'Uploaded model', timestamp: Date.now(), downloadUrl: glb.url }
+            saveGeneratedModel(newModel)
+            setGeneratedModels(getGeneratedModels())
           } else { setError('No GLB file found'); setIsLoading(false); setStage(null) }
         } else { setError('No files available'); setIsLoading(false); setStage(null) }
       } else if (anyFailed) {
@@ -240,15 +268,33 @@ export default function ThreeDGenerator() {
           <div className="absolute bottom-0 left-0 right-0 pointer-events-auto">
             <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
             <div className="relative px-4 pb-4 max-w-4xl mx-auto">
+              {generatedModels.length > 0 && (
+                <div className="mb-3">
+                  <p className="text-[10px] text-white/30 font-medium uppercase tracking-wider mb-2 px-1">Generated Models</p>
+                  <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none px-1">
+                    {generatedModels.slice(0, 6).map((m, i) => (
+                      <button key={i} onClick={() => { setModelUrl(m.downloadUrl); setPrompt(m.prompt); setShowPrompt(false); setIsLoading(false); setStage(null); setError(null) }}
+                        className="shrink-0 w-44 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 hover:border-emerald-400/30 p-3 text-left transition-all hover:bg-white/10 group hover:scale-[1.02]">
+                        <div className="w-full h-12 rounded-lg bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-white/5 flex items-center justify-center mb-2.5 group-hover:scale-105 transition-transform">
+                          <Box className="w-5 h-5 text-emerald-400/60" />
+                        </div>
+                        <p className="text-[11px] font-semibold text-white/90 truncate">{m.prompt}</p>
+                        <p className="text-[9px] text-white/35 truncate mt-0.5">{new Date(m.timestamp).toLocaleDateString()}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <p className="text-[10px] text-white/30 font-medium uppercase tracking-wider mb-2 px-1">Quick Prompts</p>
               <div className="mb-3 flex gap-2 overflow-x-auto pb-2 scrollbar-none px-1">
-                {SAMPLE_MODELS.map((m, i) => (
-                  <button key={i} onClick={() => { setModelUrl(m.file); setShowPrompt(false); setIsLoading(false); setStage(null); setError(null) }}
+                {SAMPLE_PROMPTS.map((m, i) => (
+                  <button key={i} onClick={() => { setPrompt(m.prompt); setModelUrl(null); setIsLoading(false); setStage(null); setError(null) }}
                     className="shrink-0 w-44 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 hover:border-white/30 p-3 text-left transition-all hover:bg-white/10 group hover:scale-[1.02]">
                     <div className={`w-full h-12 rounded-lg bg-gradient-to-br ${m.color} border border-white/5 flex items-center justify-center mb-2.5 group-hover:scale-105 transition-transform`}>
                       <span className="text-2xl">{m.icon}</span>
                     </div>
                     <p className="text-[11px] font-semibold text-white/90 truncate">{m.name}</p>
-                    <p className="text-[9px] text-white/35 truncate mt-0.5">{m.desc}</p>
+                    <p className="text-[9px] text-white/35 truncate mt-0.5">Click to use prompt</p>
                   </button>
                 ))}
               </div>

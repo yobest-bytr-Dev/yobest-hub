@@ -7,7 +7,7 @@ import { getApprovedCommunityGames, getOfficialGames, submitGame, getSubmissions
 import { toDirectImageUrl, uploadToGoogleDrive } from '@/lib/drive-upload'
 import ImagePicker from '@/components/ui/ImagePicker'
 import type { Experience, GameCategory } from '@/lib/types'
-import { extractYoutubeId, formatNumber, getCategoryColor, cn } from '@/lib/utils'
+import { extractYoutubeId, formatNumber, getCategoryColor, timeAgo, cn } from '@/lib/utils'
 import { useStore } from '@/store/useStore'
 import { getYouTubeStatsBatch, type YouTubeStats } from '@/lib/youtube'
 import Tabs from '@/components/ui/Tabs'
@@ -95,6 +95,7 @@ function GameCard({ game, ytStats, serverViews, onMouseEnter, onMouseLeave }: {
         <div className="absolute bottom-2 right-2 flex items-center gap-3 text-white/80 text-xs">
           <span className="flex items-center gap-1"><Eye size={12} />{formatNumber(views)}</span>
           <span className="flex items-center gap-1"><Heart size={12} />{formatNumber(likes)}</span>
+          {game.created_at && <span className="text-white/50 text-[10px]">{timeAgo(game.created_at)}</span>}
         </div>
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
           <div className="w-14 h-14 rounded-full bg-white/15 backdrop-blur-md flex items-center justify-center border border-white/20">
@@ -234,6 +235,12 @@ function GameTooltip({ game, ytStats, position }: {
               <span className="text-text-muted">Type</span>
               <span className="text-text-primary font-medium">{game.is_official ? 'Official' : 'Community'}</span>
             </div>
+            {game.created_at && (
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-text-muted">Added</span>
+                <span className="text-text-primary font-medium">{timeAgo(game.created_at)}</span>
+              </div>
+            )}
             {game.description && (
               <div className="pt-1.5 mt-1.5 border-t border-border-primary">
                 <p className="text-[10px] text-text-muted line-clamp-3 leading-relaxed">{game.description}</p>

@@ -240,6 +240,27 @@ export async function getOfficialGames(): Promise<Experience[]> {
     } catch {}
   }
 
+  // Fetch live view counts from game_views table
+  if (games.length > 0) {
+    try {
+      const gameIds = games.map(g => g.id)
+      const { data: viewsData } = await supabase
+        .from('game_views')
+        .select('game_id')
+        .in('game_id', gameIds)
+
+      if (viewsData) {
+        const viewCounts = new Map<string, number>()
+        viewsData.forEach((v: any) => {
+          viewCounts.set(v.game_id, (viewCounts.get(v.game_id) || 0) + 1)
+        })
+        games.forEach(g => {
+          g.views_count = viewCounts.get(g.id) || 0
+        })
+      }
+    } catch {}
+  }
+
   return games
 }
 
@@ -321,6 +342,27 @@ export async function getApprovedCommunityGames(): Promise<Experience[]> {
         })
         games.forEach(g => {
           g.likes_count = likeCounts.get(g.id) || 0
+        })
+      }
+    } catch {}
+  }
+
+  // Fetch live view counts from game_views table
+  if (games.length > 0) {
+    try {
+      const gameIds = games.map(g => g.id)
+      const { data: viewsData } = await supabase
+        .from('game_views')
+        .select('game_id')
+        .in('game_id', gameIds)
+
+      if (viewsData) {
+        const viewCounts = new Map<string, number>()
+        viewsData.forEach((v: any) => {
+          viewCounts.set(v.game_id, (viewCounts.get(v.game_id) || 0) + 1)
+        })
+        games.forEach(g => {
+          g.views_count = viewCounts.get(g.id) || 0
         })
       }
     } catch {}

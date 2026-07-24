@@ -8,7 +8,7 @@ import ImagePicker from '@/components/ui/ImagePicker'
 import StarRating from '@/components/ui/StarRating'
 import { useStore } from '@/store/useStore'
 import type { Asset, Release } from '@/lib/types'
-import { cn } from '@/lib/utils'
+import { cn, timeAgo } from '@/lib/utils'
 import { useNavigate } from 'react-router-dom'
 import AdBanner from '@/components/AdBanner'
 import Gallery from '@/components/ui/Gallery'
@@ -278,6 +278,7 @@ function AssetCard({ asset, onClick }: { asset: Asset; onClick: () => void }) {
         <div className="flex items-center gap-2 mb-3">
           <StarRating rating={asset.rating || 0} count={asset.rating_count || 0} size={12} />
           <span className="text-xs text-text-muted flex items-center gap-1"><Download size={11} /> {asset.downloads_count || 0}</span>
+          {asset.created_at && <span className="text-xs text-text-dim">{timeAgo(asset.created_at)}</span>}
         </div>
         <div className="flex items-center justify-between">
           {isFree ? (

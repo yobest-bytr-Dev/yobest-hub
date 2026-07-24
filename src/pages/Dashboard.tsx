@@ -257,6 +257,7 @@ function GamesTab() {
                     <span>{game.price}</span>
                     <span>{formatNumber(game.views_count || 0)} views</span>
                     <span>{formatNumber(game.likes_count || 0)} likes</span>
+                    {game.created_at && <span className="text-text-dim">{new Date(game.created_at).toLocaleDateString()}</span>}
                   </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">

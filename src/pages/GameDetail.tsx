@@ -316,9 +316,11 @@ export default function GameDetail() {
                 <span className="flex items-center gap-1.5"><Heart size={14} /> {formatNumber(likes)} likes</span>
                 <span className="flex items-center gap-1.5"><Eye size={14} /> {formatNumber(siteViews)} views</span>
                 <span className="flex items-center gap-1.5"><MessageSquare size={14} /> {comments.length} comments</span>
-                {ytStats?.publishedAt && (
+                {ytStats?.publishedAt ? (
                   <span className="flex items-center gap-1.5"><Calendar size={14} /> {new Date(ytStats.publishedAt).toLocaleDateString()}</span>
-                )}
+                ) : game.created_at ? (
+                  <span className="flex items-center gap-1.5"><Calendar size={14} /> Added {new Date(game.created_at).toLocaleDateString()}</span>
+                ) : null}
               </div>
 
               {game.description && (

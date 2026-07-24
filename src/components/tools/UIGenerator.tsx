@@ -947,45 +947,51 @@ export default function UIGenerator() {
 
       const systemMsg = UI_SYSTEM_PROMPT + canvasContext + editInstruction
 
-      // ── Step 1: Try AI — proxy through ai-proxy edge function (Gemini BYOK) ──
+      // ── Step 1: Try AI — retry once before template fallback ──
       let parsed: any = null
 
-      try {
-        const controller = new AbortController()
-        const timeout = setTimeout(() => controller.abort(), 90000)
-        setAiStatus('Generating with AI...')
-        const payload = {
-          messages: [
-            { role: 'system', content: systemMsg },
-            { role: 'user', content: msg },
-          ],
-          temperature: 0.3,
-          max_tokens: 4000,
-        }
-        const r = await fetch(AI_PROXY, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-          signal: controller.signal,
-        })
-        clearTimeout(timeout)
-        const data = await r.json()
-        if (data.error) {
-          console.log(`AI proxy error:`, data.error)
-        } else {
-          const content = data.choices?.[0]?.message?.content || ''
-          if (content) {
-            try { parsed = JSON.parse(content) } catch {
-              const m = content.match(/\{[\s\S]*\}/)
-              if (m) try { parsed = JSON.parse(m[0]) } catch {}
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        if (parsed) break
+        try {
+          const controller = new AbortController()
+          const timeout = setTimeout(() => controller.abort(), 90000)
+          setAiStatus(attempt === 1 ? 'Generating with AI...' : 'Retrying AI...')
+          const payload = {
+            messages: [
+              { role: 'system', content: systemMsg },
+              { role: 'user', content: msg },
+            ],
+            temperature: 0.3,
+            max_tokens: 4000,
+          }
+          const r = await fetch(AI_PROXY, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            signal: controller.signal,
+          })
+          clearTimeout(timeout)
+          const data = await r.json()
+          if (data.error) {
+            console.log(`AI proxy attempt ${attempt} error:`, data.error)
+          } else {
+            const content = data.choices?.[0]?.message?.content || ''
+            if (content) {
+              try { parsed = JSON.parse(content) } catch {
+                const m = content.match(/\{[\s\S]*\}/)
+                if (m) try { parsed = JSON.parse(m[0]) } catch {}
+              }
+            }
+            if (parsed) {
+              parsed = normalizeCommands(parsed)
+              console.log(`Gemini model ${data.model || 'unknown'} succeeded on attempt ${attempt}`)
             }
           }
-          if (parsed) {
-            parsed = normalizeCommands(parsed)
-            console.log(`Gemini model ${data.model || 'unknown'} succeeded`)
-          }
+        } catch (e) {
+          console.log(`AI proxy attempt ${attempt} failed:`, e instanceof Error ? e.message : e)
         }
-      } catch (e) {
-        console.log(`AI proxy failed:`, e instanceof Error ? e.message : e)
+        if (!parsed && attempt === 1) {
+          await new Promise(r => setTimeout(r, 2000))
+        }
       }
 
       // ── Step 2: If AI failed, try edge function template fallback ──

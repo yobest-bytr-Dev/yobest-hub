@@ -26,40 +26,43 @@ serve(async (req) => {
     }
     if (!model) model = "gemini-2.5-flash"
 
-    let geminiKey = "";
+    // Build healthy key pool
+    let allKeys: string[] = []
 
-    // Try multi-key pool first
     const { data: keysRow } = await sb
       .from("bot_config")
       .select("value")
       .eq("key", "gemini_api_keys")
-      .maybeSingle();
+      .maybeSingle()
     if (keysRow?.value) {
       try {
-        const parsed = typeof keysRow.value === "string" ? JSON.parse(keysRow.value) : keysRow.value;
+        const parsed = typeof keysRow.value === "string" ? JSON.parse(keysRow.value) : keysRow.value
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const healthy = parsed.filter((k: any) => k.status !== "error");
-          const pool = healthy.length > 0 ? healthy : parsed;
-          const pick = pool[Math.floor(Math.random() * pool.length)];
-          if (pick?.key) geminiKey = pick.key;
+          const healthy = parsed.filter((k: any) => k.status !== "error" && k.key)
+          const pool = healthy.length > 0 ? healthy : parsed.filter((k: any) => k.key)
+          allKeys = [...pool].sort(() => Math.random() - 0.5).map((k: any) => k.key)
         }
       } catch {}
     }
 
     // Fallback to single key
-    if (!geminiKey) {
+    if (allKeys.length === 0) {
       const { data: row } = await sb
         .from("bot_config")
         .select("value")
         .eq("key", "gemini_api_key")
-        .maybeSingle();
-      if (row?.value) geminiKey = typeof row.value === "string" ? row.value.replace(/^"|"$/g, "") : String(row.value);
+        .maybeSingle()
+      if (row?.value) {
+        const v = typeof row.value === "string" ? row.value.replace(/^"|"$/g, "") : String(row.value)
+        if (v) allKeys = [v]
+      }
+    }
+    if (allKeys.length === 0) {
+      const envKey = Deno.env.get("GEMINI_API_KEY") ?? ""
+      if (envKey) allKeys = [envKey]
     }
 
-    // Env var
-    if (!geminiKey) geminiKey = Deno.env.get("GEMINI_API_KEY") ?? "";
-
-    if (!geminiKey) {
+    if (allKeys.length === 0) {
       throw new Error("No Gemini API key configured. Ask admin to add one in Admin > Settings.")
     }
 
@@ -125,86 +128,94 @@ That is the ONLY acceptable format. No headers. No separators. No bold. Just pla
       throw new Error("No user message provided")
     }
 
-    const geminiModels = ["gemini-2.5-flash", "gemini-2.5-flash-pro", "gemini-2.0-flash", "gemini-2.0-flash-lite"]
+    const geminiModels = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-2.0-flash-lite"]
     const modelsToTry = [model, ...geminiModels.filter((m) => m !== model)]
     let lastError = ""
 
-    for (const modelName of modelsToTry) {
-      try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:streamGenerateContent?alt=sse&key=${geminiKey}`
+    // Try every key × every model
+    for (const geminiKey of allKeys) {
+      for (const modelName of modelsToTry) {
+        try {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:streamGenerateContent?alt=sse&key=${geminiKey}`
 
-        const payload = {
-          contents,
-          systemInstruction: { parts: [{ text: systemPrompt }] },
-          generationConfig: { temperature: 0.7, maxOutputTokens: 8192 },
-        }
+          const payload = {
+            contents,
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            generationConfig: { temperature: 0.7, maxOutputTokens: 8192 },
+          }
 
-        const resp = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        })
+          const resp = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          })
 
-        if (!resp.ok) {
-          const errText = await resp.text()
-          lastError = `HTTP ${resp.status}: ${errText}`
-          console.log(`Gemini ${modelName} failed: ${lastError}`)
-          continue
-        }
+          if (!resp.ok) {
+            const errText = await resp.text()
+            lastError = `HTTP ${resp.status}: ${errText}`
+            console.log(`Key ...${geminiKey.slice(-4)} + ${modelName} failed: ${lastError}`)
+            // Rate limited or quota exceeded → try next key
+            if (lastError.includes("quota") || lastError.includes("rate")) {
+              break
+            }
+            // Other error → try next model same key
+            continue
+          }
 
-        // Transform Gemini SSE stream to OpenAI-compatible SSE stream
-        const encoder = new TextEncoder()
-        const decoder = new TextDecoder()
-        const stream = new ReadableStream({
-          async start(controller) {
-            try {
-              const reader = resp.body?.getReader()
-              if (!reader) { controller.close(); return }
+          // Transform Gemini SSE stream to OpenAI-compatible SSE stream
+          const encoder = new TextEncoder()
+          const decoder = new TextDecoder()
+          const stream = new ReadableStream({
+            async start(controller) {
+              try {
+                const reader = resp.body?.getReader()
+                if (!reader) { controller.close(); return }
 
-              let buffer = ""
-              while (true) {
-                const { done, value } = await reader.read()
-                if (done) break
-                buffer += decoder.decode(value, { stream: true })
-                const lines = buffer.split("\n")
-                buffer = lines.pop() || ""
+                let buffer = ""
+                while (true) {
+                  const { done, value } = await reader.read()
+                  if (done) break
+                  buffer += decoder.decode(value, { stream: true })
+                  const lines = buffer.split("\n")
+                  buffer = lines.pop() || ""
 
-                for (const line of lines) {
-                  if (line.startsWith("data: ")) {
-                    try {
-                      const data = JSON.parse(line.slice(6))
-                      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text
-                      if (text) {
-                        const chunk = JSON.stringify({ choices: [{ delta: { content: text } }] })
-                        controller.enqueue(encoder.encode(`data: ${chunk}\n\n`))
-                      }
-                    } catch {}
+                  for (const line of lines) {
+                    if (line.startsWith("data: ")) {
+                      try {
+                        const data = JSON.parse(line.slice(6))
+                        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text
+                        if (text) {
+                          const chunk = JSON.stringify({ choices: [{ delta: { content: text } }] })
+                          controller.enqueue(encoder.encode(`data: ${chunk}\n\n`))
+                        }
+                      } catch {}
+                    }
                   }
                 }
+                controller.enqueue(encoder.encode("data: [DONE]\n\n"))
+                controller.close()
+              } catch (e) {
+                controller.error(e)
               }
-              controller.enqueue(encoder.encode("data: [DONE]\n\n"))
-              controller.close()
-            } catch (e) {
-              controller.error(e)
-            }
-          },
-        })
+            },
+          })
 
-        return new Response(stream, {
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "text/event-stream",
-            "Cache-Control": "no-cache",
-            Connection: "keep-alive",
-          },
-        })
-      } catch (e) {
-        lastError = e instanceof Error ? e.message : "Unknown error"
-        console.log(`Gemini ${modelName} error: ${lastError}`)
+          return new Response(stream, {
+            headers: {
+              ...corsHeaders,
+              "Content-Type": "text/event-stream",
+              "Cache-Control": "no-cache",
+              Connection: "keep-alive",
+            },
+          })
+        } catch (e) {
+          lastError = e instanceof Error ? e.message : "Unknown error"
+          console.log(`Key ...${geminiKey.slice(-4)} + ${modelName} error: ${lastError}`)
+        }
       }
     }
 
-    throw new Error(`All Gemini models failed. Last error: ${lastError}`)
+    throw new Error(`All Gemini models failed with all keys. Last error: ${lastError}`)
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error"
     return new Response(

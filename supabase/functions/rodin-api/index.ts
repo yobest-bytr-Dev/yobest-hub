@@ -2,64 +2,64 @@ import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 
 const RODIN_KEY = "vibecoding";
 
-async function getGeminiKey(): Promise<string> {
+async function getGeminiKeys(): Promise<string[]> {
   try {
     const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2.39.3");
     const sb = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
-    // Try multi-key pool
     const { data: keysRow } = await sb.from("bot_config").select("value").eq("key", "gemini_api_keys").maybeSingle();
     if (keysRow?.value) {
       try {
         const parsed = typeof keysRow.value === "string" ? JSON.parse(keysRow.value) : keysRow.value;
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const healthy = parsed.filter((k: any) => k.status !== "error");
-          const pool = healthy.length > 0 ? healthy : parsed;
-          const pick = pool[Math.floor(Math.random() * pool.length)];
-          if (pick?.key) return pick.key;
+          const healthy = parsed.filter((k: any) => k.status !== "error" && k.key);
+          if (healthy.length > 0) return [...healthy].sort(() => Math.random() - 0.5).map((k: any) => k.key);
+          const all = parsed.filter((k: any) => k.key);
+          return all.sort(() => Math.random() - 0.5).map((k: any) => k.key);
         }
       } catch {}
     }
-    // Fallback to single key
     const { data: singleRow } = await sb.from("bot_config").select("value").eq("key", "gemini_api_key").maybeSingle();
     if (singleRow?.value) {
       const v = typeof singleRow.value === "string" ? singleRow.value.replace(/^"|"$/g, "") : String(singleRow.value);
-      if (v) return v;
+      if (v) return [v];
     }
   } catch {}
-  // Env var
-  return Deno.env.get("GEMINI_API_KEY") ?? "";
+  const envKey = Deno.env.get("GEMINI_API_KEY") ?? "";
+  return envKey ? [envKey] : [];
 }
 
 async function callGemini(systemPrompt: string, userContent: string, maxTokens = 500, temperature = 0.7): Promise<string> {
-  const key = await getGeminiKey();
-  if (!key) throw new Error("No Gemini API key configured");
-  const models = ["gemini-2.5-flash", "gemini-2.5-flash-pro", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
+  const keys = await getGeminiKeys();
+  if (keys.length === 0) throw new Error("No Gemini API key configured");
+  const models = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
   let lastError = "";
-  for (const model of models) {
-    try {
-      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: userContent }] }],
-          systemInstruction: { parts: [{ text: systemPrompt }] },
-          generationConfig: { temperature, maxOutputTokens: maxTokens },
-        }),
-      });
-      const data = await resp.json();
-      if (!resp.ok) {
-        lastError = data?.error?.message || `HTTP ${resp.status}`;
-        if (lastError.includes("quota") || lastError.includes("rate")) continue;
-        throw new Error(lastError);
+  for (const key of keys) {
+    for (const model of models) {
+      try {
+        const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ role: "user", parts: [{ text: userContent }] }],
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            generationConfig: { temperature, maxOutputTokens: maxTokens },
+          }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+          lastError = data?.error?.message || `HTTP ${resp.status}`;
+          if (lastError.includes("quota") || lastError.includes("rate")) break; // try next key
+          continue; // try next model
+        }
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) return text;
+        lastError = "Empty response";
+      } catch (e) {
+        lastError = e instanceof Error ? e.message : "Unknown error";
       }
-      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (text) return text;
-      lastError = "Empty response";
-    } catch (e) {
-      lastError = e instanceof Error ? e.message : "Unknown error";
     }
   }
-  throw new Error(`All models failed. Last: ${lastError}`);
+  throw new Error(`All models failed with all keys. Last: ${lastError}`);
 }
 
 const corsHeaders = {
@@ -708,27 +708,20 @@ Output ONLY the JSON. No markdown. No explanation.` + EDIT_INSTRUCTION;
         console.log("Force template mode for:", userMsg);
         parsed = generateFromTemplate(userMsg);
       } else {
-        // Try AI model — single model with generous timeout
-        // Free OpenRouter models can take 30-90s. Edge function limit is 150s.
-        // We try Gemini models for server-side AI fallback
-        const geminiKey = await getGeminiKey();
-        if (geminiKey) {
-          try {
-            const aiContent = await callGemini(SYSTEM_PROMPT + canvasContext, userMsg, 2000, 0.2);
-            if (aiContent) {
-              try { parsed = JSON.parse(aiContent); } catch {
-                const m = aiContent.match(/\{[\s\S]*\}/);
-                if (m) try { parsed = JSON.parse(m[0]); } catch {}
-              }
-              if (parsed) parsed = normalizeCommands(parsed);
+        // Try AI model — multi-key Gemini with fallback
+        try {
+          const aiContent = await callGemini(SYSTEM_PROMPT + canvasContext, userMsg, 2000, 0.2);
+          if (aiContent) {
+            try { parsed = JSON.parse(aiContent); } catch {
+              const m = aiContent.match(/\{[\s\S]*\}/);
+              if (m) try { parsed = JSON.parse(m[0]); } catch {}
             }
-          } catch (e) {
-            console.log("Gemini server-side AI failed:", e instanceof Error ? e.message : e);
+            if (parsed) parsed = normalizeCommands(parsed);
           }
-        } else {
-          console.log("No Gemini key configured, skipping server-side AI");
+        } catch (e) {
+          console.log("Gemini server-side AI failed:", e instanceof Error ? e.message : e);
         }
-      } // end else (AI attempt)
+      } // end AI attempt
 
       // Validate: commands MUST be an array with valid actions
       const isValid = parsed

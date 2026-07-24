@@ -6,9 +6,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const FALLBACK_MODELS = ["gemini-2.5-flash", "gemini-2.5-flash-pro", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
+const FALLBACK_MODELS = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
 
-async function getRandomKey(sb: any): Promise<string> {
+async function getHealthyKeys(sb: any): Promise<string[]> {
   const { data: keysRow } = await sb
     .from("bot_config")
     .select("value")
@@ -19,14 +19,20 @@ async function getRandomKey(sb: any): Promise<string> {
     try {
       const parsed = typeof keysRow.value === "string" ? JSON.parse(keysRow.value) : keysRow.value;
       if (Array.isArray(parsed) && parsed.length > 0) {
-        const healthy = parsed.filter((k: any) => k.status !== "error");
-        const pool = healthy.length > 0 ? healthy : parsed;
-        const pick = pool[Math.floor(Math.random() * pool.length)];
-        if (pick?.key) return pick.key;
+        const healthy = parsed.filter((k: any) => k.status !== "error" && k.key);
+        if (healthy.length > 0) {
+          // Shuffle healthy keys for random distribution
+          const shuffled = [...healthy].sort(() => Math.random() - 0.5);
+          return shuffled.map((k: any) => k.key);
+        }
+        // Fallback: try all keys if none marked healthy
+        const all = parsed.filter((k: any) => k.key);
+        return all.sort(() => Math.random() - 0.5).map((k: any) => k.key);
       }
     } catch {}
   }
 
+  // Fallback to single key
   const { data: singleRow } = await sb
     .from("bot_config")
     .select("value")
@@ -34,14 +40,15 @@ async function getRandomKey(sb: any): Promise<string> {
     .maybeSingle();
   if (singleRow?.value) {
     const v = typeof singleRow.value === "string" ? singleRow.value.replace(/^"|"$/g, "") : String(singleRow.value);
-    if (v) return v;
+    if (v) return [v];
   }
 
-  return Deno.env.get("GEMINI_API_KEY") ?? "";
+  const envKey = Deno.env.get("GEMINI_API_KEY") ?? "";
+  return envKey ? [envKey] : [];
 }
 
 async function testSingleKey(key: string): Promise<{ ok: boolean; error?: string; models?: string }> {
-  const testModels = ["gemini-2.5-flash", "gemini-2.5-flash-pro", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
+  const testModels = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
   for (const model of testModels) {
     try {
       const resp = await fetch(
@@ -112,12 +119,14 @@ serve(async (req: Request): Promise<Response> => {
     // ── Normal chat completion request ──────────────────────────────
     const { messages, model: reqModel, temperature = 0.3, max_tokens = 4000, api_key: directKey } = body;
 
-    let geminiKey = directKey || "";
-    if (!geminiKey) {
-      geminiKey = await getRandomKey(sb);
+    let keysToTry: string[] = [];
+    if (directKey) {
+      keysToTry = [directKey];
+    } else {
+      keysToTry = await getHealthyKeys(sb);
     }
 
-    if (!geminiKey) {
+    if (keysToTry.length === 0) {
       return new Response(
         JSON.stringify({ error: "No Gemini API key configured. Add keys in Admin > Settings." }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
@@ -158,57 +167,66 @@ serve(async (req: Request): Promise<Response> => {
     const modelsToTry = model ? [model, ...FALLBACK_MODELS.filter((m) => m !== model)] : FALLBACK_MODELS;
     let lastError = "";
 
-    for (const modelName of modelsToTry) {
-      try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiKey}`;
+    // Try every key × every model combination
+    for (const key of keysToTry) {
+      for (const modelName of modelsToTry) {
+        try {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`;
 
-        const payload: any = {
-          contents,
-          generationConfig: {
-            temperature,
-            maxOutputTokens: max_tokens,
-          },
-        };
+          const payload: any = {
+            contents,
+            generationConfig: {
+              temperature,
+              maxOutputTokens: max_tokens,
+            },
+          };
 
-        if (systemInstruction) {
-          payload.systemInstruction = { parts: [{ text: systemInstruction }] };
+          if (systemInstruction) {
+            payload.systemInstruction = { parts: [{ text: systemInstruction }] };
+          }
+
+          const resp = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+          const data = await resp.json();
+
+          if (!resp.ok) {
+            lastError = data?.error?.message || `HTTP ${resp.status}`;
+            // If rate limited or quota exceeded, try next key
+            if (lastError.includes("quota") || lastError.includes("rate")) {
+              console.log(`Key ...${key.slice(-4)} + ${modelName} rate limited, trying next...`);
+              break; // break inner loop, try next key
+            }
+            // For other errors (invalid key, etc.), try next model with same key
+            console.log(`Gemini ${modelName} failed: ${lastError}`);
+            continue;
+          }
+
+          const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (!text) {
+            lastError = "Empty response from Gemini";
+            continue;
+          }
+
+          return new Response(
+            JSON.stringify({
+              choices: [{ message: { content: text } }],
+              model: modelName,
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        } catch (e) {
+          lastError = e instanceof Error ? e.message : "Unknown error";
+          console.log(`Gemini ${modelName} error: ${lastError}`);
         }
-
-        const resp = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-
-        const data = await resp.json();
-
-        if (!resp.ok) {
-          lastError = data?.error?.message || `HTTP ${resp.status}`;
-          console.log(`Gemini ${modelName} failed: ${lastError}`);
-          continue;
-        }
-
-        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!text) {
-          lastError = "Empty response from Gemini";
-          continue;
-        }
-
-        return new Response(
-          JSON.stringify({
-            choices: [{ message: { content: text } }],
-            model: modelName,
-          }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      } catch (e) {
-        lastError = e instanceof Error ? e.message : "Unknown error";
-        console.log(`Gemini ${modelName} error: ${lastError}`);
       }
     }
 
     return new Response(
-      JSON.stringify({ error: `All Gemini models failed. Last error: ${lastError}` }),
+      JSON.stringify({ error: `All Gemini models failed with all keys. Last error: ${lastError}` }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
     );
   } catch (err) {

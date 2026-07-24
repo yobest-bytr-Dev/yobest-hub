@@ -1345,7 +1345,7 @@ function SettingsTab() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {[
             { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', desc: 'Best balance of speed & quality', badge: 'Recommended' },
-            { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', desc: 'Best quality, slower', badge: 'Smart' },
+            { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite', desc: 'Ultra-fast, basic quality', badge: '' },
             { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', desc: 'Fast, reliable', badge: '' },
             { id: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash Lite', desc: 'Ultra-fast, basic quality', badge: '' },
           ].map((m) => (

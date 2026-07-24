@@ -1121,7 +1121,7 @@ function SettingsTab() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: [{ role: 'user', content: 'Say OK' }],
-          model: 'gemini-2.0-flash',
+          model: 'gemini-2.5-flash',
           max_tokens: 10,
           api_key: k.key,
         }),

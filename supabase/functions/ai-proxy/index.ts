@@ -6,7 +6,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const FALLBACK_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
+const FALLBACK_MODELS = ["gemini-2.5-flash", "gemini-2.5-flash-pro", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
 
 async function getRandomKey(sb: any): Promise<string> {
   const { data: keysRow } = await sb
@@ -41,7 +41,7 @@ async function getRandomKey(sb: any): Promise<string> {
 }
 
 async function testSingleKey(key: string): Promise<{ ok: boolean; error?: string; models?: string }> {
-  const testModels = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-2.0-flash-lite"];
+  const testModels = ["gemini-2.5-flash", "gemini-2.5-flash-pro", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
   for (const model of testModels) {
     try {
       const resp = await fetch(

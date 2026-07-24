@@ -125,7 +125,7 @@ That is the ONLY acceptable format. No headers. No separators. No bold. Just pla
       throw new Error("No user message provided")
     }
 
-    const geminiModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"]
+    const geminiModels = ["gemini-2.5-flash", "gemini-2.5-flash-pro", "gemini-2.0-flash", "gemini-2.0-flash-lite"]
     const modelsToTry = [model, ...geminiModels.filter((m) => m !== model)]
     let lastError = ""
 

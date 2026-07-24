@@ -33,18 +33,33 @@ async function getGeminiKey(): Promise<string> {
 async function callGemini(systemPrompt: string, userContent: string, maxTokens = 500, temperature = 0.7): Promise<string> {
   const key = await getGeminiKey();
   if (!key) throw new Error("No Gemini API key configured");
-  const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: userContent }] }],
-      systemInstruction: { parts: [{ text: systemPrompt }] },
-      generationConfig: { temperature, maxOutputTokens: maxTokens },
-    }),
-  });
-  const data = await resp.json();
-  if (!resp.ok) throw new Error(data?.error?.message || `HTTP ${resp.status}`);
-  return data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  const models = ["gemini-2.5-flash", "gemini-2.5-flash-pro", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
+  let lastError = "";
+  for (const model of models) {
+    try {
+      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: userContent }] }],
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          generationConfig: { temperature, maxOutputTokens: maxTokens },
+        }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        lastError = data?.error?.message || `HTTP ${resp.status}`;
+        if (lastError.includes("quota") || lastError.includes("rate")) continue;
+        throw new Error(lastError);
+      }
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (text) return text;
+      lastError = "Empty response";
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : "Unknown error";
+    }
+  }
+  throw new Error(`All models failed. Last: ${lastError}`);
 }
 
 const corsHeaders = {
@@ -745,28 +760,7 @@ Output ONLY the JSON. No markdown. No explanation.` + EDIT_INSTRUCTION;
           status: 400,
         });
       }
-      // Try Unsplash with API key, fall back to curated Picsum seeds
-      try {
-        const resp = await fetch(
-          `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=12&orientation=landscape`,
-          { headers: { Authorization: `Client-ID ${OPENROUTER_KEY}` } }
-        );
-        if (resp.ok) {
-          const data = await resp.json();
-          const images = (data.results || []).map((img: any) => ({
-            url: img.urls?.small || img.urls?.regular,
-            full: img.urls?.full,
-            thumb: img.urls?.thumb,
-            alt: img.alt_description || query,
-            author: img.user?.name || "Unknown",
-            width: img.width,
-            height: img.height,
-          }));
-          return new Response(JSON.stringify({ images, source: "unsplash" }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-      } catch {}
+      // Curated Picsum seeds for image search (Unsplash removed — no key)
       // Fallback: curated Picsum with varied seeds based on query
       const queryWords = query.toLowerCase().split(/\s+/);
       const seeds = [

@@ -947,15 +947,15 @@ export default function UIGenerator() {
 
       const systemMsg = UI_SYSTEM_PROMPT + canvasContext + editInstruction
 
-      // ── Step 1: Try AI — retry once before template fallback ──
+      // ── Step 1: Try AI proxy — up to 3 attempts with increasing delay ──
       let parsed: any = null
 
-      for (let attempt = 1; attempt <= 2; attempt++) {
+      for (let attempt = 1; attempt <= 3; attempt++) {
         if (parsed) break
         try {
           const controller = new AbortController()
-          const timeout = setTimeout(() => controller.abort(), 90000)
-          setAiStatus(attempt === 1 ? 'Generating with AI...' : 'Retrying AI...')
+          const timeout = setTimeout(() => controller.abort(), 120000)
+          setAiStatus(attempt === 1 ? 'Generating with AI...' : attempt === 2 ? 'Retrying AI (attempt 2)...' : 'Retrying AI (attempt 3)...')
           const payload = {
             messages: [
               { role: 'system', content: systemMsg },
@@ -989,14 +989,40 @@ export default function UIGenerator() {
         } catch (e) {
           console.log(`AI proxy attempt ${attempt} failed:`, e instanceof Error ? e.message : e)
         }
-        if (!parsed && attempt === 1) {
-          await new Promise(r => setTimeout(r, 2000))
+        if (!parsed && attempt < 3) {
+          await new Promise(r => setTimeout(r, attempt * 2000))
         }
       }
 
-      // ── Step 2: If AI failed, try edge function template fallback ──
+      // ── Step 2: If AI proxy failed, try backup AI via rodin-api (server-side Gemini) ──
       if (!parsed || !parsed.commands?.length) {
-        console.log('AI failed, trying edge template fallback')
+        console.log('AI proxy failed, trying backup AI via rodin-api')
+        setAiStatus('Trying backup AI...')
+        try {
+          const backupController = new AbortController()
+          const backupTimeout = setTimeout(() => backupController.abort(), 120000)
+          const backupResp = await fetch(CHAT_API, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ messages: [{ role: 'user', content: msg }], canvas_state: cs }),
+            signal: backupController.signal,
+          })
+          clearTimeout(backupTimeout)
+          if (backupResp.ok) {
+            const backupData = await backupResp.json()
+            if (backupData?.commands?.length) {
+              parsed = backupData
+              console.log('Backup AI via rodin-api succeeded')
+            }
+          }
+        } catch (e) {
+          console.log('Backup AI via rodin-api failed:', e instanceof Error ? e.message : e)
+        }
+      }
+
+      // ── Step 3: If backup AI also failed, try edge function template fallback ──
+      if (!parsed || !parsed.commands?.length) {
+        console.log('All AI failed, trying edge template fallback')
+        setAiStatus('Using template fallback...')
         try {
           const tmplResp = await fetch(CHAT_API, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1010,9 +1036,10 @@ export default function UIGenerator() {
         }
       }
 
-      // ── Step 3: If edge function also failed, use LOCAL client-side template ──
+      // ── Step 4: If everything failed, use LOCAL client-side template ──
       if (!parsed || !parsed.commands?.length) {
         console.log('Using local template fallback')
+        setAiStatus('Using local template...')
         parsed = localTemplateFallback(msg)
       }
 

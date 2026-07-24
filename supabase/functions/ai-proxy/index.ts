@@ -127,10 +127,26 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     if (keysToTry.length === 0) {
-      return new Response(
-        JSON.stringify({ error: "No Gemini API key configured. Add keys in Admin > Settings." }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
-      );
+      // Last resort: try ALL keys including broken ones
+      const { data: allKeysRow } = await sb
+        .from("bot_config")
+        .select("value")
+        .eq("key", "gemini_api_keys")
+        .maybeSingle();
+      if (allKeysRow?.value) {
+        try {
+          const parsed = typeof allKeysRow.value === "string" ? JSON.parse(allKeysRow.value) : allKeysRow.value;
+          if (Array.isArray(parsed)) {
+            keysToTry = [...parsed].sort(() => Math.random() - 0.5).map((k: any) => k.key).filter(Boolean);
+          }
+        } catch {}
+      }
+      if (keysToTry.length === 0) {
+        return new Response(
+          JSON.stringify({ error: "No Gemini API key configured. Add keys in Admin > Settings." }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+        );
+      }
     }
 
     let model = reqModel || "";

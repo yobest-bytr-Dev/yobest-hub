@@ -13,8 +13,9 @@ async function getGeminiKeys(): Promise<string[]> {
         if (Array.isArray(parsed) && parsed.length > 0) {
           const healthy = parsed.filter((k: any) => k.status !== "error" && k.key);
           if (healthy.length > 0) return [...healthy].sort(() => Math.random() - 0.5).map((k: any) => k.key);
+          // Last resort: try all keys including broken ones
           const all = parsed.filter((k: any) => k.key);
-          return all.sort(() => Math.random() - 0.5).map((k: any) => k.key);
+          if (all.length > 0) return [...all].sort(() => Math.random() - 0.5).map((k: any) => k.key);
         }
       } catch {}
     }
@@ -715,7 +716,7 @@ Output ONLY the JSON. No markdown. No explanation.` + EDIT_INSTRUCTION;
       } else {
         // Try AI model — multi-key Gemini with fallback
         try {
-          const aiContent = await callGemini(SYSTEM_PROMPT + canvasContext, userMsg, 2000, 0.2);
+          const aiContent = await callGemini(SYSTEM_PROMPT + canvasContext, userMsg, 4000, 0.2);
           if (aiContent) {
             try { parsed = JSON.parse(aiContent); } catch {
               const m = aiContent.match(/\{[\s\S]*\}/);

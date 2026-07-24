@@ -640,6 +640,7 @@ export default function UIGenerator() {
   const [dragData, setDragData] = useState<{ sx: number; sy: number; ox: number; oy: number; startX: number; startY: number } | null>(null)
   const [resizing, setResizing] = useState(false)
   const [resizeData, setResizeData] = useState<{ sx: number; sy: number; ow: number; oh: number; corner: string } | null>(null)
+  const [canvasDragOver, setCanvasDragOver] = useState(false)
 
   // History
   const [hist, setHist] = useState<UIEl[][]>([[]])
@@ -650,6 +651,49 @@ export default function UIGenerator() {
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
   useEffect(() => { localStorage.setItem('ui-instant-build', String(instantBuild)) }, [instantBuild])
+
+  // ─── Auto-normalize ZIndex: parents behind children, backgrounds behind interactive ───
+  useEffect(() => {
+    if (elements.length === 0) return
+    setElements(prev => {
+      const elMap = new Map(prev.map(e => [e.id, { ...e }]))
+      const depthCache = new Map<string, number>()
+      const getDepth = (id: string): number => {
+        if (depthCache.has(id)) return depthCache.get(id)!
+        const el = elMap.get(id)
+        if (!el || !el.parentId) { depthCache.set(id, 0); return 0 }
+        const d = 1 + getDepth(el.parentId)
+        depthCache.set(id, d)
+        return d
+      }
+      for (const id of elMap.keys()) getDepth(id)
+      // Type priority: backgrounds lowest, panels mid, interactive highest
+      const typePriority: Record<string, number> = {
+        Frame: 1, ImageLabel: 2, ScrollingFrame: 3,
+        TextLabel: 5, TextButton: 10, TextBox: 10,
+      }
+      const depthCounters = new Map<number, number>()
+      const sorted = [...prev].sort((a, b) => {
+        const da = getDepth(a.id), db = getDepth(b.id)
+        if (da !== db) return da - db
+        const pa = a.parentId || '', pb = b.parentId || ''
+        if (pa !== pb) return pa.localeCompare(pb)
+        const pa2 = (typePriority[a.type] || 5), pb2 = (typePriority[b.type] || 5)
+        if (pa2 !== pb2) return pa2 - pb2
+        return (a.props.LayoutOrder || 0) - (b.props.LayoutOrder || 0)
+      })
+      let changed = false
+      for (const el of sorted) {
+        const depth = getDepth(el.id)
+        const counter = (depthCounters.get(depth) || 0) + 1
+        depthCounters.set(depth, counter)
+        const newZ = depth * 100 + counter
+        if (elMap.get(el.id)!.zIndex !== newZ) changed = true
+        elMap.get(el.id)!.zIndex = newZ
+      }
+      return changed ? [...elMap.values()] : prev
+    })
+  }, [elements.length, elements.map(e => `${e.id}:${e.parentId}:${e.type}`).join(',')])
 
   const pushHist = useCallback((els: UIEl[]) => {
     setHist(h => [...h.slice(0, histIdx + 1), els])
@@ -1270,6 +1314,11 @@ export default function UIGenerator() {
   // ─── Element Style ───
   function elStyle(el: UIEl, isHoveredContainer = false): React.CSSProperties {
     const p = el.props
+    // Compute depth for z-index: root=0, child=1, grandchild=2...
+    let depth = 0
+    let cur: UIEl | undefined = el
+    while (cur?.parentId) { depth++; cur = elements.find(e => e.id === cur!.parentId) }
+    const depthZ = depth * 100 + (el.zIndex || 1)
     return {
       position: 'absolute', left: `${el.position.X * 100}%`, top: `${el.position.Y * 100}%`,
       width: `${el.size.X * 100}%`, height: `${el.size.Y * 100}%`,
@@ -1277,20 +1326,27 @@ export default function UIGenerator() {
       backgroundColor: (p.BackgroundTransparency ?? 0) >= 1 ? 'transparent' : parseColor(p.BackgroundColor3),
       borderRadius: p.CornerRadius || 0,
       border: p.BorderSizePixel > 0 ? `${p.BorderSizePixel}px solid ${parseColor(p.BorderColor3)}` : undefined,
-      zIndex: el.zIndex || 1, overflow: el.type === 'ScrollingFrame' ? 'auto' : 'hidden',
-      opacity: el.visible ? 1 : 0.3, outline: selectedId === el.id ? '2px solid #3b82f6' : undefined,
+      zIndex: depthZ,
+      overflow: el.type === 'ScrollingFrame' ? 'auto' : 'visible',
+      opacity: el.visible ? 1 : 0.3,
+      outline: selectedId === el.id ? '2px solid #3b82f6' : undefined,
       outlineOffset: '1px',
     }
   }
 
   function childStyle(el: UIEl): React.CSSProperties {
     const p = el.props
+    // Children always render above their parent
+    let depth = 0
+    let cur: UIEl | undefined = el
+    while (cur?.parentId) { depth++; cur = elements.find(e => e.id === cur!.parentId) }
+    const depthZ = depth * 100 + (el.zIndex || 1)
     return {
       position: 'absolute', left: `${el.position.X * 100}%`, top: `${el.position.Y * 100}%`,
       width: `${el.size.X * 100}%`, height: `${el.size.Y * 100}%`,
       transform: 'translate(-50%, -50%)',
       backgroundColor: (p.BackgroundTransparency ?? 0) >= 1 ? 'transparent' : parseColor(p.BackgroundColor3),
-      borderRadius: p.CornerRadius || 0, zIndex: el.zIndex || 1, overflow: 'hidden',
+      borderRadius: p.CornerRadius || 0, zIndex: depthZ, overflow: 'visible',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       border: p.BorderSizePixel > 0 ? `${p.BorderSizePixel}px solid ${parseColor(p.BorderColor3)}` : undefined,
     }
@@ -1487,7 +1543,7 @@ export default function UIGenerator() {
   const selectedLayout = selected?.layout || 'none'
 
   return (
-    <div className="flex flex-col rounded-2xl bg-bg-secondary border border-border-primary overflow-hidden" style={{ height: '75vh', minHeight: 650 }}>
+    <div className="flex flex-col rounded-2xl bg-bg-secondary border border-border-primary overflow-hidden shadow-2xl shadow-black/20" style={{ height: '75vh', minHeight: 650 }}>
 
       {/* ─── Top Bar ─── */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-border-primary bg-bg-elevated/80">
@@ -1650,9 +1706,21 @@ export default function UIGenerator() {
         )}
 
         {/* ─── Canvas ─── */}
-        <div className="flex-1 overflow-hidden bg-[#08080c] relative"
+        <div className="flex-1 overflow-hidden relative"
+          style={{ background: 'radial-gradient(ellipse at center, #0f0f1a 0%, #08080c 70%)', cursor: isPanning ? 'grabbing' : 'default' }}
           onMouseDown={(e) => { if (e.target === e.currentTarget) setSelectedId(null); handleCanvasDown(e) }} onMouseMove={handleCanvasMove} onMouseUp={handleCanvasUp} onMouseLeave={handleCanvasUp}
-          style={{ cursor: isPanning ? 'grabbing' : 'default' }}>
+          onDragOver={e => { e.preventDefault(); e.stopPropagation(); setCanvasDragOver(true) }}
+          onDragLeave={e => { e.preventDefault(); setCanvasDragOver(false) }}
+          onDrop={e => { e.preventDefault(); e.stopPropagation(); setCanvasDragOver(false); const files = e.dataTransfer.files; if (files.length > 0) { const f = files[0]; if (f.type.startsWith('image/')) { const reader = new FileReader(); reader.onload = () => setAttachedImage(reader.result as string); reader.readAsDataURL(f) } } }}>
+          {canvasDragOver && (
+            <div className="absolute inset-0 z-50 flex items-center justify-center bg-accent-blue/10 backdrop-blur-sm border-2 border-dashed border-accent-blue/40 rounded-lg pointer-events-none transition-all">
+              <div className="flex flex-col items-center gap-2 px-6 py-4 rounded-xl bg-bg-elevated/90 border border-accent-blue/20 shadow-xl">
+                <ImageIcon className="h-8 w-8 text-accent-blue" />
+                <p className="text-xs font-medium text-accent-blue">Drop image here</p>
+                <p className="text-[10px] text-text-dim">Will be used in AI generation</p>
+              </div>
+            </div>
+          )}
           <div ref={canvasRef} className="absolute" style={{
             width: cw, height: ch,
             left: `calc(50% + ${pan.x}px)`, top: `calc(50% + ${pan.y}px)`,
@@ -1666,7 +1734,7 @@ export default function UIGenerator() {
               }} />
             )}
             {/* Screen */}
-            <div className="absolute inset-0 rounded-lg border border-white/5 shadow-2xl overflow-hidden" style={{ backgroundColor: canvasBg }}>
+            <div className="absolute inset-0 rounded-xl shadow-2xl" style={{ backgroundColor: canvasBg, boxShadow: '0 0 60px rgba(99,102,241,0.08), 0 25px 50px rgba(0,0,0,0.5)' }}>
               {/* Recursive element renderer */}
               {(() => {
                 const renderEl = (el: UIEl, isChild = false): React.ReactNode => {
@@ -1708,6 +1776,8 @@ export default function UIGenerator() {
                         borderStyle: isContainer ? 'dashed' : style.borderStyle,
                         outline: selectedId === el.id ? '2px solid #3b82f6' : style.outline,
                         outlineOffset: '2px',
+                        boxShadow: selectedId === el.id ? '0 0 12px rgba(59,130,246,0.2)' : (el.type === 'TextButton' ? '0 2px 8px rgba(0,0,0,0.3)' : undefined),
+                        transition: 'box-shadow 0.15s ease',
                       }}
                       className={cn('cursor-pointer select-none group', isBuilding && 'el-building', isContainer && 'hover:ring-1 hover:ring-white/10')}
                       onClick={(e) => { e.stopPropagation(); setSelectedId(el.id) }}
@@ -1716,7 +1786,7 @@ export default function UIGenerator() {
                       {childEls.map(child => renderEl(child, true))}
                       {/* Hover label */}
                       {selectedId !== el.id && (
-                        <div className="absolute -top-5 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded text-[8px] font-mono bg-black/80 text-white/70 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                        <div className="absolute -top-5 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded-md text-[8px] font-mono bg-black/80 backdrop-blur-sm text-white/70 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 border border-white/5">
                           {el.name} ({el.type})
                         </div>
                       )}
@@ -1749,7 +1819,7 @@ export default function UIGenerator() {
                         </div>
                       )}
                       {(el.type === 'TextLabel' || el.type === 'TextButton' || el.type === 'TextBox') && childEls.length === 0 && (
-                        <span style={{ color: parseColor(el.props.TextColor3), fontSize: el.props.TextScaled ? undefined : (el.props.TextSize || 14), textAlign: el.props.TextXAlignment === 'Left' ? 'left' : el.props.TextXAlignment === 'Right' ? 'right' : 'center' }} className="px-2 font-bold truncate w-full block">{el.props.Text || (el.type === 'TextBox' ? 'Input...' : 'Text')}</span>
+                        <span style={{ color: parseColor(el.props.TextColor3), fontSize: el.props.TextScaled ? undefined : (el.props.TextSize || 14), textAlign: el.props.TextXAlignment === 'Left' ? 'left' : el.props.TextXAlignment === 'Right' ? 'right' : 'center', textShadow: el.type === 'TextButton' ? '0 1px 3px rgba(0,0,0,0.4)' : undefined }} className="px-2 font-bold truncate w-full block">{el.props.Text || (el.type === 'TextBox' ? 'Input...' : 'Text')}</span>
                       )}
                       {el.type === 'ImageLabel' && el.props.Image && childEls.length === 0 && (
                         <img src={el.props.Image} alt="" className="w-full h-full object-cover" style={{ opacity: 1 - (el.props.ImageTransparency || 0) }} />
@@ -1797,7 +1867,7 @@ export default function UIGenerator() {
         </div>
 
         {/* ─── Right Panel: Properties + Chat/Templates ─── */}
-        <div className="w-[320px] border-l border-border-primary flex flex-col bg-bg-primary/30">
+        <div className="w-[320px] border-l border-border-primary flex flex-col bg-bg-primary/50 backdrop-blur-sm">
           {/* Properties */}
           {selected && showProps && (
             <div className="border-b border-border-primary max-h-[45%] overflow-y-auto">
@@ -2044,25 +2114,37 @@ export default function UIGenerator() {
                 </div>
                 <div className="px-3 pb-2 pt-1 border-t border-border-primary">
                   {attachedImage && (
-                    <div className="mb-1.5 flex items-center gap-2 bg-bg-tertiary rounded-md px-2 py-1">
-                      <img src={attachedImage} alt="Attached" className="h-8 w-8 rounded object-cover border border-border-primary" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                      <span className="text-[9px] text-text-dim truncate flex-1">{attachedImage}</span>
-                      <button onClick={() => setAttachedImage('')} className="text-text-dim hover:text-red-400"><X className="h-3 w-3" /></button>
+                    <div className="mb-1.5 flex items-center gap-2 bg-bg-tertiary/80 rounded-lg px-2.5 py-1.5 border border-accent-blue/20">
+                      <img src={attachedImage} alt="Attached" className="h-10 w-10 rounded-md object-cover border border-white/10" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[9px] text-text-dim truncate">{attachedImage.startsWith('data:') ? 'Uploaded image' : attachedImage}</p>
+                        <p className="text-[8px] text-accent-blue">AI will use this in the UI</p>
+                      </div>
+                      <button onClick={() => setAttachedImage('')} className="text-text-dim hover:text-red-400 p-0.5"><X className="h-3 w-3" /></button>
                     </div>
                   )}
-                  <div className="flex items-end gap-1.5 bg-bg-elevated rounded-lg px-2.5 py-1.5 border border-border-primary focus-within:border-accent-purple/50 transition-colors">
-                    <button onClick={() => { const url = prompt('Paste image URL:'); if (url) setAttachedImage(url.trim()) }}
-                      className="h-6 w-6 rounded-md flex-shrink-0 flex items-center justify-center bg-bg-tertiary text-text-dim hover:text-accent-blue hover:bg-accent-blue/10 transition-all"
-                      title="Attach image URL">
-                      <ImageIcon className="h-3 w-3" />
-                    </button>
+                  <div className="flex items-end gap-1.5 bg-bg-elevated rounded-xl px-3 py-2 border border-border-primary/50 focus-within:border-accent-purple/40 transition-all shadow-sm">
+                    <input type="file" accept="image/*" className="hidden" id="ui-image-upload"
+                      onChange={e => { const f = e.target.files?.[0]; if (!f) return; const reader = new FileReader(); reader.onload = () => setAttachedImage(reader.result as string); reader.readAsDataURL(f); e.target.value = '' }} />
+                    <div className="flex gap-1">
+                      <button onClick={() => document.getElementById('ui-image-upload')?.click()}
+                        className="h-7 w-7 rounded-lg flex items-center justify-center bg-bg-tertiary/50 text-text-dim hover:text-accent-blue hover:bg-accent-blue/10 transition-all"
+                        title="Upload image file">
+                        <ImageIcon className="h-3.5 w-3.5" />
+                      </button>
+                      <button onClick={() => { const url = prompt('Paste image URL:'); if (url) setAttachedImage(url.trim()) }}
+                        className="h-7 w-7 rounded-lg flex items-center justify-center bg-bg-tertiary/50 text-text-dim hover:text-accent-green hover:bg-accent-green/10 transition-all"
+                        title="Paste image URL">
+                        <Upload className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                     <textarea value={input} onChange={e => setInput(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg() } }}
-                      placeholder={elements.length > 0 ? "Edit existing elements or add new ones..." : "Describe your UI and AI builds it..."} rows={1}
-                      className="flex-1 bg-transparent text-text-primary text-[10px] resize-none focus:outline-none placeholder:text-text-dim max-h-16" />
+                      placeholder={elements.length > 0 ? "Edit elements or describe new ones..." : "Describe your UI — AI builds it..."} rows={1}
+                      className="flex-1 bg-transparent text-text-primary text-[11px] resize-none focus:outline-none placeholder:text-text-dim/50 max-h-16 leading-relaxed" />
                     <button onClick={() => sendMsg()} disabled={!input.trim() || isLoading || building}
-                      className={cn('h-6 w-6 rounded-md flex-shrink-0 flex items-center justify-center transition-all', input.trim() && !isLoading && !building ? 'bg-accent-purple text-white' : 'bg-bg-tertiary text-text-dim')}>
-                      {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+                      className={cn('h-7 w-7 rounded-lg flex-shrink-0 flex items-center justify-center transition-all', input.trim() && !isLoading && !building ? 'bg-accent-purple text-white shadow-lg shadow-accent-purple/20' : 'bg-bg-tertiary text-text-dim')}>
+                      {isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
                     </button>
                   </div>
                 </div>

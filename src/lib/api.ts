@@ -1035,35 +1035,41 @@ export async function submitReview(experienceId: string, rating: number, comment
 }
 
 export async function getReviews(experienceId: string) {
-  const { data, error } = await supabase
-    .from('reviews')
-    .select('*, profiles:user_id(username, avatar_url, roblox_id)')
-    .eq('experience_id', experienceId)
-    .order('created_at', { ascending: false })
-  if (error) return []
-  return data || []
+  try {
+    const { data, error } = await supabase
+      .from('reviews')
+      .select('*, profiles:user_id(username, avatar_url, roblox_id)')
+      .eq('experience_id', experienceId)
+      .order('created_at', { ascending: false })
+    if (error) return []
+    return data || []
+  } catch { return [] }
 }
 
 export async function getUserReview(experienceId: string) {
   const user = await getCurrentUser()
   if (!user) return null
-  const { data } = await supabase
-    .from('reviews')
-    .select('rating, comment')
-    .eq('experience_id', experienceId)
-    .eq('user_id', user.id)
-    .single()
-  return data
+  try {
+    const { data } = await supabase
+      .from('reviews')
+      .select('rating, comment')
+      .eq('experience_id', experienceId)
+      .eq('user_id', user.id)
+      .maybeSingle()
+    return data
+  } catch { return null }
 }
 
 export async function getReviewsStats(experienceId: string) {
-  const { data } = await supabase
-    .from('reviews')
-    .select('rating')
-    .eq('experience_id', experienceId)
-  if (!data || data.length === 0) return { avg: 0, count: 0 }
-  const avg = data.reduce((sum, r) => sum + r.rating, 0) / data.length
-  return { avg: Math.round(avg * 10) / 10, count: data.length }
+  try {
+    const { data, error } = await supabase
+      .from('reviews')
+      .select('rating')
+      .eq('experience_id', experienceId)
+    if (error || !data || data.length === 0) return { avg: 0, count: 0 }
+    const avg = data.reduce((sum, r) => sum + r.rating, 0) / data.length
+    return { avg: Math.round(avg * 10) / 10, count: data.length }
+  } catch { return { avg: 0, count: 0 } }
 }
 
 export async function submitAssetReview(assetId: string, rating: number, comment: string = '') {
@@ -1079,23 +1085,27 @@ export async function submitAssetReview(assetId: string, rating: number, comment
 export async function getUserAssetReview(assetId: string) {
   const user = await getCurrentUser()
   if (!user) return null
-  const { data } = await supabase
-    .from('asset_reviews')
-    .select('rating, comment')
-    .eq('asset_id', assetId)
-    .eq('user_id', user.id)
-    .single()
-  return data
+  try {
+    const { data } = await supabase
+      .from('asset_reviews')
+      .select('rating, comment')
+      .eq('asset_id', assetId)
+      .eq('user_id', user.id)
+      .maybeSingle()
+    return data
+  } catch { return null }
 }
 
 export async function getAssetReviewsStats(assetId: string) {
-  const { data } = await supabase
-    .from('asset_reviews')
-    .select('rating')
-    .eq('asset_id', assetId)
-  if (!data || data.length === 0) return { avg: 0, count: 0 }
-  const avg = data.reduce((sum, r) => sum + r.rating, 0) / data.length
-  return { avg: Math.round(avg * 10) / 10, count: data.length }
+  try {
+    const { data, error } = await supabase
+      .from('asset_reviews')
+      .select('rating')
+      .eq('asset_id', assetId)
+    if (error || !data || data.length === 0) return { avg: 0, count: 0 }
+    const avg = data.reduce((sum, r) => sum + r.rating, 0) / data.length
+    return { avg: Math.round(avg * 10) / 10, count: data.length }
+  } catch { return { avg: 0, count: 0 } }
 }
 
 // ── Releases ──

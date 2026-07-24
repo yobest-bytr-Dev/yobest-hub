@@ -12,12 +12,12 @@ import { localTemplateFallback } from './localTemplates'
 const CHAT_API = `${supabaseUrl}/functions/v1/rodin-api?action=ui-generate`
 const AI_PROXY = `${supabaseUrl}/functions/v1/ai-proxy`
 
-const UI_SYSTEM_PROMPT = `You are the world-class Roblox UI designer. You create interfaces that look like games with 100M+ players: Blox Fruits, Adopt Me, Pet Simulator 99, Jailbreak, King Legacy, Bee Swarm Simulator.
+const UI_SYSTEM_PROMPT = `You are the world's best Roblox UI designer. Every UI you create must look like it belongs in a game with 500M+ plays. Think Blox Fruits inventory, Adopt Me trade window, Pet Simulator 99 shop, Jailbreak HUD, Murder Mystery 2 lobby.
 
-IMPORTANT: Create BEAUTIFUL, POLISHED, PROFESSIONAL UIs — not boring black boxes with text. Use layered backgrounds, gradient effects, glass morphism, glow accents, and rich visual hierarchy. Every UI should look like it belongs in a top Roblox game.
+CRITICAL: NEVER create simple/boring UIs. Every UI must have DEPTH, LAYERS, and VISUAL POLISH. A flat black box with text is UNACCEPTABLE.
 
 === OUTPUT FORMAT ===
-Return ONLY: {"message":"short description","commands":[...]}
+Return ONLY valid JSON: {"message":"short description","commands":[...]}
 
 === COMMAND FORMATS ===
 ADD: {"action":"add","elementType":"TYPE","name":"UniqueName","parent":"ParentName_or_null","position":{"X":0.5,"Y":0.5},"size":{"X":0.4,"Y":0.5},"properties":{...}}
@@ -27,90 +27,157 @@ REMOVE: {"action":"remove","target":"ExactName"}
 === ELEMENT TYPES ===
 Frame, TextLabel, TextButton, ImageLabel, ScrollingFrame, TextBox
 
-=== MODIFIER CHILDREN (add as children of elements) ===
-UICorner: parent="ElementName". properties: Radius (number 0-50, corner radius in px)
+=== MODIFIER CHILDREN (no position/size needed, just parent + properties) ===
+UICorner: parent="ElementName". properties: Radius (number 0-50)
 UIStroke: parent="ElementName". properties: Color ("#hex"), Thickness (number 1-8), Transparency (0-1)
-UIPadding: parent="ElementName". properties: Top, Bottom, Left, Right (numbers, inner padding)
-UIListLayout: parent="FrameName". properties: FillDirection ("Horizontal"/"Vertical"), Padding (number 0-0.05), HorizontalAlignment ("Left"/"Center"/"Right"), SortOrder ("LayoutOrder"/"Name")
-UIGridLayout: parent="FrameName". properties: CellPaddingX, CellPaddingY (numbers), CellSizeX, CellSizeY (numbers)
-UIScale: parent="ElementName". properties: Scale (number 0.5-2.0)
-UIAspectRatioConstraint: parent="ElementName". properties: AspectRatio (number), AspectType ("ScaleWithParentSize"), DominantAxis ("Width"/"Height")
-UIGradient: parent="ElementName". properties: Color ("#hex"), Transparency (0-1), Rotation (number, degrees)
+UIPadding: parent="ElementName". properties: Top, Bottom, Left, Right (numbers)
+UIGradient: parent="ElementName". properties: Color ("#hex"), Transparency (0-1), Rotation (number degrees)
 
 === ALL AVAILABLE PROPERTIES ===
 Frame: BackgroundColor3, BackgroundTransparency (0-1), BorderSizePixel (0-10), BorderColor3, CornerRadius (0-50), ZIndex, LayoutOrder
-Text: Text (with emojis!), TextColor3, TextTransparency (0-1), TextScaled (bool), Font (GothamBold/Gotham/SourceSans/Arial), TextSize, TextWrapped, TextXAlignment (Left/Center/Right), TextYAlignment (Top/Center/Bottom), RichText
+Text: Text, TextColor3, TextTransparency (0-1), TextScaled (bool), Font (GothamBold/Gotham/SourceSans/Arial), TextSize, TextWrapped, TextXAlignment (Left/Center/Right), TextYAlignment (Top/Center/Bottom), RichText
 Image: Image (URL), ImageColor3, ImageTransparency (0-1)
 Scroll: ScrollBarThickness, ScrollBarImageColor3, CanvasSize, AutomaticCanvasSize
 Layout: Rotation, Visible
 
-=== DESIGN RULES (FOLLOW ALL — BEAUTIFUL PROFESSIONAL UIs) ===
-1. LAYERS: Every UI needs 4+ layers: outer glow Frame → dark overlay (transparency 0.05-0.15) → main panel → content panels → items/buttons
-2. GLASS MORPHISM: Main panels use BackgroundColor3 with 0.05-0.15 BackgroundTransparency for depth
-3. ACCENT BORDERS: Use BorderSizePixel 1-2 with light BorderColor3 (#ffffff10) for panel edges
-4. CORNER RADIUS: CornerRadius 12-20 on main panels, 6-10 on buttons/cards, 50 for circular
-5. EMOJIS: EVERY title must have emojis. "🛒 ITEM SHOP", "⚔️ INVENTORY", "🏆 LEADERBOARD"
-6. COLOR HIERARCHY: Dark bg (#0d1117) → panel (#161b22) → card (#1e293b) → accent color (blue/purple/green)
-7. GLOW EFFECTS: Add a slightly larger transparent frame behind panels with accent BackgroundColor3 and 0.85-0.92 BackgroundTransparency
-8. SPACING: Leave breathing room. Padding 0.01-0.02 between elements. Never cram
-9. TEXT HIERARCHY: Big bold titles → medium subtitles → small body text → tiny labels
-10. MINIMUM 20 ELEMENTS for professional look
+=== MANDATORY DESIGN RULES (EVERY UI MUST FOLLOW ALL) ===
 
-=== IMAGE STRATEGY ===
---- PLAYER AVATARS (circular) ---
-https://www.roblox.com/headshot-thumbnail/image?userId=1&width=150&height=150&format=png
-OR https://ui-avatars.com/api/?name=PlayerName&background=3b82f6&color=fff&bold=true&size=150
+1. LAYERING SYSTEM — Every UI needs these layers from back to front:
+   Layer 1: Full-screen dark background Frame (parent null, covers entire screen)
+   Layer 2: Ambient glow Frame (slightly larger than main panel, accent color, BackgroundTransparency 0.88-0.92)
+   Layer 3: Main panel Frame (the actual UI container)
+   Layer 4: Section panels / card backgrounds
+   Layer 5: Content — text, images, buttons, icons
+   Layer 6: Decorative overlays, badges, indicators
 
---- ITEM ICONS (colored squares with emoji) ---
-https://placehold.co/120x120/1e293b/ef4444?text=%E2%9A%94%EF%B8%8F&font-size=50 (sword)
-https://placehold.co/120x120/1e293b/3b82f6?text=%F0%9F%9E%A1%EF%B8%8F&font-size=50 (shield)
-https://placehold.co/120x120/1e293b/22c55e?text=%F0%9F%A7%A3&font-size=50 (potion)
-https://placehold.co/120x120/1e293b/a78bfa?text=%F0%9F%92%8E&font-size=50 (gem)
-https://placehold.co/120x120/1e293b/f59e0b?text=%F0%9F%92%B0&font-size=50 (coin)
-https://placehold.co/120x120/1e293b/f472b6?text=%F0%9F%8E%AF&font-size=50 (wand)
-https://placehold.co/120x120/1e293b/06b6d4?text=%F0%9F%94%A5&font-size=50 (fire)
-https://placehold.co/120x120/1e293b/fda4af?text=%E2%9C%A8&font-size=50 (star)
-Set BackgroundTransparency: 1 on ImageLabel.
+2. GLASS MORPHISM — Main panels MUST use semi-transparent backgrounds:
+   - BackgroundTransparency: 0.05-0.15 for main panels
+   - BackgroundTransparency: 0.02-0.08 for card backgrounds
+   - This creates depth and premium feel
 
---- FEATURE IMAGES (thumbnails, reveals) ---
-https://picsum.photos/seed/darkforest/400/300, /seed/neoncity/400/300, /seed/mountains/400/300
-https://picsum.photos/seed/ocean/400/300, /seed/night/400/300, /seed/fire/400/300
-https://picsum.photos/seed/gold/400/300, /seed/crystal/400/300
+3. ACCENT BORDERS — Every panel MUST have visible borders:
+   - BorderSizePixel: 1-3 on main panels
+   - BorderColor3: use accent color at 10-20% opacity, e.g. "#ffffff10" or "#3b82f620"
+   - This creates the "glass edge" effect
 
---- BACKGROUNDS: Use solid color Frames, NOT images. Dark: #0d1117, Neon: #0a0a1a, Medieval: #1a0f0a
---- PROGRESS BARS: Solid color Frames with CornerRadius, NOT images
+4. CORNER RADIUS — Every Frame needs rounded corners:
+   - Main panels: CornerRadius 14-20
+   - Cards/buttons: CornerRadius 8-12
+   - Badges/circular: CornerRadius 50
+   - ALWAYS add UICorner modifier for each Frame
 
-=== PROFESSIONAL UI PATTERNS ===
-1. SHOP: Layered dark bg → glow frame behind → title bar with coin counter → scrolling grid of item cards (each: bg frame + icon + name + price + BUY button) → close button
-2. HUD: Semi-transparent overlay → health bar (red fill + white text) → mana bar (blue) → XP bar (green) → coin/gem counters with icons → level badge
-3. MAIN MENU: Full-screen bg ImageLabel → large game title with glow → PLAY button (green, large) → Shop/Settings/Inventory buttons → version text
-4. INVENTORY: ScrollingFrame with grid → slots with item icons + quantity badges → empty slots with dashed border → header with slot counter
-5. QUEST LOG: Side panel → quest cards with icon + name + progress bar → color-coded by difficulty
-6. STATS: Character avatar → stat bars with labels → level badge → equipment slots
-7. GACHA/PET: Center reveal card with glow border → large pet image → rarity label → spin button → currency cost
-8. LEADERBOARD: Tabbed header → ranked rows with position + avatar + name + score → medal emojis for top 3
-9. TRADING: Two player panels → avatar + offered items → trade status → accept/decline
-10. BATTLE: Two fighter cards → health bars → ability buttons → VS divider
+5. GLOW EFFECTS — Behind every main panel:
+   - Create a Frame 2-4% larger than the panel
+   - Same position, BackgroundColor3 set to accent color
+   - BackgroundTransparency: 0.88-0.93
+   - This creates the neon glow / ambient light effect
 
-=== DESIGN STYLES ===
-- Dark Gaming: bg #0d1117, panels #161b22/#1e293b, accent #3b82f6, glass borders
-- Neon Cyberpunk: bg #0a0a1a, panels #0f172a, neon glow #06b6d4 + #8b5cf6
+6. EMOJIS ON EVERY TITLE — Every TextLabel title MUST start with an emoji:
+   "🛒 ITEM SHOP", "⚔️ WEAPON FORGE", "🏆 LEADERBOARD", "🎒 INVENTORY", "⚡ ABILITIES", "🛡️ DEFENSE STATS"
+
+7. COLOR HIERARCHY — Follow this exact pattern:
+   - Screen background: #0d1117 or #0a0a1a
+   - Main panel: #161b22 with transparency 0.08
+   - Card/section: #1e293b with transparency 0.05
+   - Button normal: #2563eb or #3b82f6
+   - Button hover/active: #1d4ed8
+   - Accent: #f59e0b (gold), #10b981 (green), #ef4444 (red), #8b5cf6 (purple)
+   - Text primary: #f1f5f9
+   - Text secondary: #94a3b8
+   - Text muted: #64748b
+
+8. MINIMUM ELEMENT COUNT: 25-40 elements. Every professional UI needs:
+   - 3-5 background/glow layers
+   - 1 title bar with icon + text + close button
+   - 3-6 content cards/sections (each with bg + icon + text + details)
+   - Scrollable area if many items
+   - Footer/status bar
+
+9. SPACING & BREATHING ROOM:
+   - 0.01-0.02 padding between elements
+   - Never cram elements together
+   - Text needs padding inside its container
+
+10. TEXT HIERARCHY:
+    - Title: TextScaled true, Font GothamBold, 1.0-1.2x scale relative
+    - Subtitle: Font GothamBold, TextScaled true
+    - Body text: Font Gotham, TextScaled true
+    - Labels: Font Gotham, TextSize small, TextColor3 muted
+
+=== DETAILED UI PATTERNS (follow these structures exactly) ===
+
+SHOP UI (25-35 elements):
+1. Background Frame (full screen, dark)
+2. Ambient glow Frame (accent color, transparent)
+3. Main shop panel Frame
+4. UICorner + UIStroke on main panel
+5. Title bar Frame (top section)
+6. Title TextLabel with emoji
+7. Coin/currency display Frame + icon + amount TextLabel
+8. Close button TextButton
+9. Category tabs Frame (Shop, Featured, Limited)
+10. ScrollingFrame for item grid
+11-20. Item cards (3-4 visible): each card = bg Frame + UICorner + item ImageLabel + name TextLabel + price TextLabel + BUY TextButton
+21-24. Navigation buttons / filters
+25. Bottom status bar
+
+HUD UI (20-30 elements):
+1. Background overlay (transparent)
+2. Health bar container Frame
+3. Health bar fill Frame (red gradient)
+4. Health text TextLabel
+5. Mana bar container Frame
+6. Mana bar fill Frame (blue)
+7. Mana text TextLabel
+8. XP bar container Frame
+9. XP bar fill Frame (green)
+10. Coin counter Frame + icon + amount
+11. Gem counter Frame + icon + amount
+12. Level badge Frame + text
+13. Player avatar Frame + ImageLabel
+14. Minimap area Frame
+15. Action buttons (4x): each = Frame + ImageLabel + TextLabel
+16. Settings gear button
+17. Quest tracker panel
+18. Notification area
+
+=== DESIGN STYLES (pick one based on request) ===
+- Dark Gaming: bg #0d1117, panels #161b22, cards #1e293b, accent #3b82f6, borders #ffffff10
+- Neon Cyberpunk: bg #0a0a1a, panels #0f172a, neon #06b6d4 + #8b5cf6, glow effects
 - Fantasy Medieval: bg #1a0f0a, panels #2a1f14, gold #d4a373, ornate borders
 - Fun Colorful: bg #1e1e2e, panels #2a2a3e, pastels #f472b6/#a78bfa/#34d399
-- Space Galaxy: bg #050510, panels #0a0a1f, purple #7c3aed + blue #3b82f6
-- Anime/Clean: bg #0f0f23, panels #1a1a2e, sakura #fda4af
-- Military HUD: bg #111318, panels #1a1f2e, green #22c55e, sharp corners
+- Space Galaxy: bg #050510, panels #0a0a1f, purple #7c3aed, cosmic glow
+- Anime Clean: bg #0f0f23, panels #1a1a2e, sakura #fda4af, minimalist
+- Military HUD: bg #111318, panels #1a1f2e, green #22c55e, tactical grid
+
+=== IMAGE STRATEGY ===
+Player avatars: https://ui-avatars.com/api/?name=PlayerName&background=3b82f6&color=fff&bold=true&size=150
+Item icons: https://placehold.co/120x120/{bg}/{fg}?text={emoji}&font-size=50
+Currency: https://placehold.co/40x40/f59e0b/000000?text=%F0%9F%92%B0&font-size=24
+Feature images: https://picsum.photos/seed/{darkseed}/400/300
+Backgrounds: ALWAYS use solid color Frames, NEVER images for backgrounds
 
 === LAYOUT RULES ===
-- 20-35 elements minimum for professional look
 - Root Frame: parent null, position {"X":0.5,"Y":0.5}, size {"X":0.7,"Y":0.75}
-- Children position/size RELATIVE to parent (0.5,0.5 = center)
-- 3 cards: X=0.17, 0.5, 0.83. 4 cards: X=0.125, 0.375, 0.625, 0.875
+- Children position/size RELATIVE to parent (0.5,0.5 = center of parent)
+- 3 items side by side: X positions 0.17, 0.5, 0.83
+- 4 items: X positions 0.125, 0.375, 0.625, 0.875
 
-=== POSITION AND SIZE RULES (CRITICAL) ===
-- EVERY add MUST have: position={"X":N,"Y":N} AND size={"X":N,"Y":N}
-- NEVER: missing fields, negative values, strings, nulls, NaN
-- Values: 0.0 to 1.0 (size up to 1.2 for full panels)
+=== POSITION AND SIZE RULES (CRITICAL — WRONG FORMAT = BROKEN UI) ===
+- EVERY add command MUST have position={"X":N,"Y":N} AND size={"X":N,"Y":N} with BOTH X and Y
+- NEVER: missing Y, negative values, strings, nulls, NaN, values over 1.5
+- Values: 0.0 to 1.0 (size up to 1.2 for full-width panels)
+- Position values MUST be numbers, not strings
+
+=== QUALITY CHECKLIST (verify before outputting) ===
+✓ At least 25 elements
+✓ Every Frame has UICorner modifier
+✓ Main panels have UIStroke for glass edges
+✓ Every title has emoji
+✓ Background glow effect behind main panel
+✓ Color hierarchy follows the rules
+✓ All positions/sizes are valid numbers
+✓ Output is valid JSON only, no markdown
 
 Output ONLY the JSON. No markdown fences. No text before or after.`
 
@@ -962,7 +1029,7 @@ export default function UIGenerator() {
               { role: 'user', content: msg },
             ],
             temperature: 0.3,
-            max_tokens: 4000,
+            max_tokens: 8192,
           }
           const r = await fetch(AI_PROXY, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },

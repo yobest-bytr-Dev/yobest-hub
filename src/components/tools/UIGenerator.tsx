@@ -28,10 +28,17 @@ REMOVE: {"action":"remove","target":"ExactName"}
 Frame, TextLabel, TextButton, ImageLabel, ScrollingFrame, TextBox
 
 === MODIFIER CHILDREN (no position/size, parent = the element it modifies) ===
-UICorner: properties: Radius (number 0-50)
-UIStroke: properties: Color ("#hex"), Thickness (number 1-8), Transparency (0-1)
-UIPadding: properties: Top, Bottom, Left, Right (numbers)
-UIGradient: properties: Color ("#hex"), Transparency (0-1), Rotation (number degrees)
+UICorner: properties: Radius (number 0-50) — rounds corners on any Frame/Button
+UIStroke: properties: Color ("#hex"), Thickness (number 1-8), Transparency (0-1) — adds visible border stroke
+UIPadding: properties: Top, Bottom, Left, Right (numbers in pixels) — inner spacing inside a Frame
+UIGradient: properties: Color ("#hex"), Transparency (0-1), Rotation (number degrees) — color gradient overlay
+UIListLayout: properties: FillDirection (Horizontal/Vertical), Padding (number), HorizontalAlignment (Left/Center/Right), VerticalAlignment (Top/Center/Bottom), SortOrder (LayoutOrder/Name) — auto-arranges children in a row/column
+UIGridLayout: properties: CellPadding_X, CellPadding_Y (numbers), CellSize_X, CellSize_Y (numbers 0-1) — arranges children in a grid
+UIScale: properties: Scale (number 0.1-3.0) — scales an element and all its children
+UIAspectRatioConstraint: properties: AspectRatio (number, e.g. 1.0 for square, 16/9 for widescreen), AspectType (ScaleWithParentSize/ScaleWithChildSize), DominantAxis (Width/Height) — forces aspect ratio
+UIFlexItem: properties: FlexMode (Fill/Grow/Shrink/None), Style (Stretch/Center/Automatic) — for UIListLayout flex children
+UIPositionConstraint: properties: MinPosition_X/Y, MaxPosition_X/Y (numbers 0-1) — constrains element position
+UISizeConstraint: properties: MinSize_X/Y, MaxSize_X/Y (numbers 0-1) — constrains element size
 
 === ALL PROPERTIES ===
 Frame: BackgroundColor3, BackgroundTransparency (0-1), BorderSizePixel (0-10), BorderColor3, CornerRadius (0-50), ZIndex, LayoutOrder
@@ -157,6 +164,39 @@ Player avatars: https://ui-avatars.com/api/?name=PlayerName&background=3b82f6&co
 Item placeholders: https://placehold.co/120x120/{bg}/{fg}?text={emoji}&font-size=50
 Feature images: https://picsum.photos/seed/{seed}/400/300
 
+=== ROBLOX GAMEPASSES (use for premium/VIP/shop cards) ===
+Gamepass shield icons: /ui-icons/gamepass/1-Blue.png through /ui-icons/gamepass/10-Blue.png
+Gamepass with stars: /ui-icons/gamepass/With Stars-Blue.png, /ui-icons/gamepass/With Stars-Blue-1.png
+These look like official Roblox gamepass badges — use them on premium item cards and VIP sections.
+
+=== WEB ICON COLLECTIONS (always use these for rich UIs) ===
+Coins/Currency: https://placehold.co/64x64/f59e0b/000000?text=%F0%9F%92%B0&font-size=36
+Gems/Premium: https://placehold.co/64x64/8b5cf6/000000?text=%F0%9F%92%8E&font-size=36
+Swords/Combat: https://placehold.co/64x64/ef4444/000000?text=%E2%9A%94%EF%B8%8F&font-size=36
+Shields/Defense: https://placehold.co/64x64/3b82f6/000000?text=%F0%9F%9F%A1&font-size=36
+Stars/Rating: https://placehold.co/64x64/f59e0b/000000?text=%E2%AD%90&font-size=36
+Potion/Health: https://placehold.co/64x64/10b981/000000?text=%E2%9A%97%EF%B8%8F&font-size=36
+Chest/Loot: https://placehold.co/64x64/d97706/000000?text=%F0%9F%8E%AF&font-size=36
+Crown/Royal: https://placehold.co/64x64/f59e0b/000000?text=%F0%9F%91%91&font-size=36
+Fire/Power: https://placehold.co/64x64/ef4444/000000?text=%F0%9F%94%A5&font-size=36
+Lightning/Speed: https://placehold.co/64x64/fbbf24/000000?text=%E2%9A%A1&font-size=36
+Music: https://placehold.co/64x64/ec4899/000000?text=%F0%9F%8E%B5&font-size=36
+Settings/Gear: https://placehold.co/64x64/64748b/ffffff?text=%E2%9A%99&font-size=36
+Lock: https://placehold.co/64x64/94a3b8/000000?text=%F0%9F%94%92&font-size=36
+Timer/Clock: https://placehold.co/64x64/06b6d4/000000?text=%E2%8F%B1&font-size=36
+Trophy/Achievement: https://placehold.co/64x64/f59e0b/000000?text=%F0%9F%8F%86&font-size=36
+Skull/Death: https://placehold.co/64x64/64748b/000000?text=%F0%9F%92%80&font-size=36
+Heart/Life: https://placehold.co/64x64/ef4444/000000?text=%E2%9D%A4&font-size=36
+Gift/Reward: https://placehold.co/64x64/ec4899/000000?text=%F0%9F%8E%81&font-size=36
+Map/Location: https://placehold.co/64x64/10b981/000000?text=%F0%9F%97%BA&font-size=36
+Target/Quest: https://placehold.co/64x64/3b82f6/000000?text=%F0%9F%8E%AF&font-size=36
+
+=== PLAYER AVATAR STYLES ===
+Round: https://ui-avatars.com/api/?name=Name&background=3b82f6&color=fff&bold=true&size=150&rounded=true
+Gradient: https://ui-avatars.com/api/?name=Name&background=linear-gradient(135deg,3b82f6,8b5cf6)&color=fff&bold=true&size=150
+Dark: https://ui-avatars.com/api/?name=Name&background=1e293b&color=f1f5f9&bold=true&size=150
+Gold: https://ui-avatars.com/api/?name=Name&background=f59e0b&color=000000&bold=true&size=150
+
 === ICON USAGE RULES ===
 - Shops: Use gamepass icons (Blue/Gold variants) for premium items, Green for available, Red for locked
 - HUD: Use vector icons (White variants) for health/mana/stamina bars, Coin for currency, Gem for premium
@@ -250,11 +290,18 @@ Royal Luxury: bg #0f0a14, panels #1a1428, gold #d4a373, pearl white accents
 
 === QUALITY CHECKLIST (verify before output) ===
 ✓ 30+ elements minimum
-✓ Every Frame has UICorner modifier
-✓ Main panels have UIStroke
+✓ Every Frame has UICorner modifier (Radius 10-20)
+✓ Main panels have UIStroke (Thickness 1-2, Transparency 0.85-0.92)
+✓ At least 1 UIPadding modifier on content panels (Top/Bottom/Left/Right 8-12)
+✓ At least 1 UIGradient modifier on main panel (subtle directional light)
+✓ Title bars use UIListLayout for horizontal alignment
+✓ Item grids use UIGridLayout for structured layout
+✓ ScrollingFrame items use UIAspectRatioConstraint for consistent sizing
 ✓ Glow Frame behind main panel
 ✓ Every title has emoji prefix
-✓ At least 3 ImageLabel elements using /ui-icons/ paths
+✓ At least 5 ImageLabel elements using /ui-icons/ or web icon URLs
+✓ At least 3 placehold.co emoji icons for items/buttons
+✓ At least 2 ui-avatars.com player avatars if showing players
 ✓ Color hierarchy correct (dark bg → glass panel → accent highlights)
 ✓ All positions/sizes are valid numbers
 ✓ Valid JSON only, no markdown fences, no explanation
@@ -496,6 +543,15 @@ function genLua(elements: UIEl[]): string {
         lines.push(`${indent}${v}.Color = ColorSequence.new(${colorToRoblox(gColor)})`)
         lines.push(`${indent}${v}.Transparency = NumberSequence.new(${el.props.UIGradient_Transparency ?? 0})`)
         lines.push(`${indent}${v}.Rotation = ${el.props.UIGradient_Rotation ?? 45}`)
+      } else if (el.type === 'UIFlexItem') {
+        lines.push(`${indent}${v}.FlexMode = Enum.UIFlexMode.${el.props.UIFlexItem_FlexMode ?? 'Fill'}`)
+        lines.push(`${indent}${v}.Style = Enum.UIFlexItemStyle.${el.props.UIFlexItem_Style ?? 'Stretch'}`)
+      } else if (el.type === 'UIPositionConstraint') {
+        lines.push(`${indent}${v}.MinPosition = UDim2.new(${el.props.UIPositionConstraint_MinPosition_X ?? 0}, 0, ${el.props.UIPositionConstraint_MinPosition_Y ?? 0}, 0)`)
+        lines.push(`${indent}${v}.MaxPosition = UDim2.new(${el.props.UIPositionConstraint_MaxPosition_X ?? 1}, 0, ${el.props.UIPositionConstraint_MaxPosition_Y ?? 1}, 0)`)
+      } else if (el.type === 'UISizeConstraint') {
+        lines.push(`${indent}${v}.MinSize = UDim2.new(${el.props.UISizeConstraint_MinSize_X ?? 0}, 0, ${el.props.UISizeConstraint_MinSize_Y ?? 0}, 0)`)
+        lines.push(`${indent}${v}.MaxSize = UDim2.new(${el.props.UISizeConstraint_MaxSize_X ?? 1}, 0, ${el.props.UISizeConstraint_MaxSize_Y ?? 1}, 0)`)
       }
       lines.push(`${indent}${v}.Parent = ${parentVar}`)
       lines.push('')
@@ -510,7 +566,7 @@ function genLua(elements: UIEl[]): string {
 
     for (const [k, val] of Object.entries(el.props)) {
       if (k === 'Position' || k === 'Size') continue
-      if (k.startsWith('UI') && (k.startsWith('UICorner') || k.startsWith('UIStroke') || k.startsWith('UIPadding') || k.startsWith('UIList') || k.startsWith('UIGrid') || k.startsWith('UIScale') || k.startsWith('UIAspect') || k.startsWith('UIGradient'))) continue
+      if (k.startsWith('UI') && (k.startsWith('UICorner') || k.startsWith('UIStroke') || k.startsWith('UIPadding') || k.startsWith('UIList') || k.startsWith('UIGrid') || k.startsWith('UIScale') || k.startsWith('UIAspect') || k.startsWith('UIGradient') || k.startsWith('UIFlex') || k.startsWith('UIPosition') || k.startsWith('UISize') || k.startsWith('UINext'))) continue
       if (!differsFromDefault(k, val)) continue
       if (val === undefined || val === null) continue
 
@@ -1059,7 +1115,7 @@ export default function UIGenerator() {
   const normalizeCommands = useCallback((parsed: any): any => {
     if (!parsed || !Array.isArray(parsed.commands)) return parsed
     const skipTypes = new Set(['ScreenGui', 'LocalScript', 'Script'])
-    const modifierTypes = new Set(['UICorner', 'UIStroke', 'UIPadding', 'UIListLayout', 'UIGridLayout', 'UIScale', 'UIAspectRatioConstraint', 'UIGradient'])
+    const modifierTypes = new Set(['UICorner', 'UIStroke', 'UIPadding', 'UIListLayout', 'UIGridLayout', 'UIScale', 'UIAspectRatioConstraint', 'UIGradient', 'UIFlexItem', 'UIPositionConstraint', 'UISizeConstraint', 'UINextLayoutOrder'])
     const nameMap = new Map<string, string>()
 
     const cleaned = parsed.commands.filter((c: any) => {
@@ -1838,8 +1894,20 @@ export default function UIGenerator() {
                   // Gather modifier props from children
                   const uiCorner = childEls.find(c => c.type === 'UICorner')
                   const uiStroke = childEls.find(c => c.type === 'UIStroke')
+                  const uiPadding = childEls.find(c => c.type === 'UIPadding')
+                  const uiGradient = childEls.find(c => c.type === 'UIGradient')
+                  const uiScale = childEls.find(c => c.type === 'UIScale')
+                  const uiListLayout = childEls.find(c => c.type === 'UIListLayout')
+                  const uiGridLayout = childEls.find(c => c.type === 'UIGridLayout')
+                  const uiAspectRatio = childEls.find(c => c.type === 'UIAspectRatioConstraint')
 
                   const style = isChild ? childStyle(el) : elStyle(el)
+
+                  // Apply UICorner to style (border-radius from modifier overrides prop)
+                  if (uiCorner) {
+                    const radius = uiCorner.props.UICorner_Radius ?? uiCorner.props.Radius ?? 8
+                    style.borderRadius = radius
+                  }
 
                   // Apply UIStroke to style
                   if (uiStroke) {
@@ -1847,6 +1915,62 @@ export default function UIGenerator() {
                     const thickness = (uiStroke.props.UIStroke_Thickness ?? 2) * 1.5
                     const transparency = uiStroke.props.UIStroke_Transparency ?? 0.3
                     style.border = `${thickness}px solid ${strokeColor}${Math.round((1 - transparency) * 255).toString(16).padStart(2, '0')}`
+                  }
+
+                  // Apply UIPadding (inner padding)
+                  if (uiPadding) {
+                    const pt = uiPadding.props.UIPadding_Top ?? uiPadding.props.PaddingTop ?? 8
+                    const pb = uiPadding.props.UIPadding_Bottom ?? uiPadding.props.PaddingBottom ?? 8
+                    const pl = uiPadding.props.UIPadding_Left ?? uiPadding.props.PaddingLeft ?? 8
+                    const pr = uiPadding.props.UIPadding_Right ?? uiPadding.props.PaddingRight ?? 8
+                    style.padding = `${pt}px ${pr}px ${pb}px ${pl}px`
+                  }
+
+                  // Apply UIGradient (CSS linear-gradient)
+                  if (uiGradient) {
+                    const gColor = parseColor(uiGradient.props.UIGradient_Color || '#ffffff')
+                    const rotation = uiGradient.props.UIGradient_Rotation ?? uiGradient.props.Rotation ?? 45
+                    const transparency = uiGradient.props.UIGradient_Transparency ?? 0.3
+                    const gAlpha = Math.round((1 - transparency) * 255).toString(16).padStart(2, '0')
+                    style.background = `linear-gradient(${rotation}deg, ${gColor}${gAlpha}, transparent)`
+                  }
+
+                  // Apply UIScale (CSS transform scale)
+                  if (uiScale) {
+                    const scaleVal = uiScale.props.UIScale_Scale ?? uiScale.props.Scale ?? 1
+                    const existing = style.transform || ''
+                    style.transform = `${existing} scale(${scaleVal})`.trim()
+                  }
+
+                  // Apply UIAspectRatioConstraint (CSS aspect-ratio)
+                  if (uiAspectRatio) {
+                    const ratio = uiAspectRatio.props.UIAspectRatio_AspectRatio ?? uiAspectRatio.props.AspectRatio ?? 1
+                    style.aspectRatio = `${ratio} / 1`
+                  }
+
+                  // Apply UIListLayout (flexbox on container)
+                  if (uiListLayout && isContainer) {
+                    const dir = uiListLayout.props.UIListLayout_FillDirection ?? 'Vertical'
+                    const hAlign = uiListLayout.props.UIListLayout_HorizontalAlignment ?? 'Left'
+                    const vAlign = uiListLayout.props.UIListLayout_VerticalAlignment ?? 'Top'
+                    const padding = uiListLayout.props.UIListLayout_Padding ?? 4
+                    style.display = 'flex'
+                    style.flexDirection = dir === 'Horizontal' ? 'row' : 'column'
+                    style.alignItems = hAlign === 'Center' ? 'center' : hAlign === 'Right' ? 'flex-end' : 'flex-start'
+                    style.justifyContent = vAlign === 'Center' ? 'center' : vAlign === 'Bottom' ? 'flex-end' : 'flex-start'
+                    style.gap = `${padding}px`
+                    style.flexWrap = 'wrap'
+                  }
+
+                  // Apply UIGridLayout (CSS grid on container)
+                  if (uiGridLayout && isContainer) {
+                    const cellW = uiGridLayout.props.UIGridLayout_CellSize_X ?? 0.3
+                    const cellH = uiGridLayout.props.UIGridLayout_CellSize_Y ?? 0.25
+                    const padX = uiGridLayout.props.UIGridLayout_CellPadding_X ?? 0.02
+                    const padY = uiGridLayout.props.UIGridLayout_CellPadding_Y ?? 0.02
+                    style.display = 'grid'
+                    style.gridTemplateColumns = `repeat(auto-fill, minmax(${cellW * 100}%, 1fr))`
+                    style.gap = `${padY * 100}% ${padX * 100}%`
                   }
 
                   // Add dashed border on hover for containers

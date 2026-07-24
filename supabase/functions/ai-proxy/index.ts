@@ -117,7 +117,7 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     // ── Normal chat completion request ──────────────────────────────
-    const { messages, model: reqModel, temperature = 0.3, max_tokens = 4000, api_key: directKey } = body;
+    const { messages, model: reqModel, temperature = 0.3, max_tokens = 4000, api_key: directKey, imageParts } = body;
 
     // Load ALL keys from DB, split into healthy + broken
     let healthyKeys: string[] = [];
@@ -188,9 +188,17 @@ serve(async (req: Request): Promise<Response> => {
       if (msg.role === "system") {
         systemInstruction = msg.content;
       } else {
+        // If imageParts are provided, attach them to the last user message
+        const isLastUser = msg.role === "user" && imageParts?.length && contents.filter(c => c.role === "user").length === 0;
+        const parts: any[] = [{ text: msg.content }];
+        if (isLastUser) {
+          for (const ip of imageParts) {
+            if (ip.inlineData) parts.push({ inlineData: ip.inlineData });
+          }
+        }
         contents.push({
           role: msg.role === "assistant" ? "model" : "user",
-          parts: [{ text: msg.content }],
+          parts,
         });
       }
     }

@@ -311,7 +311,7 @@ export interface UIEl {
   layoutProps?: { cellSize?: { X: number; Y: number }; padding?: number; gap?: number; fillDirection?: 'Horizontal' | 'Vertical' }
 }
 
-interface ChatMsg { role: 'user' | 'assistant'; content: string; commands?: any[] }
+  interface ChatMsg { role: 'user' | 'assistant'; content: string; commands?: any[]; imageUrl?: string }
 
 // ─── Layout application ──────────────────────────────────────
 function applyLayout(el: UIEl, allElements: UIEl[]): UIEl[] {
@@ -1068,8 +1068,9 @@ export default function UIGenerator() {
 
   const sendMsg = async (text?: string) => {
     const msg = (text || input).trim(); if (!msg || isLoading || building) return
-    const userContent = attachedImage ? `${msg}\n\n[USER PROVIDED IMAGE: ${attachedImage} — Use this image URL for any ImageLabel elements in the UI]` : msg
-    const um: ChatMsg = { role: 'user', content: userContent }
+    const imageForAI = attachedImage
+    const userContent = imageForAI ? `${msg}\n\n[USER HAS ATTACHED AN IMAGE — describe its visual style, colors, layout, and elements to recreate a similar UI. If it contains a Roblox UI screenshot, replicate the exact layout and style.]` : msg
+    const um: ChatMsg = { role: 'user', content: imageForAI ? msg : userContent, imageUrl: imageForAI || undefined }
     setMessages(p => [...p, um]); setInput(''); setAttachedImage(''); setIsLoading(true)
 
     const editKeywords = ['change', 'make', 'edit', 'update', 'modify', 'alter', 'adjust', 'tweak', 'better', 'improve', 'fix', 'remove', 'delete', 'add', 'move', 'resize', 'recolor', 'replace', 'swap']
@@ -1101,11 +1102,19 @@ export default function UIGenerator() {
           const controller = new AbortController()
           const timeout = setTimeout(() => controller.abort(), 120000)
           setAiStatus(attempt === 1 ? 'Generating with AI...' : attempt === 2 ? 'Retrying AI (attempt 2)...' : 'Retrying AI (attempt 3)...')
+          const userParts: any[] = [{ text: userContent }]
+          if (imageForAI && imageForAI.startsWith('data:')) {
+            const match = imageForAI.match(/^data:([^;]+);base64,(.+)$/)
+            if (match) userParts.push({ inlineData: { mimeType: match[1], data: match[2] } })
+          } else if (imageForAI) {
+            userParts[0] = { text: `${userContent}\n\nReference image URL: ${imageForAI}` }
+          }
           const payload = {
             messages: [
               { role: 'system', content: systemMsg },
               { role: 'user', content: userContent },
             ],
+            imageParts: imageForAI && imageForAI.startsWith('data:') ? userParts : undefined,
             temperature: 0.3,
             max_tokens: 8192,
           }
@@ -2077,6 +2086,9 @@ export default function UIGenerator() {
                       <div className={cn('max-w-[90%] px-2.5 py-1.5 rounded-lg text-[10px] leading-relaxed',
                         msg.role === 'user' ? 'bg-accent-blue text-white rounded-br-sm' : 'bg-bg-elevated text-text-primary rounded-bl-sm border border-border-primary')}>
                         <p className="whitespace-pre-wrap break-words">{msg.content}</p>
+                        {msg.imageUrl && (
+                          <img src={msg.imageUrl} alt="Attached reference" className="mt-1 max-h-32 rounded-md border border-white/10 object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                        )}
                         {msg.commands?.length ? (
                           <div className="mt-1 flex flex-wrap gap-0.5">
                             {msg.commands.map((c: any, j: number) => (

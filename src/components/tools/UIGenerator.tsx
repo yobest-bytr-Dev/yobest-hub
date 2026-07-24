@@ -949,39 +949,29 @@ export default function UIGenerator() {
 
       // ── Step 1: Try AI — proxy through ai-proxy edge function (Gemini BYOK) ──
       let parsed: any = null
-      const models = [
-        'gemini-2.5-flash',
-        'gemini-2.5-flash-lite',
-        'gemini-2.0-flash',
-        'gemini-2.0-flash-lite',
-      ]
 
-      for (const model of models) {
-        if (parsed) break
-        setAiStatus(`Trying ${model}...`)
-        try {
-          const controller = new AbortController()
-          const timeout = setTimeout(() => controller.abort(), 60000)
-          const payload = {
-            messages: [
-              { role: 'system', content: systemMsg },
-              { role: 'user', content: msg },
-            ],
-            model,
-            temperature: 0.3,
-            max_tokens: 4000,
-          }
-          const r = await fetch(AI_PROXY, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-            signal: controller.signal,
-          })
-          clearTimeout(timeout)
-          const data = await r.json()
-          if (data.error) {
-            console.log(`AI proxy ${model} returned error:`, data.error)
-            continue
-          }
+      try {
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), 90000)
+        setAiStatus('Generating with AI...')
+        const payload = {
+          messages: [
+            { role: 'system', content: systemMsg },
+            { role: 'user', content: msg },
+          ],
+          temperature: 0.3,
+          max_tokens: 4000,
+        }
+        const r = await fetch(AI_PROXY, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        })
+        clearTimeout(timeout)
+        const data = await r.json()
+        if (data.error) {
+          console.log(`AI proxy error:`, data.error)
+        } else {
           const content = data.choices?.[0]?.message?.content || ''
           if (content) {
             try { parsed = JSON.parse(content) } catch {
@@ -991,11 +981,11 @@ export default function UIGenerator() {
           }
           if (parsed) {
             parsed = normalizeCommands(parsed)
-            console.log(`Gemini model ${model} succeeded`)
+            console.log(`Gemini model ${data.model || 'unknown'} succeeded`)
           }
-        } catch (e) {
-          console.log(`AI proxy model ${model} failed:`, e instanceof Error ? e.message : e)
         }
+      } catch (e) {
+        console.log(`AI proxy failed:`, e instanceof Error ? e.message : e)
       }
 
       // ── Step 2: If AI failed, try edge function template fallback ──
